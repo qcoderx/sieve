@@ -63,6 +63,10 @@ type candidate struct {
 // against the maximum opacity ever observed, never against one checkpoint.
 const minVisibleOpacity = capture.MinVisibleOpacity
 
+// dropNeverVisible is the reason recorded for a run that stayed below the
+// visible-opacity floor for the whole sweep.
+const dropNeverVisible = "never reached visible opacity"
+
 // edgeBand is how close to the top or bottom of the viewport a pinned run has
 // to sit before it can be read as furniture, as a fraction of viewport height.
 // A sticky bar is a strip; 18% of a 900px viewport is 162px, which comfortably
@@ -85,13 +89,24 @@ const (
 // give: where the run sits, whether it is pinned to the viewport, whether it
 // ever became visible, how it is set in type, and how it repeats.
 func classify(groups []*group, m *capture.Merged) []*candidate {
+	// Did this page reveal text by animation while we watched? If so, a run
+	// still sitting below the floor is one the sweep did not reach, not one the
+	// page is hiding.
+	animates := m.RevealsOnScroll()
+
 	cands := make([]*candidate, 0, len(groups))
 	for _, g := range groups {
 		for _, r := range g.Runs {
 			c := candidateFrom(r)
-			if c != nil {
-				cands = append(cands, c)
+			if c == nil {
+				continue
 			}
+			if !c.Keep && c.DropReason == dropNeverVisible && animates {
+				c.Keep = true
+				c.Declared = true
+				c.DropReason = ""
+			}
+			cands = append(cands, c)
 		}
 	}
 
@@ -174,7 +189,7 @@ func candidateFrom(r *run) *candidate {
 			c.Declared = true
 		} else {
 			c.Keep = false
-			c.DropReason = "never reached visible opacity"
+			c.DropReason = dropNeverVisible
 		}
 	}
 	// Text the same colour as its background renders at full opacity and is

@@ -181,6 +181,7 @@ func (a *Accumulator) addNode(n *Node, checkpoint int) bool {
 	cp := *n
 	cp.Checkpoint = checkpoint
 	cp.MaxOpacity = n.Opacity
+	cp.MinOpacity = n.Opacity
 	cp.EverVisible = n.Visible
 	cp.Seen = 1
 	a.countVisible(&cp)
@@ -210,6 +211,35 @@ func (a *Accumulator) countVisible(n *Node) bool {
 	n.CountedVisible = true
 	return true
 }
+
+// RevealsOnScroll reports whether this page was seen animating text into view.
+//
+// It counts runs that were observed below the visible-opacity floor at one
+// checkpoint and above it at another. Such a run was revealed while sieve was
+// watching, which makes it evidence about the page's mechanism rather than an
+// inference about its markup -- and it is the only evidence available on a site
+// that drives its reveals from JavaScript, where the computed style declares no
+// transition and no animation because there is none: a script is simply writing
+// a new opacity every frame.
+//
+// The threshold is small but not one. A single run crossing the floor could be
+// a cross-fade or a hover; several is how the page works.
+func (m *Merged) RevealsOnScroll() bool {
+	n := 0
+	for i := range m.Nodes {
+		x := &m.Nodes[i]
+		if x.MinOpacity <= MinVisibleOpacity && x.MaxOpacity > MinVisibleOpacity {
+			n++
+			if n >= minObservedReveals {
+				return true
+			}
+		}
+	}
+	return false
+}
+
+// minObservedReveals is how many runs must be caught in the act.
+const minObservedReveals = 3
 
 // MinVisibleOpacity is the opacity a run must reach at some point in the sweep
 // to count as content.
@@ -251,6 +281,9 @@ func (a *Accumulator) reinforce(dst *Node, n *Node) {
 	dst.Seen++
 	if n.Opacity > dst.MaxOpacity {
 		dst.MaxOpacity = n.Opacity
+	}
+	if n.Opacity < dst.MinOpacity {
+		dst.MinOpacity = n.Opacity
 	}
 	if n.Visible {
 		dst.EverVisible = true

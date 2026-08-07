@@ -113,8 +113,17 @@ type Node struct {
 
 	// Checkpoint records the first checkpoint at which this node was seen.
 	Checkpoint int `json:"cp,omitempty"`
-	// MaxOpacity and EverVisible accumulate across checkpoints during merge.
+	// MaxOpacity, MinOpacity and EverVisible accumulate across checkpoints
+	// during merge.
+	//
+	// MinOpacity exists to catch a reveal in the act. A run that was seen at
+	// zero and later at one was animated into view while sieve was watching,
+	// and that is direct evidence -- not a declaration, not a guess -- that this
+	// page brings its text in by animation. It is the only signal that works on
+	// a page whose reveals are driven from JavaScript, where nothing in the
+	// computed style says anything is going to happen.
 	MaxOpacity  float64 `json:"mo,omitempty"`
+	MinOpacity  float64 `json:"mio,omitempty"`
 	EverVisible bool    `json:"ev,omitempty"`
 	// Seen counts the checkpoints this node appeared in.
 	Seen int `json:"sn,omitempty"`

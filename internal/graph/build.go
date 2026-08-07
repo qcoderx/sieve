@@ -200,7 +200,7 @@ func Build(in Input) (*Graph, error) {
 	// site look different every time, defeating the point of a content-addressed
 	// cache; so would a rewritten asset URL or a whitespace change.
 	g.ContentHash = semanticHash(g)
-	g.Stats.ArtifactTokens = tokens.Estimate(PlainText(g))
+	g.Stats.ArtifactTokens = tokens.Estimate(payloadText(g))
 	return g, nil
 }
 
@@ -725,6 +725,61 @@ func PlainText(g *Graph) string {
 			continue
 		}
 		sb.WriteString(b.Text)
+		sb.WriteByte('\n')
+	}
+	return sb.String()
+}
+
+// payloadText is everything an artifact actually puts in front of a reader.
+//
+// The token figure in the stats used to be PlainText, which is the prose blocks
+// and nothing else. That is the right measure of the content and the wrong
+// measure of the cost: the emitted document also carries the description, the
+// links, the buttons, the media descriptions, the questions and answers and the
+// whitelisted facts, and a reader pays for all of it.
+//
+// On a page whose prose did not survive extraction the gap becomes absurd --
+// five hundred characters of block text reported against an eight-kilobyte file
+// -- and the artifact announced a ninety-nine per cent saving it had not made.
+// Counting what is emitted keeps the headline honest in both directions.
+func payloadText(g *Graph) string {
+	var sb strings.Builder
+	sb.WriteString(g.Title)
+	sb.WriteByte('\n')
+	sb.WriteString(g.Summary)
+	sb.WriteByte('\n')
+	for _, b := range g.Blocks {
+		sb.WriteString(b.Text)
+		sb.WriteByte('\n')
+	}
+	for _, a := range g.Actions {
+		sb.WriteString(a.Label)
+		sb.WriteByte(' ')
+		sb.WriteString(a.Href)
+		sb.WriteByte('\n')
+	}
+	for _, m := range g.MediaAll {
+		sb.WriteString(m.Alt)
+		sb.WriteByte(' ')
+		sb.WriteString(m.Caption)
+		sb.WriteByte('\n')
+	}
+	for _, qa := range g.FAQ {
+		sb.WriteString(qa.Question)
+		sb.WriteByte('\n')
+		sb.WriteString(qa.Answer)
+		sb.WriteByte('\n')
+	}
+	for _, f := range g.Structured {
+		sb.WriteString(f.Field)
+		sb.WriteByte(' ')
+		sb.WriteString(f.Value)
+		sb.WriteByte('\n')
+	}
+	for _, gap := range g.Gaps {
+		sb.WriteString(gap.Label)
+		sb.WriteByte(' ')
+		sb.WriteString(gap.Reason)
 		sb.WriteByte('\n')
 	}
 	return sb.String()
