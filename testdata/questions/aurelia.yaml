@@ -1,0 +1,184 @@
+# Example question set.
+#
+# Twenty questions per target, written against ground truth, in three bands:
+# factual retrieval, structural, and actionable. Each question carries the
+# atomic facts a correct answer must contain -- those are what accuracy and
+# coverage are measured against, and they are why those numbers mean something
+# rather than being a model's opinion of its own work.
+#
+#   sieve bench ./artifacts/localhost-8080 --questions testdata/questions/aurelia.yaml
+
+name: Aurelia Atelier (fixture)
+url: http://localhost:8080/immersive/
+
+questions:
+  # --- Factual retrieval --------------------------------------------------
+  - id: q01
+    band: factual
+    ask: In what year was the studio founded, and by whom?
+    expect: Founded in 1974 by Ines Aurelia.
+    facts:
+      - founded in 1974
+      - founded by Ines Aurelia
+
+  - id: q02
+    band: factual
+    ask: Where is the workshop, and what was the building before?
+    expect: A converted bakery in Alcantara, Lisbon.
+    facts:
+      - converted bakery
+      - in Alcantara
+
+  - id: q03
+    band: factual
+    ask: How many people work at the studio, and in what roles?
+    expect: Eleven people — six cabinetmakers, two finishers, and three others.
+    facts:
+      - eleven people work there
+      - six are cabinetmakers
+      - two are finishers
+
+  - id: q04
+    band: factual
+    ask: How long does a dining table take to make?
+    expect: Nine weeks.
+    facts:
+      - a dining table takes nine weeks
+
+  - id: q05
+    band: factual
+    ask: How long does a cabinet with hand-cut dovetails take?
+    expect: Fourteen weeks.
+    facts:
+      - a dovetailed cabinet takes fourteen weeks
+
+  - id: q06
+    band: factual
+    ask: What materials does the studio list?
+    expect: European oak, American black walnut, Portuguese cork, and a hard wax oil finish.
+    facts:
+      - European oak
+      - American black walnut
+      - Portuguese cork
+      - hard wax oil finish
+
+  - id: q07
+    band: factual
+    ask: How is the oak prepared before use?
+    expect: Quarter-sawn and air-dried for four years.
+    facts:
+      - quarter-sawn
+      - air-dried for four years
+
+  - id: q08
+    band: factual
+    ask: Where does the cork come from?
+    expect: Alentejo, Portugal.
+    facts:
+      - cork comes from Alentejo
+
+  - id: q09
+    band: factual
+    ask: What two things does the studio explicitly say it does not do?
+    expect: It does not use veneer over particle board, and does not stain wood to imitate another species.
+    facts:
+      - no veneer over particle board
+      - does not stain wood to imitate another species
+
+  - id: q10
+    band: factual
+    ask: What finish is used, and what is specifically avoided?
+    expect: Hard wax oil, and no polyurethane.
+    facts:
+      - hard wax oil finish
+      - no polyurethane
+
+  - id: q11
+    band: factual
+    ask: Which publication has written about the studio, and when?
+    expect: Monocle, in 2023.
+    facts:
+      - Monocle
+      - in 2023
+
+  - id: q12
+    band: factual
+    ask: What is the studio's address?
+    expect: Rua da Cozinha 4, Lisboa.
+    facts:
+      - Rua da Cozinha 4
+      - Lisboa
+
+  # This one exists to catch a distiller that reads the light DOM only. The
+  # quote lives inside a shadow root.
+  - id: q13
+    band: factual
+    ask: What did the press say about the furniture?
+    expect: That it is the most quietly confident furniture coming out of Portugal.
+    facts:
+      - most quietly confident furniture coming out of Portugal
+
+  # This one catches a distiller that skips figure captions.
+  - id: q14
+    band: factual
+    ask: What does the close-up photograph of the oak show?
+    expect: Medullary ray fleck in quarter-sawn oak.
+    facts:
+      - medullary ray fleck
+
+  # --- Structural ----------------------------------------------------------
+  - id: q15
+    band: structural
+    ask: What is the main headline of the page?
+    expect: "Furniture that outlives its owner"
+    facts:
+      - Furniture that outlives its owner
+
+  - id: q16
+    band: structural
+    ask: What sections does this page have?
+    expect: The studio, Materials, Press, and Make an enquiry.
+    facts:
+      - a section called The studio
+      - a section called Materials
+      - a section called Press
+      - a section on making an enquiry
+
+  - id: q17
+    band: structural
+    ask: What items are in the site navigation?
+    expect: Work, Studio, Materials, Contact.
+    facts:
+      - Work
+      - Studio
+      - Materials
+      - Contact
+
+  # --- Actionable ----------------------------------------------------------
+  - id: q18
+    band: actionable
+    ask: How does a visitor make an enquiry?
+    expect: By submitting the enquiry form, which posts to /enquiry.
+    facts:
+      - there is an enquiry form
+      - it submits by POST
+      - it posts to /enquiry
+
+  - id: q19
+    band: actionable
+    ask: What fields does the enquiry form have, and which are required?
+    expect: Email address (required), Piece, and Notes.
+    facts:
+      - an email field
+      - the email field is required
+      - a piece field
+      - a notes field
+
+  - id: q20
+    band: actionable
+    ask: What options can a visitor choose for the piece they want?
+    expect: Dining table, Cabinet, or Chair.
+    facts:
+      - Dining table
+      - Cabinet
+      - Chair
