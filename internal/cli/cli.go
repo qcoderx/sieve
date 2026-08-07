@@ -9,6 +9,7 @@ import (
 	"io"
 	"os"
 	"path/filepath"
+	"reflect"
 	"sort"
 	"strings"
 	"time"
@@ -78,22 +79,23 @@ artifact records which tier answered and why.
 
 // commonFlags are shared by the commands that fetch pages.
 type commonFlags struct {
-	chrome     string
-	timeout    time.Duration
-	viewport   string
-	tierMin    string
-	tierMax    string
-	obeyRobots bool
-	allowPriv  bool
+	chrome      string
+	timeout     time.Duration
+	viewport    string
+	tierMin     string
+	tierMax     string
+	obeyRobots  bool
+	allowPriv   bool
 	concurrency int
-	delay      time.Duration
-	verbose    bool
-	memoryPath string
+	delay       time.Duration
+	verbose     bool
+	memoryPath  string
 }
 
 func (c *commonFlags) register(fs *flag.FlagSet) {
 	fs.StringVar(&c.chrome, "chrome", "", "path to a Chromium binary (default: auto-detect)")
-	fs.DurationVar(&c.timeout, "timeout", 3*time.Minute, "overall time budget per page")
+	fs.DurationVar(&c.timeout, "timeout", 10*time.Second,
+		"overall time budget per page; every render sub-budget is scaled from it")
 	fs.StringVar(&c.viewport, "viewport", "1440x900", "viewport size, WxH")
 	fs.StringVar(&c.tierMin, "min-tier", "", "force at least this much work: fetch, render, sweep, recover")
 	fs.StringVar(&c.tierMax, "max-tier", "", "never work harder than this tier")
@@ -185,12 +187,67 @@ func (c *commonFlags) logf(stderr io.Writer) func(string, ...any) {
 
 // defaultMemoryPath puts the escalation memory somewhere durable. Hysteresis
 // that only lasts for one process is not hysteresis.
+// writeCache writes a small map atomically, or does nothing at all. None of
+// these caches is worth failing a run over.
+func writeCache(path string, v any) {
+	rv := reflect.ValueOf(v)
+	if rv.Kind() == reflect.Map && rv.Len() == 0 {
+		return
+	}
+	if err := os.MkdirAll(filepath.Dir(path), 0o755); err != nil {
+		return
+	}
+	b, err := json.MarshalIndent(v, "", "  ")
+	if err != nil {
+		return
+	}
+	tmp := path + ".tmp"
+	if err := os.WriteFile(tmp, b, 0o644); err != nil {
+		return
+	}
+	_ = os.Remove(path)
+	_ = os.Rename(tmp, path)
+}
+
 func defaultMemoryPath() string {
 	dir, err := os.UserCacheDir()
 	if err != nil {
 		return ""
 	}
 	return filepath.Join(dir, "sieve", "escalation.json")
+}
+
+// robotsPath puts the robots cache beside the escalation memory: both are
+// per-domain facts learned by running, and both are useless if they last only
+// for one process.
+func robotsPath(memoryPath string) string {
+	if memoryPath == "" {
+		return ""
+	}
+	return filepath.Join(filepath.Dir(memoryPath), "robots.json")
+}
+
+func loadRobots(path string) *safety.RobotsCache {
+	c := safety.NewRobotsCache(nil)
+	if path == "" {
+		return c
+	}
+	b, err := os.ReadFile(path)
+	if err != nil {
+		return c
+	}
+	var stored map[string]safety.StoredRobots
+	if err := json.Unmarshal(b, &stored); err == nil {
+		c.Restore(stored)
+	}
+	return c
+}
+
+func saveRobots(path string, c *safety.RobotsCache) {
+	if path == "" || c == nil {
+		return
+	}
+	writeCache(path, c.Snapshot())
 }
 
 func loadMemory(path string) *escalate.Memory {
@@ -213,23 +270,7 @@ func saveMemory(path string, m *escalate.Memory) {
 	if path == "" {
 		return
 	}
-	snap := m.Snapshot()
-	if len(snap) == 0 {
-		return
-	}
-	if err := os.MkdirAll(filepath.Dir(path), 0o755); err != nil {
-		return
-	}
-	b, err := json.MarshalIndent(snap, "", "  ")
-	if err != nil {
-		return
-	}
-	tmp := path + ".tmp"
-	if err := os.WriteFile(tmp, b, 0o644); err != nil {
-		return
-	}
-	_ = os.Remove(path)
-	_ = os.Rename(tmp, path)
+	writeCache(path, m.Snapshot())
 }
 
 // parseArgs parses flags that may appear before or after positional arguments.

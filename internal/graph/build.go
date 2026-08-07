@@ -37,6 +37,9 @@ type Input struct {
 	OriginalText string
 	// ReachedBottom reports whether the sweep saw the end of the document.
 	ReachedBottom bool
+	// EntryGate names an interstitial standing between the visitor and the
+	// site, when one was detected.
+	EntryGate string
 	// Now is injectable so golden tests are not time-dependent.
 	Now time.Time
 	// Generator identifies the build, e.g. "sieve/0.1.0".
@@ -65,12 +68,20 @@ func Build(in Input) (*Graph, error) {
 
 	kept := make([]*candidate, 0, len(cands))
 	dropped := 0
+	dropStats := map[string]*DropCount{}
 	for _, c := range cands {
 		if c.Keep {
 			kept = append(kept, c)
-		} else {
-			dropped++
+			continue
 		}
+		dropped++
+		d, ok := dropStats[c.DropReason]
+		if !ok {
+			d = &DropCount{Reason: c.DropReason}
+			dropStats[c.DropReason] = d
+		}
+		d.Runs++
+		d.Chars += utf8.RuneCountInString(c.Text)
 	}
 
 	pageWidth := in.Merged.ViewportW
@@ -128,8 +139,20 @@ func Build(in Input) (*Graph, error) {
 	g.Actions, g.Links = makeActions(in.Merged, base)
 	g.MediaAll = mediaAll
 	g.Structured = ParseJSONLD(in.Merged.Meta.JSONLD)
+	g.FAQ = ParseFAQ(in.Merged.Meta.JSONLD)
 	g.Latent = makeLatent(in.Merged.Latent)
 	g.Gaps = makeGaps(in.Merged, g.Latent)
+	if in.EntryGate != "" {
+		// An entry gate goes at the head of the gap list because it does not
+		// hide one section, it holds back the whole site. A reader who is told
+		// only that the page was thin will conclude the page is thin.
+		g.Gaps = append([]Gap{{
+			Label: in.EntryGate,
+			Kind:  "entry-gate",
+			Reason: "the site is behind an entry screen that a visitor must dismiss before it begins; " +
+				"sieve does not click through interstitials, so everything past it is absent from this artifact",
+		}}, g.Gaps...)
+	}
 	g.Summary = makeSummary(g)
 
 	contentChars, chromeCount, emitted := 0, 0, 0
@@ -165,6 +188,12 @@ func Build(in Input) (*Graph, error) {
 	}
 
 	g.Audit = buildAudit(in, g, ord, flow, emitted)
+	for _, d := range dropStats {
+		g.Audit.Dropped = append(g.Audit.Dropped, *d)
+	}
+	sort.SliceStable(g.Audit.Dropped, func(i, j int) bool {
+		return g.Audit.Dropped[i].Runs > g.Audit.Dropped[j].Runs
+	})
 
 	// The hash covers the normalised semantic graph, not the serialised output.
 	// Timestamps and timings change on every run and would make an unchanged
@@ -252,6 +281,14 @@ func headingSeparation(blocks []Block) float64 {
 	return score
 }
 
+// verificationOf downgrades a block sieve never actually saw rendered.
+func verificationOf(c *candidate) Verification {
+	if c.Declared {
+		return VerificationSpeculative
+	}
+	return c.Verified
+}
+
 func makeBlocks(cands []*candidate) []Block {
 	blocks := make([]Block, 0, len(cands))
 	for i, c := range cands {
@@ -269,6 +306,12 @@ func makeBlocks(cands []*candidate) []Block {
 		if c.InvisibleColor {
 			flags = append(flags, "text-colour-matches-background")
 		}
+		// Said plainly on the block itself, in every format, because a consumer
+		// deciding whether to quote this text needs to know that sieve did not
+		// watch it appear -- it read the page's promise that it would.
+		if c.Declared {
+			flags = append(flags, "declared-reveal-not-observed")
+		}
 		blocks = append(blocks, Block{
 			ID:         blockID(len(blocks)),
 			Type:       c.Type,
@@ -278,7 +321,7 @@ func makeBlocks(cands []*candidate) []Block {
 			Source:     c.SourceKind,
 			Score:      roundTo(c.Confidence, 0.01),
 			Confidence: Bucket(c.Confidence),
-			Verified:   c.Verified,
+			Verified:   verificationOf(c),
 			Checkpoint: c.Checkpoint,
 			BBox:       [4]float64{c.BBox[0], c.BBox[1], c.BBox[2], c.BBox[3]},
 			Region:     c.Region,
@@ -518,9 +561,9 @@ func makeMedia(m *capture.Merged, base *url.URL) []Media {
 		}
 		out = append(out, Media{
 			ID: mediaID(len(out)), Type: md.Kind, Src: src,
-			Alt:    textnorm.CleanString(alt),
+			Alt:     textnorm.CleanString(alt),
 			Caption: textnorm.CleanString(md.Caption),
-			Source: source, Confidence: ConfidenceHigh,
+			Source:  source, Confidence: ConfidenceHigh,
 			Width: md.BBox.W(), Height: md.BBox.H(),
 			Flags: flags,
 		})

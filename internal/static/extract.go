@@ -84,6 +84,38 @@ type Signals struct {
 	// everything it could not analyse was visible.
 	ExternalStylesheets int
 	ComplexHidingRules  int
+
+	// TextRuns and ShortRuns detect split text: markup where an animation
+	// library has shattered a heading into one element per character or per
+	// word so each can be tweened separately.
+	//
+	// This is the one thing tier 0 cannot repair. Putting the pieces back
+	// together needs the rendered line box and the computed style -- which
+	// fragments shared a line, in what order they sat on it -- and the served
+	// HTML has neither, so tier 0 emits the fragments in document order. When
+	// the library also reorders the source for its effect, the result is not
+	// merely ugly, it is wrong: organimo.com yields "Liitless m", "Te real h"
+	// and a heading spelled out as "e / v / er / n / eed."
+	//
+	// Every other escalation signal here asks whether the text is present.
+	// This one asks whether it is legible, which is a different question and
+	// the only one that catches a page that serves all of its copy and none of
+	// it readably.
+	TextRuns  int
+	ShortRuns int
+}
+
+// maxShatteredRun is the length, in runes, at or below which a text run looks
+// like a fragment rather than a phrase. Two covers per-character splitting and
+// the diacritic pairs it produces, without catching ordinary short words.
+const maxShatteredRun = 2
+
+// SplitTextRatio is the share of text runs short enough to be fragments.
+func (s Signals) SplitTextRatio() float64 {
+	if s.TextRuns == 0 {
+		return 0
+	}
+	return float64(s.ShortRuns) / float64(s.TextRuns)
 }
 
 // blockTags are the elements whose text becomes a block.
@@ -123,13 +155,15 @@ func Extract(pageURL string, body io.Reader, sizeHint int) (*Result, error) {
 		signals: Signals{HTMLBytes: len(raw)},
 		seen:    map[string]bool{},
 		hiding:  newHidingRules(),
+		lmSeen:  map[atom.Atom]int{},
+		lmTotal: countPageLandmarks(doc),
 	}
 	// Stylesheets are scanned before the walk, because visibility has to be
 	// known at the moment an element is visited. Almost nobody hides content
 	// with an inline style; they use a class, and without this pass the static
 	// tier would ingest exactly the material the rendered tiers quarantine.
 	ex.scanStyles(doc)
-	ex.walk(doc, "html", "html", "", "", 0)
+	ex.walk(doc, "html", "html", "", "", 0, false)
 
 	snap := &capture.Snapshot{
 		Checkpoint:   0,
@@ -177,6 +211,54 @@ type extractor struct {
 	seen      map[string]bool
 	order     int
 	hiding    *hidingRules
+
+	// lmSeen and lmTotal resolve which <header> and <footer> are the page's own,
+	// matching the rendered walk exactly. Tier 0 and tier 2 have to agree about
+	// what counts as chrome or the artifact changes shape purely with the tier
+	// that answered.
+	lmSeen  map[atom.Atom]int
+	lmTotal map[atom.Atom]int
+}
+
+// countPageLandmarks counts <header> and <footer> elements outside sectioning
+// content, which the walk needs up front: it cannot know which footer is the
+// last until it has passed them all, but must classify each as it arrives.
+func countPageLandmarks(root *html.Node) map[atom.Atom]int {
+	out := map[atom.Atom]int{}
+	var walk func(*html.Node, bool)
+	walk = func(n *html.Node, sectioned bool) {
+		if n.Type == html.ElementNode {
+			if !sectioned && (n.DataAtom == atom.Header || n.DataAtom == atom.Footer) {
+				out[n.DataAtom]++
+			}
+			if sectioningTags[n.DataAtom] {
+				sectioned = true
+			}
+		}
+		for c := n.FirstChild; c != nil; c = c.NextSibling {
+			walk(c, sectioned)
+		}
+	}
+	walk(root, false)
+	return out
+}
+
+// pageLandmark reports whether this <header> or <footer> is the document's
+// banner or contentinfo. There is at most one of each: the first page-level
+// header and the last page-level footer. Every other one wraps a section and is
+// content, which is what keeps a page built out of nineteen <header> elements
+// from being filed away as nineteen banners and no content at all.
+func (e *extractor) pageLandmark(a atom.Atom) bool {
+	idx := e.lmSeen[a]
+	e.lmSeen[a] = idx + 1
+	if a == atom.Header {
+		return idx == 0
+	}
+	total := e.lmTotal[a]
+	if total == 0 {
+		total = 1
+	}
+	return idx == total-1
 }
 
 // scanStyles walks the document for <style> blocks and folds them into the
@@ -227,7 +309,7 @@ func countExternalStylesheets(root *html.Node) int {
 
 // walk descends the parsed tree, carrying the same inherited facts the rendered
 // walk does so that the two produce comparable output.
-func (e *extractor) walk(n *html.Node, path, blockPath, landmark, href string, depth int) {
+func (e *extractor) walk(n *html.Node, path, blockPath, landmark, href string, depth int, sectioned bool) {
 	switch n.Type {
 	case html.ElementNode:
 		if skipTags[n.DataAtom] {
@@ -245,9 +327,19 @@ func (e *extractor) walk(n *html.Node, path, blockPath, landmark, href string, d
 			}
 			return
 		}
-		if lm := landmarkOf(n); lm != "" {
-			landmark = lm
-			e.signals.Landmarks++
+		if lm := landmarkOf(n, sectioned); lm != "" {
+			if n.DataAtom == atom.Header || n.DataAtom == atom.Footer {
+				if e.pageLandmark(n.DataAtom) {
+					landmark = lm
+					e.signals.Landmarks++
+				}
+			} else {
+				landmark = lm
+				e.signals.Landmarks++
+			}
+		}
+		if sectioningTags[n.DataAtom] {
+			sectioned = true
 		}
 		if n.DataAtom == atom.Html {
 			e.lang = attr(n, "lang")
@@ -273,6 +365,22 @@ func (e *extractor) walk(n *html.Node, path, blockPath, landmark, href string, d
 		// is precisely the kind of divergence between tiers that makes a tiered
 		// tool untrustworthy.
 		if reason := e.hiddenReason(n); reason != "" {
+			// Structured data is harvested from hidden subtrees too, because
+			// "hidden" is not a property structured data can have.
+			//
+			// A <script type="application/ld+json"> renders nowhere: inside a
+			// visible section and inside a collapsed one it is equally invisible
+			// to every visitor, and which of the two an author chose is an
+			// accident of where the section's markup happened to be written.
+			// pear.no puts its entire FAQPage block inside the FAQ section it
+			// describes, and that section is aria-hidden until it scrolls into
+			// view -- so the walk turned back at the door and the artifact lost
+			// five questions and answers that were sitting in the served bytes.
+			//
+			// This does not widen the content channel. Nothing here becomes a
+			// block; it goes to the same whitelist, with the same caps, as
+			// structured data found anywhere else.
+			e.harvestStructured(n, 0)
 			e.collectLatent(n, path, blockPath, landmark, href, depth, reason)
 			return
 		}
@@ -298,22 +406,46 @@ func (e *extractor) walk(n *html.Node, path, blockPath, landmark, href string, d
 		if idx > 0 {
 			seg = fmt.Sprintf("%s[%d]", tag, idx)
 		}
-		e.walk(c, path+"/"+seg, blockPath, landmark, href, depth+1)
+		e.walk(c, path+"/"+seg, blockPath, landmark, href, depth+1, sectioned)
 	}
 }
 
 // emitOwnText records the element's direct text children, matching the rendered
 // walk's granularity.
 func (e *extractor) emitOwnText(n *html.Node, path, blockPath, landmark, href string, depth int) {
+	// A <br> between two text children is a word boundary, and concatenating
+	// across it welds the words together: "African soul." and "European cut."
+	// on the two lines of a heading come back as "African soul.European cut."
+	//
+	// The rendered walk never has this problem, because there the two halves sit
+	// on different lines and the geometry says so. Here the line break is the
+	// only evidence there is, so it has to be honoured explicitly.
 	var sb strings.Builder
 	for c := n.FirstChild; c != nil; c = c.NextSibling {
-		if c.Type == html.TextNode {
+		switch {
+		case c.Type == html.TextNode:
 			sb.WriteString(c.Data)
+		case c.Type == html.ElementNode && c.DataAtom == atom.Br:
+			sb.WriteByte(' ')
 		}
 	}
 	text := normalizeSpace(sb.String())
 	if text == "" {
 		return
+	}
+
+	// Whitespace that surrounded this fragment in the source, recorded the way
+	// the rendered walk records it. Where an inline link abuts the text beside
+	// it, the reassembler has no geometry to consult at this tier and this is
+	// the only thing that can tell "Lisboa. hello@" from "Lisboa.hello@".
+	pad := 0
+	if raw := sb.String(); raw != "" {
+		if isASCIISpace(raw[0]) {
+			pad |= 1
+		}
+		if isASCIISpace(raw[len(raw)-1]) {
+			pad |= 2
+		}
 	}
 
 	size, weight := typographyFor(n.DataAtom)
@@ -323,7 +455,12 @@ func (e *extractor) emitOwnText(n *html.Node, path, blockPath, landmark, href st
 	case atom.P:
 		e.signals.Paragraphs++
 	}
-	e.signals.TextChars += utf8.RuneCountInString(text)
+	runes := utf8.RuneCountInString(text)
+	e.signals.TextChars += runes
+	e.signals.TextRuns++
+	if runes <= maxShatteredRun {
+		e.signals.ShortRuns++
+	}
 	e.order++
 
 	// Static extraction has no geometry. Positions are synthesised from
@@ -336,9 +473,14 @@ func (e *extractor) emitOwnText(n *html.Node, path, blockPath, landmark, href st
 		Role: attr(n, "role"), Landmark: landmark, Href: href,
 		FontSize: size, Weight: weight, Family: "static",
 		Opacity: 1, Visible: true,
+		Pad:     pad,
 		BBox:    capture.Box{0, y, 800, 32},
 		LineTop: y, Depth: depth,
 	})
+}
+
+func isASCIISpace(b byte) bool {
+	return b == ' ' || b == '\t' || b == '\n' || b == '\r' || b == '\f'
 }
 
 // hiddenReason reports why an element is not rendered, or empty.
@@ -362,6 +504,30 @@ func (e *extractor) hiddenReason(n *html.Node) string {
 		return "collapsed-details"
 	}
 	return e.hiding.match(n.Data, attr(n, "id"), attr(n, "class"))
+}
+
+// harvestStructured walks a subtree the main walk is about to skip, looking
+// only for JSON-LD. It reads nothing else.
+func (e *extractor) harvestStructured(n *html.Node, depth int) {
+	if depth > 12 {
+		return
+	}
+	if n.Type == html.ElementNode && n.DataAtom == atom.Script &&
+		strings.ToLower(attr(n, "type")) == "application/ld+json" {
+		var sb strings.Builder
+		for c := n.FirstChild; c != nil; c = c.NextSibling {
+			if c.Type == html.TextNode {
+				sb.WriteString(c.Data)
+			}
+		}
+		if body := sb.String(); len(body) > 0 && len(body) < 262144 {
+			e.jsonLD = append(e.jsonLD, body)
+		}
+		return
+	}
+	for c := n.FirstChild; c != nil; c = c.NextSibling {
+		e.harvestStructured(c, depth+1)
+	}
 }
 
 func (e *extractor) collectLatent(n *html.Node, path, blockPath, landmark, href string, depth int, reason string) {
@@ -540,13 +706,30 @@ func (e *extractor) collectHead(n *html.Node) {
 
 // --- helpers ---------------------------------------------------------------
 
-func landmarkOf(n *html.Node) string {
+// sectioningTags scope <header> and <footer>.
+//
+// A <header> inside an <article> or <section> is that section's own heading
+// area -- ordinary content -- and only one whose nearest sectioning ancestor is
+// the body is the page banner. Treating every <header> as chrome zeroes out the
+// content of any site that structures its sections properly.
+var sectioningTags = map[atom.Atom]bool{
+	atom.Article: true, atom.Section: true, atom.Aside: true,
+	atom.Nav: true, atom.Main: true,
+}
+
+func landmarkOf(n *html.Node, sectioned bool) string {
 	switch n.DataAtom {
 	case atom.Nav:
 		return "nav"
 	case atom.Header:
+		if sectioned {
+			return ""
+		}
 		return "header"
 	case atom.Footer:
+		if sectioned {
+			return ""
+		}
 		return "footer"
 	case atom.Main:
 		return "main"

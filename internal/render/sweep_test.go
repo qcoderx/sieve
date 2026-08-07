@@ -30,6 +30,10 @@ func newBrowser(t *testing.T) *render.Browser {
 	}
 	opts := render.DefaultOptions()
 	opts.Budget = 90 * time.Second
+	// Rasterisation is off by default now -- nothing reads the pixels unless OCR
+	// or vision is configured -- so the test that asserts a screenshot was taken
+	// has to ask for one.
+	opts.CaptureCanvas = true
 	if os.Getenv("SIEVE_TEST_LOG") != "" {
 		opts.Logf = t.Logf
 	}
@@ -206,4 +210,36 @@ func allText(m *capture.Merged) string {
 		sb.WriteByte('\n')
 	}
 	return sb.String()
+}
+
+// TestEntryGateDeclared covers the failure that is hardest to notice: a page
+// that produces a small artifact because it never started.
+//
+// hatom.com sits behind a "click to enter" screen and reported nine blocks with
+// no indication that the site was still shut. To a reader that is
+// indistinguishable from a site with nothing on it, which is the one thing an
+// extraction tool must never be ambiguous about. sieve does not click the
+// button -- dismissing an interstitial is an interaction, and the bounded
+// interaction rules elsewhere in this project only open what announces itself
+// as openable -- so the whole value here is in saying so.
+func TestEntryGateDeclared(t *testing.T) {
+	if os.Getenv("SIEVE_SKIP_BROWSER") != "" {
+		t.Skip("SIEVE_SKIP_BROWSER set")
+	}
+	srv := serveFixtures(t)
+	b := newBrowser(t)
+
+	ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
+	defer cancel()
+
+	res, err := b.Sweep(ctx, srv.URL+"/gated/", nil)
+	if err != nil {
+		t.Fatalf("sweep: %v", err)
+	}
+	if res.EntryGate == "" {
+		t.Fatal("entry gate not detected; the artifact would report a thin page and not say why")
+	}
+	if !strings.Contains(strings.ToLower(res.EntryGate), "enter") {
+		t.Errorf("entry gate label = %q, want the control's own words", res.EntryGate)
+	}
 }

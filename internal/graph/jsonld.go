@@ -42,6 +42,7 @@ const maxStructuredFacts = 60
 var jsonLDWhitelist = map[string]bool{
 	// Identity
 	"name": true, "legalName": true, "alternateName": true, "brand": true,
+	"identifier": true, "vatID": true, "taxID": true, "duns": true,
 	"description": true, "disambiguatingDescription": true, "slogan": true,
 	// Provenance and dates
 	"foundingDate": true, "datePublished": true, "dateModified": true,
@@ -63,6 +64,113 @@ var jsonLDWhitelist = map[string]bool{
 	// Structure
 	"itemListElement": true, "position": true, "url": true,
 	"openingHours": true, "openingHoursSpecification": true,
+}
+
+// QAPair is one question and its answer, lifted from FAQPage structured data.
+//
+// Questions and answers get their own shape rather than being flattened into
+// StructuredFacts, because the pairing is the content. "What share of the
+// revenue do you take?" and "It's agreed per partnership" are worth little
+// apart and are exactly what an agent is sent to a page to find.
+type QAPair struct {
+	Question string `json:"question"`
+	Answer   string `json:"answer"`
+}
+
+// jsonLDAnswerCap bounds one answer.
+//
+// It is far larger than jsonLDValueCap because an answer is prose and is meant
+// to be read, where a whitelisted scalar is a name or a date. It is still a cap:
+// this is structured data, so no visitor ever saw it, and an uncapped field here
+// is an invisible channel into a model's context.
+const jsonLDAnswerCap = 1200
+
+// maxQAPairs bounds the section.
+const maxQAPairs = 30
+
+// ParseFAQ lifts question-and-answer pairs out of FAQPage structured data.
+//
+// This is the one place where reading JSON-LD earns its risk. A page like
+// pear.no publishes its entire FAQ as schema.org Question/acceptedAnswer and
+// renders the same words into a scroll-revealed section that a static read
+// cannot see and a browser has to travel to reach. The structured copy is
+// exact, free, deterministic, and available in the first six hundred
+// milliseconds of a run.
+//
+// The shape is narrow on purpose: only Question objects, only their name and
+// the text of their acceptedAnswer, both normalised and capped, both marked
+// with their provenance so a consumer can tell them from text a visitor saw.
+// Nothing else in the FAQPage object is read.
+func ParseFAQ(blobs []string) []QAPair {
+	var out []QAPair
+	seen := map[string]bool{}
+
+	for _, blob := range blobs {
+		var v any
+		if err := json.Unmarshal([]byte(blob), &v); err != nil {
+			continue
+		}
+		collectFAQ(v, &out, seen, 0)
+		if len(out) >= maxQAPairs {
+			break
+		}
+	}
+	return out
+}
+
+func collectFAQ(v any, out *[]QAPair, seen map[string]bool, depth int) {
+	if depth > 6 || len(*out) >= maxQAPairs {
+		return
+	}
+	switch t := v.(type) {
+	case []any:
+		for _, e := range t {
+			collectFAQ(e, out, seen, depth+1)
+		}
+	case map[string]any:
+		if s, _ := t["@type"].(string); strings.EqualFold(s, "Question") {
+			q := textnorm.CleanString(scalarString(t["name"]))
+			if q == "" {
+				q = textnorm.CleanString(scalarString(t["text"]))
+			}
+			a := answerText(t["acceptedAnswer"])
+			if a == "" {
+				a = answerText(t["suggestedAnswer"])
+			}
+			q, _ = textnorm.Truncate(q, jsonLDValueCap)
+			a, _ = textnorm.Truncate(a, jsonLDAnswerCap)
+			if q != "" && a != "" && !seen[q] {
+				seen[q] = true
+				*out = append(*out, QAPair{Question: q, Answer: a})
+			}
+			return
+		}
+		// Only descend through the containers a FAQPage actually uses. A
+		// permissive walk here would turn every nested object on the page into
+		// a candidate answer.
+		for _, k := range []string{"mainEntity", "mainEntityOfPage", "itemListElement", "@graph", "hasPart"} {
+			if sub, ok := t[k]; ok {
+				collectFAQ(sub, out, seen, depth+1)
+			}
+		}
+	}
+}
+
+// answerText reads the prose out of an Answer object, and nothing else.
+func answerText(v any) string {
+	switch t := v.(type) {
+	case string:
+		return textnorm.CleanString(t)
+	case []any:
+		for _, e := range t {
+			if s := answerText(e); s != "" {
+				return s
+			}
+		}
+	case map[string]any:
+		return textnorm.CleanString(scalarString(t["text"]))
+	}
+	return ""
 }
 
 // jsonLDContainers are properties whose value is a nested object worth

@@ -27,6 +27,17 @@ import (
 // declined to connect" are different facts about the world.
 var ErrBlocked = errors.New("blocked by safety policy")
 
+// ErrUnreachable is returned when the host could not be reached at all, as
+// distinct from being refused.
+//
+// The guard is the first thing in the pipeline to touch the network, so a
+// flaky resolver surfaces here -- and reporting that as a policy refusal tells
+// the operator that sieve declined to visit a site it was in fact willing to
+// visit, which sends them looking for a block that does not exist. The two
+// cases also want opposite responses: a refusal should be respected, and a
+// resolver timeout should be retried.
+var ErrUnreachable = errors.New("host unreachable")
+
 // GuardConfig configures address filtering.
 type GuardConfig struct {
 	// AllowPrivate disables the private-address check. It exists for
@@ -134,14 +145,12 @@ func (g *Guard) Check(u *url.URL) error {
 		return nil
 	}
 
-	ctx, cancel := context.WithTimeout(context.Background(), g.cfg.LookupTimeout)
-	defer cancel()
-	addrs, err := g.cfg.Resolver.LookupIPAddr(ctx, host)
+	addrs, err := g.resolve(host)
 	if err != nil {
-		return fmt.Errorf("%w: cannot resolve %q: %v", ErrBlocked, host, err)
+		return fmt.Errorf("%w: cannot resolve %q: %v", ErrUnreachable, host, err)
 	}
 	if len(addrs) == 0 {
-		return fmt.Errorf("%w: %q resolved to no addresses", ErrBlocked, host)
+		return fmt.Errorf("%w: %q resolved to no addresses", ErrUnreachable, host)
 	}
 	// Every address is checked, not just the first. A host that resolves to one
 	// public address and one loopback address is a rebinding attempt, and which
@@ -152,6 +161,67 @@ func (g *Guard) Check(u *url.URL) error {
 		}
 	}
 	return nil
+}
+
+// resolveAttempts is how many times a name is looked up before the host is
+// called unreachable.
+//
+// A stub resolver under load drops the first UDP query and answers the retry,
+// which is ordinary and not a fact about the site. The guard runs before
+// anything else, so one dropped packet otherwise ends a four-minute distillation
+// at second zero with a message about the host not existing. Two attempts costs
+// nothing on the overwhelmingly common path where the first one answers.
+//
+// Windows makes this worse than it sounds: getaddrinfo reports a SERVFAIL or a
+// dropped query as "no such host", indistinguishable from a name that genuinely
+// does not exist, so there is no error to special-case -- only the retry
+// separates the two. Observed on this very corpus, where the same name failed
+// twice and resolved on the third ask.
+//
+// This weakens nothing: a later answer is still every-address-checked below, so
+// a rebinding attempt has gained more chances to return a private address and no
+// chance at all of having one accepted.
+const resolveAttempts = 3
+
+// resolveBackoff is the pause before each retry. It widens because a resolver
+// that has just failed is usually busy rather than broken, and asking again
+// immediately asks the same overloaded stub the same question.
+var resolveBackoff = []time.Duration{0, 150 * time.Millisecond, 400 * time.Millisecond, 900 * time.Millisecond}
+
+func (g *Guard) resolve(host string) ([]net.IPAddr, error) {
+	var err error
+	for i := 0; i < len(resolveBackoff); i++ {
+		if d := resolveBackoff[i]; d > 0 {
+			time.Sleep(d)
+		}
+		var addrs []net.IPAddr
+		ctx, cancel := context.WithTimeout(context.Background(), g.cfg.LookupTimeout)
+		addrs, err = g.cfg.Resolver.LookupIPAddr(ctx, host)
+		cancel()
+		if err == nil {
+			return addrs, nil
+		}
+		// A resolver that says the failure is temporary is worth believing, and
+		// worth waiting for. Windows reports exactly this under load -- "the
+		// local server did not receive a response from an authoritative server"
+		// -- and it ended runs against perfectly reachable hosts on this corpus
+		// repeatedly. A name that genuinely does not exist comes back as a
+		// definitive answer and stops after the attempts above, which are there
+		// for the dropped-query case that carries no such label.
+		if i >= resolveAttempts-1 && !temporaryDNS(err) {
+			break
+		}
+	}
+	return nil, err
+}
+
+// temporaryDNS reports whether the resolver called its own failure transient.
+func temporaryDNS(err error) bool {
+	var de *net.DNSError
+	if errors.As(err, &de) {
+		return de.IsTemporary || de.IsTimeout
+	}
+	return false
 }
 
 // Reset clears redirect accounting, for reuse across pages of one crawl.

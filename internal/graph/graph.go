@@ -376,6 +376,16 @@ type Audit struct {
 	HeadingSeparation float64    `json:"heading_separation"`
 	HeadingConfidence Confidence `json:"heading_confidence"`
 
+	// Dropped counts the runs that were captured but did not become blocks,
+	// grouped by why.
+	//
+	// This is the difference between an artifact that is empty and an artifact
+	// that explains itself. A page that comes back with nothing is the single
+	// most alarming output this tool can produce, and without this the user has
+	// no way to tell "the page really is a canvas" from "every run was excluded
+	// by a threshold". Both have happened; only one is a bug.
+	Dropped []DropCount `json:"dropped,omitempty"`
+
 	// ReachedBottom is false when a budget stopped the sweep early.
 	ReachedBottom bool `json:"reached_bottom"`
 	// FramesBlocked counts cross-origin iframes whose content could not be read.
@@ -385,6 +395,23 @@ type Audit struct {
 	CanvasesUnrecovered int `json:"canvases_unrecovered,omitempty"`
 	// Notes are human-readable limitations discovered during the render.
 	Notes []string `json:"notes,omitempty"`
+}
+
+// DropCount is one reason runs were excluded, and how many.
+//
+// It deliberately carries no sample of the excluded text. An earlier version
+// did, so that the reason could be checked rather than trusted, and the
+// adversarial corpus caught it within one run: the runs being excluded are
+// precisely the hidden ones, and quoting one into the audit section handed the
+// text straight back to the reader through the diagnostic meant to explain why
+// it had been withheld.
+//
+// Counts and reasons carry the diagnostic value. Anyone who needs to see the
+// text itself can replay a snapshot, where it is labelled for what it is.
+type DropCount struct {
+	Reason string `json:"reason"`
+	Runs   int    `json:"runs"`
+	Chars  int    `json:"chars"`
 }
 
 // Provenance records how this artifact was produced, in enough detail to
@@ -458,6 +485,13 @@ type Graph struct {
 
 	// Structured holds whitelisted facts lifted from JSON-LD. Never raw.
 	Structured []StructuredFact `json:"structured,omitempty"`
+	// FAQ holds question-and-answer pairs published as FAQPage structured data.
+	//
+	// They are kept apart from Blocks because their provenance is different:
+	// nobody saw these words rendered, they were declared. A consumer that
+	// wants only what a visitor could read can ignore this array; one answering
+	// a question about the site would be foolish to.
+	FAQ []QAPair `json:"faq,omitempty"`
 
 	// Latent is the quarantine. It is a separate top-level key by design and
 	// must never be merged into Blocks. See LatentBlock.
