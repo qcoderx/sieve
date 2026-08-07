@@ -49,26 +49,34 @@ type robotRule struct {
 // treated as a refusal of the whole site, because a site that will not even
 // show its rules has not invited us in.
 func FetchRobots(ctx context.Context, client *http.Client, target *url.URL) (*Robots, error) {
+	r, _, err := fetchRobotsWithBody(ctx, client, target)
+	return r, err
+}
+
+// fetchRobotsWithBody also returns the file as served, so the cache can store
+// exactly what the site said rather than a re-serialisation of what we made of
+// it.
+func fetchRobotsWithBody(ctx context.Context, client *http.Client, target *url.URL) (*Robots, string, error) {
 	ru := &url.URL{Scheme: target.Scheme, Host: target.Host, Path: "/robots.txt"}
 	req, err := http.NewRequestWithContext(ctx, http.MethodGet, ru.String(), nil)
 	if err != nil {
-		return nil, err
+		return nil, "", err
 	}
 	req.Header.Set("User-Agent", UserAgent+"/0.1 (+https://github.com/qcoderx/sieve)")
 	req.Header.Set("Accept", "text/plain,*/*;q=0.5")
 
 	resp, err := client.Do(req)
 	if err != nil {
-		return &Robots{Missing: true}, nil
+		return &Robots{Missing: true}, "", nil
 	}
 	defer resp.Body.Close()
 
 	switch {
 	case resp.StatusCode == http.StatusUnauthorized || resp.StatusCode == http.StatusForbidden:
-		return nil, fmt.Errorf("%w: robots.txt returned %d, treating the whole site as disallowed",
+		return nil, "", fmt.Errorf("%w: robots.txt returned %d, treating the whole site as disallowed",
 			ErrBlocked, resp.StatusCode)
 	case resp.StatusCode >= 400:
-		return &Robots{Missing: true}, nil
+		return &Robots{Missing: true}, "", nil
 	}
 
 	// robots.txt files are small by convention. Reading an unbounded body from
@@ -76,9 +84,9 @@ func FetchRobots(ctx context.Context, client *http.Client, target *url.URL) (*Ro
 	// target.
 	body, err := io.ReadAll(io.LimitReader(resp.Body, 512<<10))
 	if err != nil {
-		return &Robots{Missing: true}, nil
+		return &Robots{Missing: true}, "", nil
 	}
-	return ParseRobots(string(body)), nil
+	return ParseRobots(string(body)), string(body), nil
 }
 
 // ParseRobots parses robots.txt content.
@@ -251,25 +259,89 @@ func matchPattern(pattern, path string) (int, bool) {
 	return len(pattern), true
 }
 
-// RobotsCache holds one parsed robots.txt per origin for the life of a job.
+// RobotsCache holds one parsed robots.txt per origin.
+//
+// It can be persisted between runs, and on this corpus that matters more than
+// it sounds: asking permission is the one thing that must happen before
+// anything else, it costs a round trip to a cold host, and several of these
+// sites take well over a second to answer. That was a second and a half of a
+// ten-second budget, spent before a byte of the page had been requested, to
+// re-learn something that had not changed since the last run an hour earlier.
+//
+// Persisting it does not weaken the check. The stored copy is what the site
+// said, it expires, and a run that finds no fresh copy asks again.
 type RobotsCache struct {
 	client *http.Client
 	mu     sync.Mutex
 	byHost map[string]*robotsEntry
+	// ttl bounds how long a stored answer is honoured.
+	ttl time.Duration
 }
 
 type robotsEntry struct {
-	once sync.Once
+	mu   sync.Mutex
+	done bool
 	r    *Robots
 	err  error
+	// raw and at are kept so the entry can be written out and read back.
+	raw string
+	at  time.Time
 }
+
+// RobotsTTL is how long a stored robots.txt is trusted. A day is well inside
+// the interval at which sites change these files and well outside the interval
+// at which one tool re-reads a site.
+const RobotsTTL = 24 * time.Hour
 
 // NewRobotsCache builds a cache.
 func NewRobotsCache(client *http.Client) *RobotsCache {
 	if client == nil {
 		client = &http.Client{Timeout: 10 * time.Second}
 	}
-	return &RobotsCache{client: client, byHost: map[string]*robotsEntry{}}
+	return &RobotsCache{client: client, byHost: map[string]*robotsEntry{}, ttl: RobotsTTL}
+}
+
+// StoredRobots is the persisted form: the raw file as served, per origin, with
+// the time it was read.
+type StoredRobots struct {
+	FetchedAt time.Time `json:"fetched_at"`
+	Body      string    `json:"body"`
+	// Missing records that the site had no robots.txt, which is itself an
+	// answer and is worth not asking for twice.
+	Missing bool `json:"missing,omitempty"`
+}
+
+// Snapshot exports the cache for persistence.
+func (c *RobotsCache) Snapshot() map[string]StoredRobots {
+	c.mu.Lock()
+	defer c.mu.Unlock()
+	out := make(map[string]StoredRobots, len(c.byHost))
+	for k, e := range c.byHost {
+		if e.r == nil || e.at.IsZero() {
+			continue
+		}
+		out[k] = StoredRobots{FetchedAt: e.at, Body: e.raw, Missing: e.r.Missing}
+	}
+	return out
+}
+
+// Restore loads a persisted cache, discarding anything past its TTL.
+func (c *RobotsCache) Restore(in map[string]StoredRobots) {
+	now := time.Now()
+	c.mu.Lock()
+	defer c.mu.Unlock()
+	for k, v := range in {
+		if v.FetchedAt.IsZero() || now.Sub(v.FetchedAt) > c.ttl {
+			continue
+		}
+		e := &robotsEntry{raw: v.Body, at: v.FetchedAt, done: true}
+		if v.Missing {
+			e.r = &Robots{Missing: true}
+		} else {
+			e.r = ParseRobots(v.Body)
+		}
+		c.byHost[k] = e
+	}
 }
 
 // Get fetches robots.txt for a URL's origin, at most once per origin.
@@ -283,9 +355,27 @@ func (c *RobotsCache) Get(ctx context.Context, u *url.URL) (*Robots, error) {
 	}
 	c.mu.Unlock()
 
-	e.once.Do(func() {
-		e.r, e.err = FetchRobots(ctx, c.client, u)
-	})
+	e.mu.Lock()
+	defer e.mu.Unlock()
+	if e.done {
+		return e.r, e.err
+	}
+
+	r, raw, err := fetchRobotsWithBody(ctx, c.client, u)
+	// A fetch the caller ran out of patience for is not an answer about the
+	// site, and must not become one. Recording it would leave the origin
+	// permanently un-askable for the life of the process -- which for the CLI is
+	// one page and harmless, and for the long-lived server means a single slow
+	// moment decides robots.txt for that host until a restart.
+	if err != nil && ctx.Err() != nil {
+		return nil, err
+	}
+	e.done = true
+	e.r, e.err = r, err
+	if err == nil {
+		e.raw = raw
+		e.at = time.Now().UTC()
+	}
 	return e.r, e.err
 }
 

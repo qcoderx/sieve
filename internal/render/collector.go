@@ -40,8 +40,21 @@ type collector struct {
 	pending    map[network.RequestID]string // requestID -> url, for bodies worth fetching
 	corpusWant map[network.RequestID]string // requestID -> kind, for corroboration text
 	corpusRead int64
+	shots      int
 	blocked    error
 	statusSet  bool
+
+	// wanted is the queue of response bodies that are worth reading, recorded
+	// as the responses finish and read only if the page turns out to need them.
+	//
+	// These used to be pulled the instant each response landed, which put a
+	// Network.getResponseBody for every script on the page directly in the path
+	// of the sweep -- tens of megabytes crossing the CDP boundary, competing
+	// with the checkpoint loop, to build an index that is only consulted when
+	// there is a canvas to recover. Recording the request ids costs nothing and
+	// the browser keeps the bodies, so the decision can wait until it is
+	// informed.
+	wanted []bodyWant
 
 	// wg tracks the goroutines spawned to answer paused requests and to pull
 	// response bodies. finish waits on it so nothing is still writing when the
@@ -64,10 +77,70 @@ func newCollector(opts Options, res *Result) *collector {
 	return c
 }
 
+// bodyWant is a response body worth reading, deferred until it is known to be
+// wanted. A url means a scene-graph asset; a kind means corroboration text.
+type bodyWant struct {
+	id   network.RequestID
+	url  string
+	kind string
+}
+
+// maxCanvasShots bounds rasterisation for one page. Recovery is worth a couple
+// of screenshots; it is not worth the page.
+const maxCanvasShots = 3
+
 // maxCorpusBody bounds a single response fed into the corroboration index.
 // Bundles are large; a single 40MB source map should not consume the whole
 // budget and crowd out the hydration blob that actually matters.
 const maxCorpusBody = 4 << 20
+
+// bodyDrainBudget bounds the whole deferred-body read. The corpus is a
+// confirmation aid: a page that will not hand over its bundles quickly gets a
+// smaller index and recovered strings stay speculative, which is the correct
+// outcome and a far better one than spending the page's remaining time here.
+const bodyDrainBudget = 1500 * time.Millisecond
+
+// drainBodies reads the response bodies recorded during load.
+//
+// It runs after the sweep, and only when the page has a canvas, so on the great
+// majority of pages it never runs at all.
+func (c *collector) drainBodies(ctx context.Context) {
+	c.mu.Lock()
+	want := c.wanted
+	c.wanted = nil
+	c.mu.Unlock()
+	if len(want) == 0 {
+		return
+	}
+
+	drainCtx, cancel := context.WithTimeout(ctx, bodyDrainBudget)
+	defer cancel()
+
+	for _, w := range want {
+		if drainCtx.Err() != nil {
+			c.opts.logf("body drain budget reached with %d response(s) unread; "+
+				"the corroboration index is smaller than it could be", len(want))
+			return
+		}
+		if w.url != "" {
+			c.mu.Lock()
+			over := c.assetBytes >= c.opts.MaxAssetsTotal
+			c.mu.Unlock()
+			if over {
+				continue
+			}
+			c.pullBody(drainCtx, w.id, w.url)
+			continue
+		}
+		c.mu.Lock()
+		full := c.corpusRead >= int64(c.opts.MaxCorpusBytes)
+		c.mu.Unlock()
+		if full {
+			continue
+		}
+		c.pullCorpus(drainCtx, w.id, w.kind)
+	}
+}
 
 // attach subscribes to the CDP event stream for this tab.
 //
@@ -117,22 +190,14 @@ func (c *collector) attach(tabCtx context.Context, guard NavGuard) {
 			u, isAsset := c.pending[e.RequestID]
 			if isAsset {
 				delete(c.pending, e.RequestID)
+				c.wanted = append(c.wanted, bodyWant{id: e.RequestID, url: u})
 			}
 			kind, isCorpus := c.corpusWant[e.RequestID]
 			if isCorpus {
 				delete(c.corpusWant, e.RequestID)
+				c.wanted = append(c.wanted, bodyWant{id: e.RequestID, kind: kind})
 			}
-			over := c.assetBytes >= c.opts.MaxAssetsTotal
 			c.mu.Unlock()
-
-			if isAsset && !over {
-				c.wg.Add(1)
-				go c.pullBody(tabCtx, e.RequestID, u)
-			}
-			if isCorpus {
-				c.wg.Add(1)
-				go c.pullCorpus(tabCtx, e.RequestID, kind)
-			}
 
 		case *network.EventLoadingFailed:
 			c.mu.Lock()
@@ -163,7 +228,6 @@ func corpusKind(t network.ResourceType, mime, url string) string {
 // pullCorpus retrieves a body and folds its readable strings into the
 // membership index. The body itself is discarded immediately.
 func (c *collector) pullCorpus(tabCtx context.Context, id network.RequestID, kind string) {
-	defer c.wg.Done()
 	var body []byte
 	err := chromedp.Run(tabCtx, chromedp.ActionFunc(func(ctx context.Context) error {
 		b, err := network.GetResponseBody(id).Do(ctx)
@@ -296,7 +360,6 @@ func (c *collector) blockedErr() error {
 }
 
 func (c *collector) pullBody(tabCtx context.Context, id network.RequestID, u string) {
-	defer c.wg.Done()
 	var body []byte
 	err := chromedp.Run(tabCtx, chromedp.ActionFunc(func(ctx context.Context) error {
 		b, err := network.GetResponseBody(id).Do(ctx)
@@ -347,42 +410,55 @@ func (c *collector) finish(tabCtx context.Context) {
 	}
 }
 
-// considerCanvases rasterises canvas regions that are large enough to be
-// carrying content, at most once per canvas, at the checkpoint where the canvas
-// filled the most of the viewport.
+// rasteriseCanvases screenshots the canvas regions large enough to be carrying
+// content, once each, after the sweep.
+//
+// This used to run inside the checkpoint loop, offering a screenshot at every
+// stop and re-taking one whenever a canvas grew. Two things were wrong with
+// that. Page.captureScreenshot waits for the compositor to produce a frame, and
+// on a SwiftShader-rasterised WebGL page that wait is measured in seconds --
+// paid repeatedly, inside the loop whose latency the whole rewrite is about.
+//
+// And the pixels are only ever read by OCR or by a vision model. Both are off
+// unless asked for, so in the default configuration every one of those
+// screenshots was decoded, cropped, re-encoded and then dropped unread. The
+// caller now enables this only when something exists that can look at the
+// result, which is why CaptureCanvas is no longer on by default.
 //
 // The screenshot is of the viewport, cropped in Go. Asking Chromium for a
 // clipped capture would save a little transfer, but the clip rectangle's frame
 // of reference has moved between Chromium versions, and a crop computed here
 // from the rectangle the page itself reported is exact and stays exact.
-func (c *collector) considerCanvases(ctx context.Context, snap *capture.Snapshot, cp int) {
-	if !c.opts.CaptureCanvas {
+func (c *collector) rasteriseCanvases(ctx context.Context, canvases []capture.Canvas) {
+	if !c.opts.CaptureCanvas || len(canvases) == 0 {
 		return
 	}
+	// Largest first: if the budget only stretches to one screenshot, it should
+	// be of the canvas most likely to be carrying the page.
+	ranked := append([]capture.Canvas(nil), canvases...)
+	sort.SliceStable(ranked, func(i, j int) bool {
+		return ranked[i].ViewportShare > ranked[j].ViewportShare
+	})
+
 	var want []capture.Canvas
-	for _, cv := range snap.Canvases {
+	for _, cv := range ranked {
 		if cv.ViewportShare < c.opts.CanvasShareGate {
 			continue
 		}
-		if prev, ok := c.res.CanvasShots[cv.Path]; ok && prev.Share >= cv.ViewportShare {
-			continue
-		}
-		// A canvas mostly outside the viewport crops to a sliver.
-		if cv.ViewBox.Bottom() <= 0 || cv.ViewBox.Y() >= snap.ViewportH {
-			continue
-		}
 		want = append(want, cv)
+		if len(want) >= maxCanvasShots {
+			break
+		}
 	}
 	if len(want) == 0 {
 		return
 	}
 
-	// Page.captureScreenshot waits for the compositor to produce a frame, and a
-	// tab that has stopped compositing never produces one. Without a deadline
-	// here a single unlucky canvas would consume the entire job budget, so the
-	// screenshot is treated as optional: if it does not arrive quickly, the
-	// sweep carries on without it.
-	shotCtx, cancelShot := context.WithTimeout(ctx, 10*time.Second)
+	// A tab that has stopped compositing never produces a frame. Without a
+	// deadline a single unlucky canvas consumes the entire job budget, so the
+	// screenshot is optional: if it does not arrive quickly, recovery proceeds
+	// on the evidence it already has.
+	shotCtx, cancelShot := context.WithTimeout(ctx, canvasShotBudget)
 	defer cancelShot()
 
 	var shot []byte
@@ -398,7 +474,7 @@ func (c *collector) considerCanvases(ctx context.Context, snap *capture.Snapshot
 		return nil
 	}))
 	if err != nil || len(shot) == 0 {
-		c.opts.logf("canvas screenshot failed at checkpoint %d: %v", cp, err)
+		c.opts.logf("canvas screenshot failed: %v", err)
 		return
 	}
 	img, err := png.Decode(bytes.NewReader(shot))
@@ -420,14 +496,16 @@ func (c *collector) considerCanvases(ctx context.Context, snap *capture.Snapshot
 			continue
 		}
 		c.res.CanvasShots[cv.Path] = &CanvasShot{
-			Path:       cv.Path,
-			PNG:        buf.Bytes(),
-			Share:      cv.ViewportShare,
-			Checkpoint: cp,
-			Uniform:    isUniform(crop),
+			Path:    cv.Path,
+			PNG:     buf.Bytes(),
+			Share:   cv.ViewportShare,
+			Uniform: isUniform(crop),
 		}
 	}
 }
+
+// canvasShotBudget bounds the wait for a compositor frame.
+const canvasShotBudget = 2 * time.Second
 
 // cropTo cuts the canvas rectangle out of a viewport screenshot, converting CSS
 // pixels to device pixels and clamping to the image.

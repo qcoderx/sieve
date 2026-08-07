@@ -1,4 +1,4 @@
-﻿package capture
+package capture
 
 import (
 	"sort"
@@ -274,6 +274,12 @@ func (a *Accumulator) reinforce(dst *Node, n *Node) {
 	// background.
 	if !n.InvisibleColor {
 		dst.InvisibleColor = false
+	}
+	// One sighting of a declared reveal is enough to establish it: the page
+	// said so once, and a later checkpoint catching the element mid-transition
+	// does not unsay it.
+	if n.Revealable {
+		dst.Revealable = true
 	}
 	better := n.Opacity > dst.Opacity || (n.Opacity >= dst.Opacity && n.Visible && !dst.Visible)
 	if better {

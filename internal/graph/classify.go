@@ -34,6 +34,11 @@ type candidate struct {
 	// InvisibleColor marks text whose colour matched what was behind it.
 	InvisibleColor bool
 
+	// Declared marks a run kept on the page's own statement that it would be
+	// revealed, rather than on sieve having seen it revealed. It is never
+	// treated as verified and it is always reported in the audit.
+	Declared bool
+
 	// Keep is false for candidates that never became visible to anyone.
 	Keep       bool
 	DropReason string
@@ -57,6 +62,20 @@ type candidate struct {
 // Scroll-reveal animations start at 0 and finish at 1, so the test is always
 // against the maximum opacity ever observed, never against one checkpoint.
 const minVisibleOpacity = capture.MinVisibleOpacity
+
+// edgeBand is how close to the top or bottom of the viewport a pinned run has
+// to sit before it can be read as furniture, as a fraction of viewport height.
+// A sticky bar is a strip; 18% of a 900px viewport is 162px, which comfortably
+// covers a tall header with a logo and still excludes anything occupying the
+// body of the screen.
+//
+// maxChromeRunLen is the other half of that test. Navigation is labels and
+// content is sentences, so a run long enough to be prose is not furniture no
+// matter where it is pinned.
+const (
+	edgeBand        = 0.18
+	maxChromeRunLen = 60
+)
 
 // classify decides, for each reassembled run, which part of the page it belongs
 // to and whether it is content at all.
@@ -137,8 +156,26 @@ func candidateFrom(r *run) *candidate {
 	// reported, not by guessing from class names, and a markup-based extractor
 	// ingests all of it verbatim.
 	if r.MaxOpacity < minVisibleOpacity {
-		c.Keep = false
-		c.DropReason = "never reached visible opacity"
+		// A run the page declared it would reveal is kept, and labelled.
+		//
+		// The opacity rule stays exactly as strict about what it will vouch
+		// for: this run is not marked as seen, it is marked as declared. What
+		// changes is that a scroll-driven site no longer loses its entire
+		// argument because the sweep could not afford to stop at the precise
+		// offset that fades each section in. On pear.no that is the difference
+		// between an artifact with the terms, the selectivity and the
+		// application in it and one without them.
+		//
+		// The distinction is the page's own: `transition: opacity` is written
+		// by an author who intends the text to be read. Text hidden in order to
+		// stay hidden -- the injection case this filter exists for -- carries no
+		// such declaration and is still dropped here.
+		if r.Revealable {
+			c.Declared = true
+		} else {
+			c.Keep = false
+			c.DropReason = "never reached visible opacity"
+		}
 	}
 	// Text the same colour as its background renders at full opacity and is
 	// still unreadable, which is exactly how the opacity defence is bypassed.
@@ -181,16 +218,38 @@ func assignRegions(cands []*candidate, m *capture.Merged) {
 			continue
 		}
 
-		// A run pinned to the viewport has no place in the document's reading
-		// order -- it is beside the content, not in it. This is the signal that
-		// keeps a sticky header out of the middle of chapter four.
+		// A run pinned to the viewport is usually beside the content rather than
+		// in it, and that is the signal that keeps a sticky header out of the
+		// middle of chapter four. But "pinned" alone is not enough, because
+		// pinned sections are a whole genre of site: the page holds a panel
+		// still while the scroll drives an animation, swaps in the next panel,
+		// and holds that. Every word of the argument is pinned.
+		//
+		// Splitting the viewport in half and calling the top header and the
+		// bottom footer classifies such a page as pure chrome. pear.no is built
+		// this way, and that rule filed all thirty-four blocks of its extracted
+		// body copy as furniture: an artifact reporting no content for a page
+		// whose text had been captured perfectly.
+		//
+		// Furniture has two properties this does not. It hugs an edge of the
+		// viewport -- that is what makes it furniture rather than page -- and it
+		// is short, because navigation is labels and content is sentences.
+		// Requiring both leaves the pinned-section genre in the reading order
+		// while still catching sticky bars, which is the case that mattered.
 		if c.Fixed {
-			if c.BBox.Y() > vh*0.6 {
-				c.Region = RegionFooter
-			} else {
+			atTop := c.BBox.Bottom() <= vh*edgeBand
+			atBottom := c.BBox.Y() >= vh*(1-edgeBand)
+			brief := utf8.RuneCountInString(c.Text) <= maxChromeRunLen
+			switch {
+			case brief && atTop:
 				c.Region = RegionHeader
+				continue
+			case brief && atBottom:
+				c.Region = RegionFooter
+				continue
 			}
-			continue
+			// Pinned, but neither brief nor at an edge: this is a held section,
+			// so it falls through to the ordinary tests and keeps its place.
 		}
 
 		// Without landmarks, position is what is left. Text in the first screen

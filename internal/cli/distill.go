@@ -17,20 +17,26 @@ import (
 	"github.com/qcoderx/sieve/internal/snapshot"
 )
 
+// teardownReserve is the wall-clock time held back from the distillation for
+// emitting the artifact and releasing Chromium. Shutting the browser down is
+// the larger half and is easy to forget: it costs a few hundred milliseconds
+// whatever the page was.
+const teardownReserve = 900 * time.Millisecond
+
 func runDistill(args []string, stdout, stderr io.Writer) int {
 	fs := flag.NewFlagSet("distill", flag.ContinueOnError)
 	fs.SetOutput(stderr)
 
 	var (
-		common       commonFlags
-		out          string
-		snapshotPath string
-		vision       bool
-		visionModel  string
-		visionCalls  int
+		common        commonFlags
+		out           string
+		snapshotPath  string
+		vision        bool
+		visionModel   string
+		visionCalls   int
 		reducedMotion bool
-		private      bool
-		quiet        bool
+		private       bool
+		quiet         bool
 	)
 	common.register(fs)
 	fs.StringVar(&out, "out", "./artifacts", "directory to write the artifact into")
@@ -85,6 +91,8 @@ func runDistill(args []string, stdout, stderr io.Writer) int {
 	opts.Render.ChromePath = common.chrome
 	opts.Render.ReducedMotion = reducedMotion
 	opts.Render.Logf = opts.Logf
+	// Every render sub-budget follows the timeout the user actually asked for.
+	opts.Render.ScaleTo(common.timeout - teardownReserve)
 
 	opts.Canvas = canvas.DefaultOptions()
 	opts.Canvas.EnableVision = vision
@@ -93,28 +101,43 @@ func runDistill(args []string, stdout, stderr io.Writer) int {
 	if visionModel != "" {
 		opts.Canvas.VisionModel = visionModel
 	}
+	// Rasterising a canvas is only worth the compositor wait when something is
+	// going to look at the pixels.
+	opts.Render.CaptureCanvas = vision || opts.Canvas.OCR != nil
 
+	rpath := robotsPath(common.memoryPath)
 	if common.obeyRobots {
-		opts.Robots = safety.NewRobotsCache(nil)
+		opts.Robots = loadRobots(rpath)
 	}
 
 	if !quiet {
 		fmt.Fprintf(stderr, "sieve %s — distilling %s\n", render.Version, target)
 	}
 
-	ctx, cancel := withTimeout(common.timeout)
+	// The distillation gets the timeout minus what the command still has to do
+	// after it: write four files and shut a browser down. `--timeout 10s` is a
+	// promise about how long running sieve takes, and a promise that only covers
+	// the part before the artifact is written is not the one anybody made.
+	ctx, cancel := withTimeout(common.timeout - teardownReserve)
 	defer cancel()
 
-	d := distill.New(opts)
-	defer d.Close()
-
+	// One distiller, built once, closed once.
+	//
+	// There were two: one created here and immediately shadowed by a second
+	// carrying the progress callback. `defer d.Close()` binds its receiver at
+	// the point the defer runs, so the deferred close belonged to the distiller
+	// that never did any work, and the one that owned the browser was released
+	// only on the success path. Every error return -- an unreachable host, a
+	// refusal, a timeout -- leaked a Chromium. That is the hundred and sixty
+	// stray processes, and they were slow enough to look like extraction bugs.
 	if !quiet {
 		opts.OnProgress = func(p distill.Progress) {
 			fmt.Fprintf(stderr, "  [%6s] %-8s %s\n",
 				p.Elapsed.Round(time.Millisecond), p.Stage, p.Message)
 		}
-		d = distill.New(opts)
 	}
+	d := distill.New(opts)
+	defer d.Close()
 
 	res, err := d.Distill(ctx, target)
 	if err != nil {
@@ -124,9 +147,16 @@ func runDistill(args []string, stdout, stderr io.Writer) int {
 				"sieve respects a site's stated boundaries rather than working around them.\n")
 			return 3
 		}
+		if containsErr(err, safety.ErrUnreachable) {
+			fmt.Fprintf(stderr, "\nsieve: %v\n", err)
+			fmt.Fprint(stderr, "\nThe host could not be reached, which is not a refusal: "+
+				"nothing about this site was declined. Check the name and the resolver, then retry.\n")
+			return 4
+		}
 		return fail(stderr, err)
 	}
 	saveMemory(common.memoryPath, d.Memory())
+	saveRobots(rpath, opts.Robots)
 
 	art, err := emit.Build(res.Graph)
 	if err != nil {
@@ -143,6 +173,16 @@ func runDistill(args []string, stdout, stderr io.Writer) int {
 		} else if !quiet {
 			fmt.Fprintf(stderr, "  snapshot: %s\n", snapshotResolved(snapshotPath, target))
 		}
+	}
+
+	// The browser has nothing left to do, and shutting it down is not free:
+	// Chromium takes the better part of a second to exit. Releasing it here,
+	// rather than leaving it to the deferred Close after the summary is printed,
+	// takes that second off the wall clock the user is measuring.
+	tClose := time.Now()
+	d.Close()
+	if common.verbose {
+		fmt.Fprintf(stderr, "  browser released in %v\n", time.Since(tClose).Round(time.Millisecond))
 	}
 
 	if quiet {
@@ -184,11 +224,20 @@ func printSummary(w io.Writer, dir string, res *distill.Result) {
 	fmt.Fprintf(w, "    order      %s (%s basis, %.0f%% method agreement)\n",
 		g.Audit.OrderConfidence, g.Audit.OrderBasis, g.Audit.OrderAgreement*100)
 	fmt.Fprintf(w, "    headings   %s\n", g.Audit.HeadingConfidence)
+	for _, d := range g.Audit.Dropped {
+		fmt.Fprintf(w, "    excluded   %d run(s), %d chars — %s\n", d.Runs, d.Chars, d.Reason)
+	}
 	if !g.Audit.ReachedBottom {
 		fmt.Fprintf(w, "    !          the sweep did not reach the bottom of the document\n")
 	}
 	for _, n := range g.Audit.Notes {
 		fmt.Fprintf(w, "    note       %s\n", n)
+	}
+
+	// An artifact with no content is the most alarming thing this tool can
+	// produce, so it never goes out without an explanation attached.
+	if g.Stats.ContentNodes == 0 {
+		fmt.Fprintf(w, "\n  This page yielded no readable content. %s\n", emptyDiagnosis(g))
 	}
 
 	if len(res.Timing) > 0 {
@@ -198,6 +247,28 @@ func printSummary(w io.Writer, dir string, res *distill.Result) {
 		}
 	}
 	fmt.Fprintln(w)
+}
+
+// emptyDiagnosis says why a page produced nothing, in the terms a user can act
+// on. "No content" with no explanation is indistinguishable from a broken tool.
+func emptyDiagnosis(g *graph.Graph) string {
+	switch {
+	case g.Provenance.Blocked:
+		return "The site refused this client (" + g.Provenance.BlockedReason +
+			"). sieve respects that rather than working around it."
+	case len(g.Audit.Dropped) > 0:
+		d := g.Audit.Dropped[0]
+		return fmt.Sprintf("Every run that was captured was excluded: %s. "+
+			"If that reason looks wrong for this page, it is a bug worth reporting with a snapshot.", d.Reason)
+	case len(g.Latent) > 0:
+		return fmt.Sprintf("All %d run(s) of text on it were hidden from visitors and are quarantined; "+
+			"retrieve them with the hidden-content tool if you need them.", len(g.Latent))
+	case g.Stats.RawNodes == 0:
+		return "The browser reported no text at all. The page's words are most likely drawn " +
+			"into a canvas, or held behind an interaction such as a click-to-enter screen."
+	default:
+		return "Its text was captured but none of it became content. This is worth reporting with a snapshot."
+	}
 }
 
 func pinnedSuffix(pinned bool) string {

@@ -23,6 +23,9 @@ type run struct {
 	MaxOpacity  float64
 	EverVisible bool
 	Fixed       bool
+	// Revealable is set when any constituent node's element declared a
+	// transition or animation that would have made it visible.
+	Revealable bool
 	// leadPad and trailPad record whitespace that surrounded the run's first
 	// and last fragments in the source.
 	leadPad  bool
@@ -75,6 +78,7 @@ func reassemble(nodes []capture.Node) []*group {
 			LineTop: n.LineTop, BBox: n.BBox, Lead: n,
 			MaxOpacity: n.MaxOpacity, EverVisible: n.EverVisible, Fixed: n.Fixed,
 			leadPad: n.Pad&1 != 0, trailPad: n.Pad&2 != 0,
+			Revealable: n.Revealable,
 		})
 	}
 
@@ -202,7 +206,26 @@ func joinRun(cur, r *run) {
 	fs := maxf(r.Lead.FontSize, cur.Lead.FontSize)
 	thresh := maxf(r.Lead.Tracking, 0) + 0.14*fs
 	gap := r.BBox.X() - cur.BBox.Right()
-	if gap > thresh {
+
+	// Two fragments are welded together only on positive evidence that they are
+	// contiguous on one line: the next one starts just after the last one ends,
+	// and they sit at the same height.
+	//
+	// The test used to be the other way round -- join unless the gap is wide --
+	// and a gap is not wide when it is negative. Any pair of fragments whose
+	// boxes overlap or run backwards therefore joined silently, which is the
+	// normal state of affairs for animated text: pear.no stacks the two halves
+	// of a line in transformed spans and got "We share inwhat it earns", and
+	// stacks its navigation items at a common left edge and got
+	// "The ModelThe WorkThe TermsQuestions".
+	//
+	// Erring towards a space is the right asymmetry. A space too many is a
+	// typographic blemish a reader steps over; a space too few invents a word
+	// that is not on the page, and an agent quoting it is quoting something
+	// nobody wrote.
+	sameLine := absf(r.BBox.CenterY()-cur.BBox.CenterY()) <= 0.4*fs
+	contiguous := sameLine && gap >= -0.5*fs && gap <= thresh
+	if !contiguous {
 		sep = " "
 	}
 	// Whitespace the source actually contained overrides the geometric guess.
@@ -242,6 +265,9 @@ func absorb(cur, r *run) {
 	cur.trailPad = r.trailPad
 	if r.MaxOpacity > cur.MaxOpacity {
 		cur.MaxOpacity = r.MaxOpacity
+	}
+	if r.Revealable {
+		cur.Revealable = true
 	}
 	if r.EverVisible {
 		cur.EverVisible = true

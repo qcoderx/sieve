@@ -103,6 +103,14 @@ type Thresholds struct {
 	// CanvasViewportShare is the fraction of the viewport a canvas must cover
 	// for recovery to be worth attempting.
 	CanvasViewportShare float64
+
+	// ShatteredTextRatio is the share of text runs that may be one- or
+	// two-character fragments before the served HTML is treated as split text
+	// that only a browser can reassemble.
+	ShatteredTextRatio float64
+	// MinShatteredRuns stops the ratio firing on tiny documents, where three
+	// fragments out of eight runs is noise rather than a pattern.
+	MinShatteredRuns int
 }
 
 // DefaultThresholds is the pinned configuration.
@@ -114,6 +122,8 @@ func DefaultThresholds() Thresholds {
 		MinStaticChars:      400,
 		ThinTextRatio:       0.012,
 		CanvasViewportShare: 0.25,
+		ShatteredTextRatio:  0.18,
+		MinShatteredRuns:    8,
 	}
 }
 
@@ -305,6 +315,43 @@ func Score(sig static.Signals, libWeight float64, libName string, th Thresholds)
 			"(page otherwise scored %.3f)", floor, libName, score)
 		return d
 	}
+
+	// Split text is the same kind of evidence, and it is invisible to every
+	// factor above.
+	//
+	// A page that shatters its headings into one element per character serves
+	// all of its text, in quantity, with structure around it. It scores as an
+	// easy page and it is the hardest kind there is: the fragments can only be
+	// put back together from rendered line boxes, so tier 0 emits them in
+	// document order and the artifact spells words wrong. organimo.com serves
+	// 2.9% readable text with a full outline, scored 0.180, answered at tier 0,
+	// and produced "Liitless m" and a heading reading "e / v / er / n / eed."
+	//
+	// Nothing about that is recoverable by weighting. Either a browser lays the
+	// page out or the text is wrong, so this sets a floor.
+	//
+	// The floor is the sweep, not a single render, and the reason is the reason
+	// the text was split in the first place: nobody shatters a heading into
+	// thirty elements for the markup, they do it to animate the pieces, and
+	// animation on these pages is driven by scroll. Loading organimo.com once
+	// and capturing after settle reassembles the words correctly and finds three
+	// blocks, because the other 128 runs are still sitting at zero opacity
+	// waiting to be scrolled to. This matches libraryFloor, which already puts
+	// text-splitting plugins at the sweep when it recognises one by name; this
+	// rule reaches the same conclusion from the markup, for the plugins it
+	// cannot name.
+	if ratio := sig.SplitTextRatio(); sig.ShortRuns >= th.MinShatteredRuns && ratio >= th.ShatteredTextRatio {
+		if TierSweep.Rank() > d.Tier.Rank() {
+			d.Tier = TierSweep
+		}
+		d.Reason = fmt.Sprintf("raised to %q because the served HTML is split text: %d of %d text runs are "+
+			"one or two characters (%.0f%%), which is an animation library splitting words into per-character "+
+			"elements. Reassembling them needs rendered line boxes, so a static read would emit the fragments "+
+			"in document order and misspell the page (it otherwise scored %.3f)",
+			d.Tier, sig.ShortRuns, sig.TextRuns, ratio*100, score)
+		return d
+	}
+
 	d.Reason = explain(d, th)
 	return d
 }
@@ -340,7 +387,15 @@ func explain(d Decision, th Thresholds) string {
 		notes = append(notes, f.Note)
 	}
 	if len(notes) == 0 {
-		return fmt.Sprintf("score %.3f, below the %.2f escalation threshold", d.Score, th.EscalateAbove)
+		// No factor had anything to say, which happens when a page is so small
+		// there is nothing to measure. The message still has to match the
+		// decision: an earlier version hardcoded "below the escalation
+		// threshold" here and cheerfully printed it next to a tier of "sweep"
+		// at a score well above that threshold.
+		if d.Tier == TierFetch {
+			return fmt.Sprintf("score %.3f, below the %.2f escalation threshold", d.Score, th.EscalateAbove)
+		}
+		return fmt.Sprintf("score %.3f chose tier %q", d.Score, d.Tier)
 	}
 	return fmt.Sprintf("score %.3f chose tier %q; %s", d.Score, d.Tier, strings.Join(notes, "; "))
 }
@@ -385,6 +440,23 @@ func (m *Memory) Apply(host string, d Decision) Decision {
 		m.seen[host] = d.Tier
 	}
 	return d
+}
+
+// Predicted reports the tier this domain has needed before, or the empty tier
+// when it has never been seen.
+//
+// It exists so work that only pays off on an escalated page can be started
+// before the page has been scored. The memory is the only evidence available at
+// that point, and it is evidence the ladder already trusts enough to override a
+// fresh score with.
+func (m *Memory) Predicted(host string) Tier {
+	host = strings.ToLower(strings.TrimPrefix(host, "www."))
+	if host == "" {
+		return ""
+	}
+	m.mu.RLock()
+	defer m.mu.RUnlock()
+	return m.seen[host]
 }
 
 // Note records that a domain turned out to need a given tier, whether or not

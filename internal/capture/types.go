@@ -35,10 +35,17 @@ type Node struct {
 	Tag   string `json:"t"`  // lowercase tag name
 	Text  string `json:"x"`  // whitespace-normalised own text
 
-	Role     string `json:"r,omitempty"`  // explicit ARIA role
-	Aria     string `json:"al,omitempty"` // aria-label, when it differs from text
-	Landmark string `json:"lm,omitempty"` // nearest landmark ancestor: nav, header, footer, main, aside, form, dialog
-	Href     string `json:"h,omitempty"`  // resolved href when the node is inside a link
+	Role string `json:"r,omitempty"`  // explicit ARIA role
+	Aria string `json:"al,omitempty"` // aria-label, when it differs from text
+	// Landmark is the nearest landmark ancestor: nav, header, footer, main,
+	// aside, form, dialog.
+	//
+	// <header> and <footer> are resolved during the walk rather than reported
+	// raw. A document has at most one banner and one contentinfo, so only the
+	// first page-level header and the last page-level footer are landmarks; the
+	// rest are section furniture, which is content. See countPageLandmarks.
+	Landmark string `json:"lm,omitempty"`
+	Href     string `json:"h,omitempty"` // resolved href when the node is inside a link
 
 	FontSize   float64 `json:"fs"`           // px
 	Weight     int     `json:"fw"`           // 100..900, normalised from keywords
@@ -69,6 +76,17 @@ type Node struct {
 	// fragments of mixed content, where an inline link abuts the text beside it
 	// and geometry alone cannot say whether a space was written between them.
 	Pad int `json:"pd,omitempty"`
+
+	// Revealable marks a run that is not currently legible but whose element or
+	// an ancestor declares a transition or animation that would make it so.
+	//
+	// It is the page's own statement of intent, read from computed style: an
+	// author writes `transition: opacity .8s` on a section because the section
+	// is meant to appear. Text hidden in order to stay hidden carries no such
+	// declaration. The flag never promotes anything by itself; it lets the graph
+	// tell "waiting to be revealed" apart from "hidden", which are the same
+	// thing to an opacity threshold and very different things to a reader.
+	Revealable bool `json:"rv,omitempty"`
 
 	// Fixed marks a node inside a position:fixed or position:sticky subtree.
 	// Its BBox is in viewport coordinates, not document coordinates, because a
@@ -177,14 +195,14 @@ type Field struct {
 
 // Media is an image, video or 3D model reference.
 type Media struct {
-	Path    string `json:"p"`
-	Kind    string `json:"k"` // image | video | model
-	Src     string `json:"s"`
-	Alt     string `json:"a,omitempty"`
-	AltCapped bool `json:"ac,omitempty"` // alt text was truncated at the metadata cap
-	Title   string `json:"ti,omitempty"`
-	Caption string `json:"cp,omitempty"`
-	BBox    Box    `json:"bb"`
+	Path      string `json:"p"`
+	Kind      string `json:"k"` // image | video | model
+	Src       string `json:"s"`
+	Alt       string `json:"a,omitempty"`
+	AltCapped bool   `json:"ac,omitempty"` // alt text was truncated at the metadata cap
+	Title     string `json:"ti,omitempty"`
+	Caption   string `json:"cp,omitempty"`
+	BBox      Box    `json:"bb"`
 	// Decorative marks images the page itself flags as presentational
 	// (role="presentation" or an explicitly empty alt).
 	Decorative bool `json:"dec,omitempty"`
@@ -237,18 +255,18 @@ type Meta struct {
 
 // Snapshot is one checkpoint's worth of observation.
 type Snapshot struct {
-	Checkpoint int          `json:"n"`
-	ScrollY    float64      `json:"sy"`
-	DocHeight  float64      `json:"dh"`
-	ViewportW  float64      `json:"vw"`
-	ViewportH  float64      `json:"vh"`
-	Nodes      []Node       `json:"nodes"`
-	Latent     []LatentNode `json:"latent"`
-	Actions    []Action     `json:"actions"`
-	MediaItems []Media      `json:"media"`
-	Canvases   []Canvas     `json:"canvases"`
+	Checkpoint  int          `json:"n"`
+	ScrollY     float64      `json:"sy"`
+	DocHeight   float64      `json:"dh"`
+	ViewportW   float64      `json:"vw"`
+	ViewportH   float64      `json:"vh"`
+	Nodes       []Node       `json:"nodes"`
+	Latent      []LatentNode `json:"latent"`
+	Actions     []Action     `json:"actions"`
+	MediaItems  []Media      `json:"media"`
+	Canvases    []Canvas     `json:"canvases"`
 	Disclosures []Disclosure `json:"disc"`
-	Meta       *Meta        `json:"meta,omitempty"`
+	Meta        *Meta        `json:"meta,omitempty"`
 	// VisibleChars is how many characters of readable text the browser had on
 	// screen at this checkpoint. It is the denominator for the retention audit.
 	VisibleChars int `json:"vc"`

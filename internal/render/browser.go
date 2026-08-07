@@ -239,6 +239,9 @@ func (b *Browser) SetOptions(o Options) {
 	defer b.mu.Unlock()
 	launch := b.opts
 	// Preserve everything that was fixed at launch.
+	//
+	// Chromium's own flags cannot change after the process starts, so only the
+	// sweep-level knobs are honoured.
 	o.ChromePath = launch.ChromePath
 	o.Headless = launch.Headless
 	o.NoSandbox = launch.NoSandbox
