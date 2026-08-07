@@ -54,6 +54,12 @@ type GuardConfig struct {
 	MaxRedirects int
 	// Resolver is injectable for tests.
 	Resolver *net.Resolver
+	// Fallback is consulted only to confirm a negative, and only when the
+	// primary resolver has already refused. It exists because a platform
+	// resolver can report a live domain as nonexistent, and one mechanism's
+	// confident wrong answer should not end a run. Nil means Go's own DNS
+	// client, which is independent of the default resolver's getaddrinfo path.
+	Fallback *net.Resolver
 	// LookupTimeout bounds name resolution.
 	LookupTimeout time.Duration
 }
@@ -212,8 +218,52 @@ func (g *Guard) resolve(host string) ([]net.IPAddr, error) {
 			break
 		}
 	}
+
+	// Before believing a negative, get a second opinion from a different
+	// mechanism.
+	//
+	// Go's default resolver on Windows is getaddrinfo, and getaddrinfo under
+	// load reports a perfectly real domain as "no such host" -- a definitive
+	// answer, with IsNotFound set, that is simply wrong. It is not rare: on this
+	// project's own test corpus it took out four different live sites at various
+	// moments, and it kills the whole run at the first stage, with a message
+	// telling the operator to check a name that is fine.
+	//
+	// Retrying the same mechanism does not help, because the mechanism is not
+	// being slow, it is being confident. So the negative is confirmed against
+	// Go's own DNS client, which talks to the configured servers directly and
+	// fails independently. Two mechanisms agreeing that a name does not resolve
+	// is a real answer; one is a rumour.
+	//
+	// This costs nothing on the happy path -- it runs only when the run is about
+	// to be abandoned -- and it weakens nothing: whatever address comes back is
+	// checked against the private ranges below exactly as any other would be.
+	if addrs, ferr := g.resolveIndependently(host); ferr == nil && len(addrs) > 0 {
+		return addrs, nil
+	}
 	return nil, err
 }
+
+// independentResolver is Go's own DNS client rather than the platform's.
+var independentResolver = &net.Resolver{PreferGo: true}
+
+func (g *Guard) resolveIndependently(host string) ([]net.IPAddr, error) {
+	r := g.cfg.Fallback
+	if r == nil {
+		// A custom primary was configured and no fallback with it, so there is
+		// no independent mechanism to consult: the caller chose the resolver and
+		// its answer stands.
+		if g.cfg.Resolver != net.DefaultResolver {
+			return nil, errNoIndependentResolver
+		}
+		r = independentResolver
+	}
+	ctx, cancel := context.WithTimeout(context.Background(), g.cfg.LookupTimeout)
+	defer cancel()
+	return r.LookupIPAddr(ctx, host)
+}
+
+var errNoIndependentResolver = errors.New("no independent resolver available")
 
 // temporaryDNS reports whether the resolver called its own failure transient.
 func temporaryDNS(err error) bool {
