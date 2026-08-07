@@ -1,0 +1,188 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>Aurelia Atelier — Hand-finished furniture</title>
+<meta name="description" content="Aurelia Atelier makes hand-finished furniture in Lisbon. Founded 1974.">
+<meta property="og:title" content="Aurelia Atelier">
+<style>
+  :root { --ink: #12100e; --paper: #f6f2ec; }
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+  body { background: var(--paper); color: var(--ink); font-family: Georgia, serif; }
+
+  /* A pinned navigation. Its text repeats at every checkpoint and must not be
+     scattered through the reading order. */
+  nav.pinned {
+    position: fixed; top: 0; left: 0; right: 0; height: 64px; z-index: 10;
+    display: flex; gap: 24px; align-items: center; padding: 0 32px;
+    font-size: 13px; letter-spacing: 0.08em; text-transform: uppercase;
+    background: rgba(246,242,236,0.9);
+  }
+  nav.pinned a { color: var(--ink); text-decoration: none; }
+
+  /* z-index:0 makes each section a stacking context, so the hero canvas at
+     z-index:-1 sits behind the section's text but still in front of the body
+     background rather than being painted out of existence by it. */
+  section { min-height: 100vh; padding: 120px 64px; position: relative; z-index: 0; }
+
+  /* Split-text: the headline is shattered into one span per character, which is
+     what GSAP SplitText and similar plugins produce. */
+  .split { font-size: 76px; font-weight: 700; line-height: 1.05; letter-spacing: -0.02em; }
+  .split .word { display: inline-block; }
+  .split .char { display: inline-block; }
+
+  /* Scroll reveal: content starts invisible and translated, and only lands at
+     its real position once revealed. */
+  .reveal { opacity: 0; transform: translateY(60px); transition: opacity .35s, transform .35s; }
+  .reveal.in { opacity: 1; transform: none; }
+
+  .lede { font-size: 22px; max-width: 54ch; margin-top: 32px; }
+  h2.styled-div, .styled-div { font-size: 44px; font-weight: 700; margin-bottom: 24px; }
+  .kicker { font-size: 12px; letter-spacing: .18em; text-transform: uppercase; opacity: .6; }
+  p { font-size: 17px; line-height: 1.6; max-width: 62ch; margin-bottom: 16px; }
+
+  /* Two columns, so the ordering pass has something to get wrong. */
+  .cols { display: grid; grid-template-columns: 1fr 1fr; gap: 64px; }
+
+  canvas#hero-canvas { position: absolute; inset: 0; width: 100%; height: 100%; z-index: -1; }
+  footer { padding: 64px; font-size: 14px; }
+  form { display: grid; gap: 12px; max-width: 420px; margin-top: 24px; }
+  label { font-size: 13px; }
+  input, select, textarea { padding: 8px; font: inherit; }
+  .hidden-dupe { display: none; }
+</style>
+</head>
+<body>
+
+<nav class="pinned" aria-label="Primary">
+  <a href="/work">Work</a>
+  <a href="/studio">Studio</a>
+  <a href="/materials">Materials</a>
+  <a href="/contact">Contact</a>
+</nav>
+
+<!-- A display:none duplicate of the navigation, as shipped by most responsive
+     templates. Nothing inside it is reachable by scrolling and it must not
+     appear in the artifact. -->
+<nav class="hidden-dupe">
+  <a href="/work">Work</a><a href="/studio">Studio</a><a href="/materials">Materials</a>
+</nav>
+
+<section id="hero">
+  <canvas id="hero-canvas" width="800" height="600" aria-label="Rotating oak chair"></canvas>
+  <p class="kicker">Lisbon, since 1974</p>
+  <h1 class="split" id="headline"></h1>
+  <p class="lede reveal">We make chairs, tables and cabinets by hand, in oak, walnut and Portuguese cork.</p>
+</section>
+
+<section id="studio">
+  <div class="styled-div reveal">The studio</div>
+  <div class="cols">
+    <div>
+      <p class="reveal">Aurelia Atelier was founded in 1974 by Ines Aurelia in a converted bakery in Alcantara. The workshop has occupied the same three rooms ever since.</p>
+      <p class="reveal">Eleven people work here. Six are cabinetmakers, two are finishers, and three keep everything else moving.</p>
+    </div>
+    <div>
+      <p class="reveal">Every piece is made to order. A dining table takes nine weeks; a cabinet with hand-cut dovetails takes fourteen.</p>
+      <p class="reveal">We do not use veneer over particle board, and we do not stain wood to imitate a species it is not.</p>
+    </div>
+  </div>
+</section>
+
+<section id="materials">
+  <div class="styled-div reveal">Materials</div>
+  <ul class="reveal">
+    <li>European oak, quarter-sawn, air-dried for four years</li>
+    <li>American black walnut</li>
+    <li>Portuguese cork, from Alentejo</li>
+    <li>Hard wax oil finish, no polyurethane</li>
+  </ul>
+  <figure class="reveal">
+    <img src="grain.png" alt="Close-up of quarter-sawn oak grain" width="320" height="200">
+    <figcaption>Quarter-sawn oak, showing medullary ray fleck.</figcaption>
+  </figure>
+</section>
+
+<!-- A web component: its content lives in a shadow root and is invisible to
+     any parser that only reads the light DOM. -->
+<section id="press">
+  <press-quotes></press-quotes>
+</section>
+
+<section id="contact">
+  <div class="styled-div reveal">Make an enquiry</div>
+  <form action="/enquiry" method="post">
+    <label for="email">Email address</label>
+    <input id="email" name="email" type="email" required placeholder="you@example.com">
+    <label for="piece">Piece</label>
+    <select id="piece" name="piece">
+      <option>Dining table</option>
+      <option>Cabinet</option>
+      <option>Chair</option>
+    </select>
+    <label for="notes">Notes</label>
+    <textarea id="notes" name="notes" rows="4"></textarea>
+    <input type="hidden" name="csrf" value="xyz">
+    <button type="submit">Send enquiry</button>
+  </form>
+</section>
+
+<footer>
+  <p>Aurelia Atelier, Rua da Cozinha 4, Lisboa. <a href="mailto:hello@example.com">hello@example.com</a></p>
+</footer>
+
+<script>
+// Split the headline into per-character spans after load, the way a text
+// animation plugin would.
+(function () {
+  var text = "Furniture that outlives its owner";
+  var h = document.getElementById("headline");
+  text.split(" ").forEach(function (word, wi) {
+    var w = document.createElement("span");
+    w.className = "word";
+    word.split("").forEach(function (ch) {
+      var c = document.createElement("span");
+      c.className = "char";
+      c.textContent = ch;
+      w.appendChild(c);
+    });
+    h.appendChild(w);
+    if (wi < text.split(" ").length - 1) h.appendChild(document.createTextNode(" "));
+  });
+})();
+
+// Reveal on scroll: nothing below the fold exists at any meaningful opacity
+// until the viewport reaches it.
+(function () {
+  var io = new IntersectionObserver(function (entries) {
+    entries.forEach(function (e) {
+      if (e.isIntersecting) e.target.classList.add("in");
+    });
+  }, { threshold: 0.15 });
+  document.querySelectorAll(".reveal").forEach(function (el) { io.observe(el); });
+})();
+
+// Shadow DOM content.
+customElements.define("press-quotes", class extends HTMLElement {
+  connectedCallback() {
+    var r = this.attachShadow({ mode: "open" });
+    r.innerHTML =
+      '<style>blockquote{font-size:28px;max-width:40ch;} cite{font-size:13px;}</style>' +
+      '<div class="styled-div" style="font-size:44px;font-weight:700;">Press</div>' +
+      '<blockquote>The most quietly confident furniture coming out of Portugal.</blockquote>' +
+      '<cite>Monocle, 2023</cite>';
+  }
+});
+
+// Paint something into the canvas so it is not uniform.
+(function () {
+  var c = document.getElementById("hero-canvas");
+  var g = c.getContext("2d");
+  for (var i = 0; i < 60; i++) {
+    g.fillStyle = "hsl(" + (i * 6) + ",40%,60%)";
+    g.fillRect(i * 13, (i * 29) % 500, 40, 80);
+  }
+})();
+</script>
+</body>
+</html>

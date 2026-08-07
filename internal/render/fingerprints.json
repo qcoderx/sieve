@@ -1,0 +1,210 @@
+[
+  {
+    "n": "lenis",
+    "g": "Lenis",
+    "w": 1.0,
+    "c": "scroll",
+    "note": "Smooth-scroll hijacker. window.scrollTo is intercepted, so the sweep must escalate to dispatched wheel events. Document coordinates may stay near zero, which switches ordering to checkpoint basis."
+  },
+  {
+    "n": "locomotive-scroll",
+    "s": "[data-scroll-container],.has-scroll-smooth",
+    "w": 1.0,
+    "c": "scroll",
+    "note": "Transform-based virtual scroll. window.scrollY does not advance; content is translated. Geometry-based ordering is unreliable here by design."
+  },
+  {
+    "n": "gsap-scrollsmoother",
+    "g": "ScrollSmoother",
+    "w": 1.0,
+    "c": "scroll",
+    "note": "Wraps content in a transformed container. Same failure shape as Locomotive."
+  },
+  {
+    "n": "gsap-scrolltrigger",
+    "g": "ScrollTrigger",
+    "w": 0.9,
+    "c": "scroll",
+    "note": "Pinned sections make DOM order diverge sharply from reading order. Geometry-based ordering is required."
+  },
+  {
+    "n": "gsap",
+    "g": "gsap",
+    "w": 0.6,
+    "c": "reveal"
+  },
+  {
+    "n": "framer-motion",
+    "s": "[data-framer-name],[data-projection-id]",
+    "w": 0.6,
+    "c": "reveal"
+  },
+  {
+    "n": "aos",
+    "g": "AOS",
+    "w": 0.7,
+    "c": "reveal",
+    "note": "Animate-on-scroll: elements start at opacity 0 and are revealed by IntersectionObserver, which requires frame production."
+  },
+  {
+    "n": "scrollmagic",
+    "g": "ScrollMagic",
+    "w": 0.8,
+    "c": "scroll"
+  },
+  {
+    "n": "scrollreveal",
+    "g": "ScrollReveal",
+    "w": 0.7,
+    "c": "reveal"
+  },
+  {
+    "n": "swiper",
+    "s": ".swiper,.swiper-container",
+    "w": 0.5,
+    "c": "carousel",
+    "note": "Carousel slides beyond the first are often present but translated off-screen or display:none, so they land in the latent tier."
+  },
+  {
+    "n": "splide",
+    "s": ".splide",
+    "w": 0.5,
+    "c": "carousel"
+  },
+  {
+    "n": "three",
+    "g": "THREE",
+    "w": 0.9,
+    "c": "3d",
+    "note": "WebGL scene. Try runtime scene-graph introspection before rasterising anything."
+  },
+  {
+    "n": "three-devtools",
+    "g": "__THREE_DEVTOOLS__",
+    "w": 0.9,
+    "c": "3d"
+  },
+  {
+    "n": "spline",
+    "s": "spline-viewer,canvas[data-engine*=spline]",
+    "w": 0.95,
+    "c": "3d",
+    "note": "Spline scenes are pure canvas. Text in them is usually geometry, not DOM, and often has no textual origin in the payload."
+  },
+  {
+    "n": "babylon",
+    "g": "BABYLON",
+    "w": 0.9,
+    "c": "3d"
+  },
+  {
+    "n": "pixi",
+    "g": "PIXI",
+    "w": 0.85,
+    "c": "3d",
+    "note": "2D WebGL renderer. Text is drawn to a canvas and is invisible to any DOM walk."
+  },
+  {
+    "n": "rive",
+    "g": "rive",
+    "w": 0.8,
+    "c": "3d"
+  },
+  {
+    "n": "lottie",
+    "g": "lottie",
+    "w": 0.4,
+    "c": "3d",
+    "note": "Usually decorative. Lottie JSON can carry text layers, which the data-interception corpus will contain."
+  },
+  {
+    "n": "splittype",
+    "g": "SplitType",
+    "w": 0.8,
+    "c": "text",
+    "note": "Shatters headings into per-character elements. Reassembly is mandatory or every headline becomes N single-letter blocks."
+  },
+  {
+    "n": "splitting",
+    "s": "[data-splitting],.char",
+    "w": 0.75,
+    "c": "text",
+    "note": "Same shape as SplitType."
+  },
+  {
+    "n": "gsap-splittext",
+    "g": "SplitText",
+    "w": 0.8,
+    "c": "text"
+  },
+  {
+    "n": "barba",
+    "g": "barba",
+    "w": 0.6,
+    "c": "router",
+    "note": "Client-side page transitions. Navigation does not produce a document load, so a fresh render per URL is required."
+  },
+  {
+    "n": "swup",
+    "g": "Swup",
+    "w": 0.6,
+    "c": "router"
+  },
+  {
+    "n": "highway",
+    "g": "Highway",
+    "w": 0.6,
+    "c": "router"
+  },
+  {
+    "n": "next",
+    "g": "__NEXT_DATA__",
+    "w": 0.3,
+    "c": "framework",
+    "note": "Hydration blob present. Useful as a corroboration corpus for canvas recovery; never as a content source."
+  },
+  {
+    "n": "nuxt",
+    "g": "__NUXT__",
+    "w": 0.3,
+    "c": "framework"
+  },
+  {
+    "n": "remix",
+    "g": "__remixContext",
+    "w": 0.3,
+    "c": "framework"
+  },
+  {
+    "n": "apollo",
+    "g": "__APOLLO_STATE__",
+    "w": 0.3,
+    "c": "framework"
+  },
+  {
+    "n": "webflow",
+    "g": "Webflow",
+    "w": 0.4,
+    "c": "builder",
+    "note": "Webflow interactions animate opacity and transform on scroll, so first-paint HTML understates the page."
+  },
+  {
+    "n": "wix",
+    "s": "[id^=SITE_CONTAINER],[data-mesh-id]",
+    "w": 0.6,
+    "c": "builder",
+    "note": "Renders almost nothing server-side; a static fetch returns a shell."
+  },
+  {
+    "n": "framer-site",
+    "s": "[data-framer-root],#__framer-badge-container",
+    "w": 0.6,
+    "c": "builder"
+  },
+  {
+    "n": "squarespace",
+    "g": "Static.SQUARESPACE_CONTEXT",
+    "w": 0.4,
+    "c": "builder"
+  }
+]

@@ -1,0 +1,277 @@
+// Package cli implements sieve's subcommands.
+package cli
+
+import (
+	"context"
+	"encoding/json"
+	"flag"
+	"fmt"
+	"io"
+	"os"
+	"path/filepath"
+	"sort"
+	"strings"
+	"time"
+
+	"github.com/qcoderx/sieve/internal/escalate"
+	"github.com/qcoderx/sieve/internal/render"
+	"github.com/qcoderx/sieve/internal/safety"
+)
+
+// Run dispatches a subcommand. It returns a process exit code rather than
+// calling os.Exit, so the whole CLI stays testable.
+func Run(args []string, stdout, stderr io.Writer) int {
+	if len(args) == 0 {
+		usage(stderr)
+		return 2
+	}
+	cmd, rest := args[0], args[1:]
+
+	switch cmd {
+	case "distill":
+		return runDistill(rest, stdout, stderr)
+	case "replay":
+		return runReplay(rest, stdout, stderr)
+	case "doctor":
+		return runDoctor(rest, stdout, stderr)
+	case "bench":
+		return runBench(rest, stdout, stderr)
+	case "serve":
+		return runServe(rest, stdout, stderr)
+	case "mcp":
+		return runMCP(rest, stdout, stderr)
+	case "version", "--version", "-v":
+		fmt.Fprintf(stdout, "sieve %s\n", render.Version)
+		return 0
+	case "help", "--help", "-h":
+		usage(stdout)
+		return 0
+	default:
+		fmt.Fprintf(stderr, "sieve: unknown command %q\n\n", cmd)
+		usage(stderr)
+		return 2
+	}
+}
+
+func usage(w io.Writer) {
+	fmt.Fprint(w, `sieve — make a heavy website readable by an agent
+
+Usage:
+  sieve <command> [flags]
+
+Commands:
+  distill <url>     Produce an artifact for a URL
+  replay <file>     Rebuild an artifact from a recorded snapshot, offline
+  doctor [url]      Diagnose the environment and, optionally, one page
+  bench <dir>       Run a question set against the artifact and the raw page
+  serve <dir>       Serve artifacts with content negotiation
+  mcp               Run the MCP server on stdio
+  version           Print the version
+
+Run "sieve <command> -h" for the flags of a command.
+
+sieve escalates: most pages are answered by a plain HTTP fetch in well under a
+second, and the browser is used only where a cheap fetch comes back thin. Every
+artifact records which tier answered and why.
+`)
+}
+
+// commonFlags are shared by the commands that fetch pages.
+type commonFlags struct {
+	chrome     string
+	timeout    time.Duration
+	viewport   string
+	tierMin    string
+	tierMax    string
+	obeyRobots bool
+	allowPriv  bool
+	concurrency int
+	delay      time.Duration
+	verbose    bool
+	memoryPath string
+}
+
+func (c *commonFlags) register(fs *flag.FlagSet) {
+	fs.StringVar(&c.chrome, "chrome", "", "path to a Chromium binary (default: auto-detect)")
+	fs.DurationVar(&c.timeout, "timeout", 3*time.Minute, "overall time budget per page")
+	fs.StringVar(&c.viewport, "viewport", "1440x900", "viewport size, WxH")
+	fs.StringVar(&c.tierMin, "min-tier", "", "force at least this much work: fetch, render, sweep, recover")
+	fs.StringVar(&c.tierMax, "max-tier", "", "never work harder than this tier")
+	fs.BoolVar(&c.obeyRobots, "robots", true, "obey robots.txt and crawl-delay")
+	fs.BoolVar(&c.allowPriv, "allow-private-addresses", false,
+		"permit fetching private, loopback and link-local addresses (development only)")
+	fs.IntVar(&c.concurrency, "concurrency", 2, "maximum simultaneous requests to one host")
+	fs.DurationVar(&c.delay, "delay", 500*time.Millisecond, "minimum interval between requests to one host")
+	fs.BoolVar(&c.verbose, "v", false, "log progress")
+	fs.StringVar(&c.memoryPath, "memory", defaultMemoryPath(),
+		"file holding per-domain escalation memory (empty to disable)")
+}
+
+func (c *commonFlags) viewportSize() (int, int, error) {
+	parts := strings.SplitN(strings.ToLower(c.viewport), "x", 2)
+	if len(parts) != 2 {
+		return 0, 0, fmt.Errorf("viewport %q is not in WxH form", c.viewport)
+	}
+	var w, h int
+	if _, err := fmt.Sscanf(parts[0], "%d", &w); err != nil || w < 320 {
+		return 0, 0, fmt.Errorf("viewport width %q is not a sensible number", parts[0])
+	}
+	if _, err := fmt.Sscanf(parts[1], "%d", &h); err != nil || h < 240 {
+		return 0, 0, fmt.Errorf("viewport height %q is not a sensible number", parts[1])
+	}
+	return w, h, nil
+}
+
+func (c *commonFlags) tiers() (min, max escalate.Tier, err error) {
+	if c.tierMin != "" {
+		t, ok := escalate.ParseTier(c.tierMin)
+		if !ok {
+			return "", "", fmt.Errorf("unknown tier %q; expected fetch, render, sweep or recover", c.tierMin)
+		}
+		min = t
+	}
+	if c.tierMax != "" {
+		t, ok := escalate.ParseTier(c.tierMax)
+		if !ok {
+			return "", "", fmt.Errorf("unknown tier %q; expected fetch, render, sweep or recover", c.tierMax)
+		}
+		max = t
+	}
+	if min != "" && max != "" && min.Rank() > max.Rank() {
+		return "", "", fmt.Errorf("min-tier %q is above max-tier %q", min, max)
+	}
+	return min, max, nil
+}
+
+// guard builds the SSRF policy.
+//
+// The default is strict even for the CLI. A URL typed by a user is trustworthy;
+// a URL that arrived in a page the user asked to crawl is not, and depth
+// crawling makes the second case reachable from the first.
+func (c *commonFlags) guard() *safety.Guard {
+	cfg := safety.DefaultGuardConfig()
+	cfg.AllowPrivate = c.allowPriv
+	return safety.NewGuard(cfg)
+}
+
+func (c *commonFlags) limiter() *safety.Limiter {
+	// Conservative floors that cannot be configured to zero. Publishing an
+	// identity is permanent: one badly behaved release makes the project
+	// recognisable and blockable forever.
+	conc := c.concurrency
+	if conc < 1 {
+		conc = 1
+	}
+	if conc > 4 {
+		conc = 4
+	}
+	delay := c.delay
+	if delay < 200*time.Millisecond {
+		delay = 200 * time.Millisecond
+	}
+	return safety.NewLimiter(conc, delay)
+}
+
+func (c *commonFlags) logf(stderr io.Writer) func(string, ...any) {
+	if !c.verbose {
+		return nil
+	}
+	return func(format string, args ...any) {
+		fmt.Fprintf(stderr, "  "+format+"\n", args...)
+	}
+}
+
+// --- escalation memory persistence -----------------------------------------
+
+// defaultMemoryPath puts the escalation memory somewhere durable. Hysteresis
+// that only lasts for one process is not hysteresis.
+func defaultMemoryPath() string {
+	dir, err := os.UserCacheDir()
+	if err != nil {
+		return ""
+	}
+	return filepath.Join(dir, "sieve", "escalation.json")
+}
+
+func loadMemory(path string) *escalate.Memory {
+	m := escalate.NewMemory()
+	if path == "" {
+		return m
+	}
+	b, err := os.ReadFile(path)
+	if err != nil {
+		return m
+	}
+	var stored map[string]string
+	if err := json.Unmarshal(b, &stored); err == nil {
+		m.Restore(stored)
+	}
+	return m
+}
+
+func saveMemory(path string, m *escalate.Memory) {
+	if path == "" {
+		return
+	}
+	snap := m.Snapshot()
+	if len(snap) == 0 {
+		return
+	}
+	if err := os.MkdirAll(filepath.Dir(path), 0o755); err != nil {
+		return
+	}
+	b, err := json.MarshalIndent(snap, "", "  ")
+	if err != nil {
+		return
+	}
+	tmp := path + ".tmp"
+	if err := os.WriteFile(tmp, b, 0o644); err != nil {
+		return
+	}
+	_ = os.Remove(path)
+	_ = os.Rename(tmp, path)
+}
+
+// parseArgs parses flags that may appear before or after positional arguments.
+//
+// Go's flag package stops at the first non-flag argument, which would make
+// `sieve distill https://example.com --out ./artifacts` silently ignore --out.
+// That is the natural way to type the command and the way it is documented, so
+// parsing accommodates it rather than the other way round.
+func parseArgs(fs *flag.FlagSet, args []string) ([]string, error) {
+	var positional []string
+	rest := args
+	for {
+		if err := fs.Parse(rest); err != nil {
+			return nil, err
+		}
+		if fs.NArg() == 0 {
+			return positional, nil
+		}
+		positional = append(positional, fs.Arg(0))
+		rest = fs.Args()[1:]
+	}
+}
+
+// --- shared output helpers --------------------------------------------------
+
+func fail(stderr io.Writer, err error) int {
+	fmt.Fprintf(stderr, "sieve: %v\n", err)
+	return 1
+}
+
+func withTimeout(d time.Duration) (context.Context, context.CancelFunc) {
+	if d <= 0 {
+		return context.Background(), func() {}
+	}
+	return context.WithTimeout(context.Background(), d)
+}
+
+func sortedKeys[V any](m map[string]V) []string {
+	out := make([]string, 0, len(m))
+	for k := range m {
+		out = append(out, k)
+	}
+	sort.Strings(out)
+	return out
+}
