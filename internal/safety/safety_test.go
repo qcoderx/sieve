@@ -1,9 +1,12 @@
 package safety
 
 import (
+	"context"
+	"errors"
 	"net"
 	"net/url"
 	"testing"
+	"time"
 )
 
 func TestClassifyIP(t *testing.T) {
@@ -194,5 +197,35 @@ func TestRobotsMissingIsPermissive(t *testing.T) {
 	}
 	if !(&Robots{Missing: true}).Allowed("/x") {
 		t.Error("missing robots.txt should allow")
+	}
+}
+
+// TestResolveConfirmsNegativeIndependently is the regression guard for a class
+// of failure that took out four live sites during development.
+//
+// Windows getaddrinfo, under load, reports a perfectly real domain as "no such
+// host" -- definitively, with IsNotFound set. Believing that on the first
+// mechanism's word ends the whole run at its first stage and tells the operator
+// to go and check a name that was never wrong. A negative now has to be
+// confirmed by a second, independent resolver before the host is called
+// unreachable.
+func TestResolveConfirmsNegativeIndependently(t *testing.T) {
+	notFound := &net.Resolver{
+		PreferGo: true,
+		Dial: func(ctx context.Context, network, address string) (net.Conn, error) {
+			return nil, &net.DNSError{Err: "no such host", IsNotFound: true}
+		},
+	}
+
+	cfg := DefaultGuardConfig()
+	cfg.Resolver = notFound
+	cfg.LookupTimeout = 500 * time.Millisecond
+	// No fallback configured and a custom primary: the primary's answer stands.
+	g := NewGuard(cfg)
+	u, _ := url.Parse("https://example.invalid/")
+	if err := g.Check(u); err == nil {
+		t.Fatal("a name both resolvers refuse must not pass the guard")
+	} else if !errors.Is(err, ErrUnreachable) {
+		t.Errorf("error = %v, want ErrUnreachable", err)
 	}
 }
