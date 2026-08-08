@@ -238,32 +238,38 @@ func TestDeclaredDuplicatesDropped(t *testing.T) {
 // twice.
 func TestCollapseAdjacentRepeats(t *testing.T) {
 	mk := func(s string) *candidate { return &candidate{Text: s, Keep: true} }
-	in := []*candidate{
-		mk("HTML"), mk("CSS"), mk("JavaScript"),
-		mk("HTML"), mk("CSS"), mk("JavaScript"), // the clone track
-		mk("Over six years of experience building accessible web structures."),
-	}
-	// The clone is only collapsed where it is adjacent, so a run repeated later
-	// in the document survives. Interleave to prove it.
-	out := collapseAdjacentRepeats([]*candidate{
-		mk("Get in touch"), mk("Get in touch"), // marquee pair
-		mk("Some prose in between that separates the two occurrences."),
-		mk("Get in touch"), // a genuine second call to action
-	})
-	var texts []string
-	for _, c := range out {
-		texts = append(texts, c.Text)
-	}
-	if len(out) != 3 {
-		t.Fatalf("collapsed to %d blocks (%q), want 3", len(out), texts)
-	}
-	if texts[2] != "Get in touch" {
-		t.Errorf("dropped a non-adjacent repeat: %q", texts)
+	texts := func(cs []*candidate) []string {
+		var out []string
+		for _, c := range cs {
+			out = append(out, c.Text)
+		}
+		return out
 	}
 
-	// The adjacent clone track collapses, but nothing else does.
-	got := collapseAdjacentRepeats(in)
-	if len(got) != len(in) {
-		t.Errorf("collapsed a non-adjacent list: %d -> %d", len(in), len(got))
+	// A cloned track: the whole list repeats, and no item is ever immediately
+	// followed by itself. This is the case a one-block-back rule cannot see.
+	track := collapseAdjacentRepeats([]*candidate{
+		mk("HTML"), mk("CSS"), mk("JavaScript"), mk("React.js"),
+		mk("HTML"), mk("CSS"), mk("JavaScript"), mk("React.js"),
+		mk("Over six years of experience building accessible web structures."),
+	})
+	if got := texts(track); len(got) != 5 {
+		t.Errorf("cloned track not collapsed: %q", got)
+	}
+
+	// A run repeated later in the document, with content between, survives.
+	spaced := collapseAdjacentRepeats([]*candidate{
+		mk("Get in touch"),
+		mk("Some prose in between that separates the two occurrences."),
+		mk("Get in touch"),
+	})
+	if got := texts(spaced); len(got) != 3 {
+		t.Errorf("dropped a non-adjacent repeat: %q", got)
+	}
+
+	// An immediate echo of a single block still goes.
+	echo := collapseAdjacentRepeats([]*candidate{mk("LASISI QUADRI"), mk("LASISI QUADRI")})
+	if got := texts(echo); len(got) != 1 {
+		t.Errorf("immediate echo survived: %q", got)
 	}
 }

@@ -49,6 +49,16 @@ type Options struct {
 	// SettleFrames is how many consecutive animation frames must show no
 	// layout change before the page counts as settled.
 	SettleFrames int
+	// LoadBudget bounds how long sieve will wait for a page to arrive and stop
+	// moving, before it starts reading.
+	//
+	// It is deliberately separate from Budget, and it is not deducted from it.
+	// Charging a site's own loading time to the extraction meant that a page
+	// with an intro film or a preloader -- exactly the class of page this tool
+	// exists for -- handed the sweep whatever was left, and what was left was
+	// often one capture of a loading screen. A budget for reading a page should
+	// start when there is a page to read.
+	LoadBudget time.Duration
 	// SweepBudget bounds the in-page checkpoint loop. The loop rations itself
 	// against this: it plans its step size and its per-checkpoint settle wait
 	// so that the document is covered within it.
@@ -166,6 +176,7 @@ func DefaultOptions() Options {
 		SettleFloor:   60 * time.Millisecond,
 		RevealFloor:   450 * time.Millisecond,
 		SettleFrames:  2,
+		LoadBudget:    20 * time.Second,
 		SweepBudget:   5 * time.Second,
 		Budget:        10 * time.Second,
 		Passes:        2,
@@ -249,6 +260,8 @@ func (o *Options) ScaleTo(total time.Duration) {
 
 	// Navigation and the first settle are the fixed cost of having a page at
 	// all; the sweep gets what is left.
+	// The load allowance is generous and independent: waiting for a slow site is
+	// not work sieve is doing, and cutting it short only guarantees a thin read.
 	o.NavTimeout = scaleDur(render, 6, 10, 2*time.Second, 45*time.Second)
 	o.FirstSettle = scaleDur(render, 3, 25, 400*time.Millisecond, 6*time.Second)
 	o.SweepBudget = scaleDur(render, 3, 4, 800*time.Millisecond, 10*time.Minute)
