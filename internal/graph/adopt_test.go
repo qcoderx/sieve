@@ -187,3 +187,46 @@ func TestNoObservedRevealStillDrops(t *testing.T) {
 		}
 	}
 }
+
+// TestDeclaredDuplicatesDropped covers the side effect of keeping revealable
+// text: sites that animate headings very often ship two copies of them, one on
+// screen and a masked twin at opacity zero. Both used to be captured and only
+// one used to survive, for the wrong reason. Now both survive the visibility
+// rule, so the twin has to be dropped for saying nothing new.
+func TestDeclaredDuplicatesDropped(t *testing.T) {
+	n := func(path, text string, min, max, y float64) capture.Node {
+		return capture.Node{
+			Path: path, Block: path, Tag: "h2", Text: text,
+			MinOpacity: min, MaxOpacity: max, EverVisible: max > 0.12,
+			BBox: capture.Box{0, y, 400, 30}, FontSize: 32, Weight: 700,
+		}
+	}
+	m := &capture.Merged{
+		ViewportW: 1440, ViewportH: 900, DocHeight: 4000,
+		Nodes: []capture.Node{
+			// Three reveals watched happening, so the page animates.
+			n("r1", "The first paragraph watched fading into view on this page.", 0, 1, 10),
+			n("r2", "The second paragraph watched fading into view on this page.", 0, 1, 50),
+			n("r3", "The third paragraph watched fading into view on this page.", 0, 1, 90),
+			// A heading on screen, and its masked twin that never appeared.
+			n("vis", "LASISI QUADRI", 1, 1, 200),
+			n("twin", "LASISI QUADRI", 0, 0, 200),
+			// Two unobserved copies of the same words, neither ever on screen.
+			n("g1", "TECH STACK", 0, 0, 300),
+			n("g2", "TECH STACK", 0, 0, 300),
+		},
+	}
+
+	kept := map[string]int{}
+	for _, c := range classify(reassemble(m.Nodes), m) {
+		if c.Keep {
+			kept[dedupeKey(c.Text)]++
+		}
+	}
+	if got := kept[dedupeKey("LASISI QUADRI")]; got != 1 {
+		t.Errorf("kept %d copies of the visible heading, want 1 (the twin must go)", got)
+	}
+	if got := kept[dedupeKey("TECH STACK")]; got != 1 {
+		t.Errorf("kept %d copies of the unobserved heading, want 1", got)
+	}
+}

@@ -110,6 +110,7 @@ func classify(groups []*group, m *capture.Merged) []*candidate {
 		}
 	}
 
+	dropDeclaredDuplicates(cands)
 	assignRegions(cands, m)
 	markRepeats(cands)
 
@@ -127,6 +128,61 @@ func classify(groups []*group, m *capture.Merged) []*candidate {
 		c.Confidence = confidenceOf(c, ts)
 	}
 	return cands
+}
+
+// dropDeclaredDuplicates removes kept-but-unobserved runs whose words are
+// already in the artifact.
+//
+// Keeping a run on the evidence that the page animates its text is right, and
+// it has one predictable side effect: sites that animate text very often ship
+// two copies of it. A masked heading, a marquee, a crossfade between an old and
+// a new value -- one copy is on screen and its twin sits at opacity zero
+// waiting its turn. The visible copy was always captured; the hidden one used
+// to be dropped for being invisible, and is now kept for being revealable, so
+// the artifact gets both.
+//
+// A portfolio came back with a hundred and six duplicates in two hundred and
+// twenty blocks -- "HELLO, I AM", "LASISI QUADRI", "HELLO, I AM", "LASISI
+// QUADRI" -- and a median block length of ten characters.
+//
+// So a declared run that says nothing new is dropped. Precedence is what makes
+// this safe rather than arbitrary: a run sieve actually watched always wins over
+// one it merely believes in, and among two unobserved copies the first in
+// reading order wins. Nothing is lost, because the words remain in the artifact
+// exactly once.
+func dropDeclaredDuplicates(cands []*candidate) {
+	observed := make(map[string]bool, len(cands))
+	for _, c := range cands {
+		if c.Keep && !c.Declared {
+			observed[dedupeKey(c.Text)] = true
+		}
+	}
+	seen := make(map[string]bool, len(cands))
+	for _, c := range cands {
+		if !c.Keep || !c.Declared {
+			continue
+		}
+		k := dedupeKey(c.Text)
+		if k == "" {
+			continue
+		}
+		if observed[k] || seen[k] {
+			c.Keep = false
+			c.Declared = false
+			c.DropReason = dropDeclaredDupe
+			continue
+		}
+		seen[k] = true
+	}
+}
+
+// dropDeclaredDupe is the reason recorded for a hidden twin.
+const dropDeclaredDupe = "a hidden duplicate of text already present"
+
+// dedupeKey normalises a run for comparison: case and surrounding space are not
+// differences worth keeping two copies over.
+func dedupeKey(s string) string {
+	return strings.ToLower(strings.Join(strings.Fields(s), " "))
 }
 
 func candidateFrom(r *run) *candidate {
