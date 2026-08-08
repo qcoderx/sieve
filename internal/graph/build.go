@@ -204,8 +204,8 @@ func Build(in Input) (*Graph, error) {
 	return g, nil
 }
 
-// collapseAdjacentRepeats removes a run that repeats the one immediately before
-// it in reading order.
+// collapseAdjacentRepeats removes a sequence of runs that repeats the sequence
+// immediately before it in reading order.
 //
 // Carousels, marquees and infinite-scroll tracks work by holding two or more
 // copies of their items in the DOM so the loop has somewhere to go. Both copies
@@ -213,6 +213,11 @@ func Build(in Input) (*Graph, error) {
 // can be dropped for invisibility -- the artifact simply gets the list twice.
 // Four of six sites in a spot check carried it, up to thirty-three repeats each,
 // and it reads as though the page says everything twice.
+//
+// It has to match sequences, not single runs. A cloned track repeats its whole
+// list -- HTML, CSS, JavaScript, React, HTML, CSS, JavaScript, React -- and no
+// item there is ever immediately followed by itself, so a rule that only looks
+// one block back sees nothing wrong and every item survives twice.
 //
 // Adjacency is what makes this safe. Text that recurs across a page -- a
 // repeated call to action, a price appearing in a table and again in a summary
@@ -223,18 +228,53 @@ func collapseAdjacentRepeats(cands []*candidate) []*candidate {
 	if len(cands) < 2 {
 		return cands
 	}
-	out := make([]*candidate, 0, len(cands))
-	var prev string
-	for _, c := range cands {
-		k := dedupeKey(c.Text)
-		if k != "" && k == prev {
+	keys := make([]string, len(cands))
+	for i, c := range cands {
+		keys[i] = dedupeKey(c.Text)
+	}
+
+	drop := make([]bool, len(cands))
+	for i := 0; i < len(cands); i++ {
+		if drop[i] || keys[i] == "" {
 			continue
 		}
-		prev = k
-		out = append(out, c)
+		// Longest repeat first, so a cloned list of eight items collapses as one
+		// sequence rather than leaving seven survivors after the first item is
+		// matched on its own.
+		for n := maxRepeatRun; n >= 1; n-- {
+			if i+2*n > len(cands) {
+				continue
+			}
+			same := true
+			for k := 0; k < n; k++ {
+				if keys[i+k] == "" || keys[i+k] != keys[i+n+k] {
+					same = false
+					break
+				}
+			}
+			if !same {
+				continue
+			}
+			for k := 0; k < n; k++ {
+				drop[i+n+k] = true
+			}
+			i += n - 1
+			break
+		}
+	}
+
+	out := make([]*candidate, 0, len(cands))
+	for i, c := range cands {
+		if !drop[i] {
+			out = append(out, c)
+		}
 	}
 	return out
 }
+
+// maxRepeatRun is the longest cloned sequence recognised. A track long enough to
+// exceed it is collapsed in pieces, which is still an improvement.
+const maxRepeatRun = 24
 
 // buildAudit assembles the artifact's account of its own reliability.
 func buildAudit(in Input, g *Graph, ord orderResult, flow []*candidate, emittedChars int) Audit {

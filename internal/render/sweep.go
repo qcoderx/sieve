@@ -130,7 +130,11 @@ type CanvasShot struct {
 // Timing breaks the wall clock down so a slow site can be diagnosed without
 // re-running with a profiler attached.
 type Timing struct {
-	Navigate    time.Duration `json:"navigate_ms"`
+	Navigate time.Duration `json:"navigate_ms"`
+	// Load is how long the page took to arrive and stop moving. It is reported
+	// separately because it is the site's time, not sieve's, and the extraction
+	// budget does not start until it has elapsed.
+	Load        time.Duration `json:"load_ms"`
 	FirstSettle time.Duration `json:"first_settle_ms"`
 	Sweep       time.Duration `json:"sweep_ms"`
 	Total       time.Duration `json:"total_ms"`
@@ -218,22 +222,6 @@ func (b *Browser) Sweep(ctx context.Context, rawURL string, guard NavGuard) (*Re
 	// the tab, and with it any chance of asking the page what it had seen. A
 	// budget is a decision to stop working, not a reason to destroy the evidence.
 	callerCtx := ctx
-	if b.opts.Budget > 0 {
-		// The render budget is measured from here, so on its own it can end
-		// after the caller's deadline has already passed -- which is not a
-		// budget at all. When tier 0 has spent four seconds failing, a render
-		// that still believes it has its full allowance plans a first settle
-		// and a sweep for time that does not exist, and the tab is destroyed
-		// underneath it before either finishes. Every stage then reports a
-		// deadline it was never going to meet, and the artifact is empty.
-		limit := time.Now().Add(b.opts.Budget)
-		if dl, ok := ctx.Deadline(); ok && dl.Before(limit) {
-			limit = dl
-		}
-		var cancel context.CancelFunc
-		ctx, cancel = context.WithDeadline(ctx, limit)
-		defer cancel()
-	}
 	// The page deadline is carried by hand from here on.
 	//
 	// Everything below runs on tabCtx, which is derived from the browser's base
@@ -434,7 +422,8 @@ func (b *Browser) Sweep(ctx context.Context, rawURL string, guard NavGuard) (*Re
 	// a hero mid-fade records it at the opacity it happened to have, and every
 	// downstream signal reads from that number.
 	// Waiting for the document and waiting for it to stop moving are one wait,
-	// and it gets a third of what is left -- no more.
+	// and it is paid for out of the load allowance rather than out of the
+	// budget for reading the page.
 	//
 	// The wait is worth having: it is what stops a client-rendered page being
 	// swept before it has written anything. But on a page whose boot saturates
@@ -459,18 +448,9 @@ func (b *Browser) Sweep(ctx context.Context, rawURL string, guard NavGuard) (*Re
 	// time plus the settle budget, when what is actually wanted is "tell me when
 	// this page is both loaded and still" -- and the settle loop, which gates
 	// itself on readyState, answers exactly that question in one call.
-	readyBudget := b.opts.NavTimeout + b.opts.FirstSettle
-	if hasDeadline {
-		// Never more than a share of what is left. A page whose boot blocks the
-		// main thread for five seconds will happily take the whole budget to
-		// declare itself ready, and then there is nothing left to read it with:
-		// pear.no settled at 4.9s of an 8s render and returned an empty
-		// artifact. Waiting less means capturing a page mid-boot, which is worth
-		// saying; capturing nothing is not worth anything.
-		avail := time.Until(deadline) - sweepReserve
-		if share := avail / 3; share < readyBudget {
-			readyBudget = share
-		}
+	readyBudget := b.opts.LoadBudget - time.Since(start)
+	if readyBudget < b.opts.FirstSettle {
+		readyBudget = b.opts.FirstSettle
 	}
 	if readyBudget < 300*time.Millisecond {
 		readyBudget = 300 * time.Millisecond
@@ -497,6 +477,34 @@ func (b *Browser) Sweep(ctx context.Context, rawURL string, guard NavGuard) (*Re
 		pageStillLoading = true
 	}
 	res.Timing.FirstSettle = time.Since(settleStart)
+	res.Timing.Load = time.Since(start)
+
+	// The clock for reading the page starts now.
+	//
+	// It used to start at navigation, which charged the page's own loading time
+	// to the extraction: a site that spends four seconds on an intro film or a
+	// preloader handed the sweep whatever was left of ten, and what was left was
+	// often a single capture of a loading screen. That is the wrong bargain. The
+	// budget exists to bound how long sieve spends *reading* a page, and a page
+	// that has not arrived yet is not being read.
+	//
+	// Waiting is bounded separately by LoadBudget, so a site that never finishes
+	// loading still ends. But within that allowance, sieve waits -- and then
+	// gives the extraction its full budget, measured from the moment there was
+	// something to extract.
+	extractCtx := callerCtx
+	if b.opts.Budget > 0 {
+		limit := time.Now().Add(b.opts.Budget)
+		if dl, ok := callerCtx.Deadline(); ok && dl.Before(limit) {
+			limit = dl
+		}
+		var cancel context.CancelFunc
+		extractCtx, cancel = context.WithDeadline(callerCtx, limit)
+		defer cancel()
+	}
+	deadline, hasDeadline = extractCtx.Deadline()
+	b.opts.logf("page ready after %v; extraction budget starts now (%v)",
+		res.Timing.Load.Round(time.Millisecond), b.opts.Budget.Round(time.Millisecond))
 	b.opts.logf("first settle took %v (page measured %dms, settled=%v)",
 		res.Timing.FirstSettle.Round(time.Millisecond), firstSettle.MS, firstSettle.Settled)
 	res.Timing.SettleWaits++
@@ -837,10 +845,21 @@ func (b *Browser) runSweep(ctx context.Context, res *Result, col *collector,
 		// rendered. The tier decides how much of the document to walk, not
 		// whether to wait for the document to exist, and a handful of extra
 		// checkpoints lets the emptiness rule in the page look again.
+		//
+		// It applies whether or not the readiness wait noticed: a page can
+		// report itself loaded and still be a frame away from painting its
+		// content, and one capture either lands on that or does not. techsibiti
+		// returned thirteen nodes on one run and a hundred and fifty-three on
+		// the next, from the same unchanged page, on that coin toss alone.
+		//
+		// A capture costs around twenty milliseconds. Three of them cost less
+		// than the settle wait in front of them, and the stability rule ends the
+		// run early anyway once a checkpoint adds nothing -- so an already-ready
+		// page still finishes in two. The single capture was never saving
+		// anything worth this.
+		maxCheckpoints = renderRetryCheckpoints
 		if pageStillLoading {
-			maxCheckpoints = renderRetryCheckpoints
-			o.logf("the page was still loading at capture time; allowing %d checkpoints "+
-				"instead of one so the sweep can look again", maxCheckpoints)
+			o.logf("the page was still loading at capture time; the render tier will look again")
 		}
 	}
 	// The sweep's budget is what is actually left, not what was planned.
@@ -981,9 +1000,9 @@ func (b *Browser) runSweep(ctx context.Context, res *Result, col *collector,
 	return nil
 }
 
-// renderRetryCheckpoints is how many looks the render tier gets when its one
-// capture would have landed on a page that had not finished loading.
-const renderRetryCheckpoints = 6
+// renderRetryCheckpoints is how many looks the render tier gets. It is not one,
+// because one is a coin toss on whether the page had painted yet.
+const renderRetryCheckpoints = 4
 
 // sweepReserve is held back from the sweep for everything that still has to
 // happen inside the render deadline: the scene walk, the corroboration corpus,

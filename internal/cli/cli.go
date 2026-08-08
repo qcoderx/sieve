@@ -81,6 +81,7 @@ artifact records which tier answered and why.
 type commonFlags struct {
 	chrome      string
 	timeout     time.Duration
+	loadTimeout time.Duration
 	viewport    string
 	tierMin     string
 	tierMax     string
@@ -95,7 +96,11 @@ type commonFlags struct {
 func (c *commonFlags) register(fs *flag.FlagSet) {
 	fs.StringVar(&c.chrome, "chrome", "", "path to a Chromium binary (default: auto-detect)")
 	fs.DurationVar(&c.timeout, "timeout", 10*time.Second,
-		"overall time budget per page; every render sub-budget is scaled from it")
+		"time budget for reading a page, measured from the moment it has loaded")
+	fs.DurationVar(&c.loadTimeout, "load-timeout", 20*time.Second,
+		"how long to wait for a slow page to arrive and stop moving before reading it.\n"+
+			"Separate from -timeout: a site's own loading time is not work sieve is doing,\n"+
+			"and charging it to the extraction only guarantees a thin read")
 	fs.StringVar(&c.viewport, "viewport", "1440x900", "viewport size, WxH")
 	fs.StringVar(&c.tierMin, "min-tier", "", "force at least this much work: fetch, render, sweep, recover")
 	fs.StringVar(&c.tierMax, "max-tier", "", "never work harder than this tier")

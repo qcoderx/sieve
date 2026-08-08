@@ -17,10 +17,10 @@ import (
 	"github.com/qcoderx/sieve/internal/snapshot"
 )
 
-// teardownReserve is the wall-clock time held back from the distillation for
-// emitting the artifact and releasing Chromium. Shutting the browser down is
-// the larger half and is easy to forget: it costs a few hundred milliseconds
-// whatever the page was.
+// teardownReserve is the wall-clock margin allowed on top of the load and read
+// budgets for emitting the artifact and releasing Chromium. Shutting the browser
+// down is the larger half and is easy to forget: it costs a few hundred
+// milliseconds whatever the page was.
 const teardownReserve = 900 * time.Millisecond
 
 func runDistill(args []string, stdout, stderr io.Writer) int {
@@ -92,7 +92,8 @@ func runDistill(args []string, stdout, stderr io.Writer) int {
 	opts.Render.ReducedMotion = reducedMotion
 	opts.Render.Logf = opts.Logf
 	// Every render sub-budget follows the timeout the user actually asked for.
-	opts.Render.ScaleTo(common.timeout - teardownReserve)
+	opts.Render.ScaleTo(common.timeout)
+	opts.Render.LoadBudget = common.loadTimeout
 
 	opts.Canvas = canvas.DefaultOptions()
 	opts.Canvas.EnableVision = vision
@@ -118,7 +119,8 @@ func runDistill(args []string, stdout, stderr io.Writer) int {
 	// after it: write four files and shut a browser down. `--timeout 10s` is a
 	// promise about how long running sieve takes, and a promise that only covers
 	// the part before the artifact is written is not the one anybody made.
-	ctx, cancel := withTimeout(common.timeout - teardownReserve)
+	// The wall clock covers both: waiting for the page, and reading it.
+	ctx, cancel := withTimeout(common.loadTimeout + common.timeout + teardownReserve)
 	defer cancel()
 
 	// One distiller, built once, closed once.
