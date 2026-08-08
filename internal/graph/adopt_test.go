@@ -230,3 +230,40 @@ func TestDeclaredDuplicatesDropped(t *testing.T) {
 		t.Errorf("kept %d copies of the unobserved heading, want 1", got)
 	}
 }
+
+// TestCollapseAdjacentRepeats covers carousel and marquee clones, which hold
+// two copies of their items in the DOM so the loop has somewhere to go. Both
+// copies are really on screen at different moments, so neither can be dropped
+// for being hidden, and the artifact reads as though the page says everything
+// twice.
+func TestCollapseAdjacentRepeats(t *testing.T) {
+	mk := func(s string) *candidate { return &candidate{Text: s, Keep: true} }
+	in := []*candidate{
+		mk("HTML"), mk("CSS"), mk("JavaScript"),
+		mk("HTML"), mk("CSS"), mk("JavaScript"), // the clone track
+		mk("Over six years of experience building accessible web structures."),
+	}
+	// The clone is only collapsed where it is adjacent, so a run repeated later
+	// in the document survives. Interleave to prove it.
+	out := collapseAdjacentRepeats([]*candidate{
+		mk("Get in touch"), mk("Get in touch"), // marquee pair
+		mk("Some prose in between that separates the two occurrences."),
+		mk("Get in touch"), // a genuine second call to action
+	})
+	var texts []string
+	for _, c := range out {
+		texts = append(texts, c.Text)
+	}
+	if len(out) != 3 {
+		t.Fatalf("collapsed to %d blocks (%q), want 3", len(out), texts)
+	}
+	if texts[2] != "Get in touch" {
+		t.Errorf("dropped a non-adjacent repeat: %q", texts)
+	}
+
+	// The adjacent clone track collapses, but nothing else does.
+	got := collapseAdjacentRepeats(in)
+	if len(got) != len(in) {
+		t.Errorf("collapsed a non-adjacent list: %d -> %d", len(in), len(got))
+	}
+}

@@ -477,6 +477,7 @@ func (b *Browser) Sweep(ctx context.Context, rawURL string, guard NavGuard) (*Re
 	}
 
 	settleStart := time.Now()
+	var pageStillLoading bool
 	var firstSettle settleResult
 	readyCtx, cancelReady := context.WithTimeout(tabCtx, readyBudget+replyGrace)
 	err := chromedp.Run(readyCtx,
@@ -493,6 +494,7 @@ func (b *Browser) Sweep(ctx context.Context, rawURL string, guard NavGuard) (*Re
 		}
 		res.note("the page had not stopped loading when its share of the budget ran out; " +
 			"it was swept as it stood")
+		pageStillLoading = true
 	}
 	res.Timing.FirstSettle = time.Since(settleStart)
 	b.opts.logf("first settle took %v (page measured %dms, settled=%v)",
@@ -539,7 +541,7 @@ func (b *Browser) Sweep(ctx context.Context, rawURL string, guard NavGuard) (*Re
 	}
 
 	sweepStart := time.Now()
-	if err := b.runSweep(tabCtx, res, col, deadline, hasDeadline); err != nil && !errors.Is(err, context.DeadlineExceeded) {
+	if err := b.runSweep(tabCtx, res, col, deadline, hasDeadline, pageStillLoading); err != nil && !errors.Is(err, context.DeadlineExceeded) {
 		return nil, err
 	}
 	res.Timing.Sweep = time.Since(sweepStart)
@@ -814,14 +816,32 @@ func (b *Browser) settleExprMS(d time.Duration) string {
 // dedupe rules, the notes, the audit, and the decision about what to do with
 // the result. It just stops being in the inner loop.
 func (b *Browser) runSweep(ctx context.Context, res *Result, col *collector,
-	deadline time.Time, hasDeadline bool) error {
+	deadline time.Time, hasDeadline bool, pageStillLoading bool) error {
 	o := &b.opts
 
+	maxCheckpoints := o.MaxCheckpoints
 	passes := o.Passes
-	if o.MaxCheckpoints <= 1 {
+	if maxCheckpoints <= 1 {
 		// A single post-settle capture is the render tier. There is no second
 		// look to take.
 		passes = 1
+
+		// Unless the page was still loading when that capture was due.
+		//
+		// One capture is the right amount of work for a client-rendered page
+		// whose content is all present once JavaScript has run. It is the wrong
+		// amount when JavaScript has not finished running: techsibiti.com was
+		// captured mid-boot, yielded its loading screen and a search-engine
+		// fallback list, and stopped -- thirteen nodes from a thirty-seven
+		// kilobyte page, with the checkpoint cap reached before anything had
+		// rendered. The tier decides how much of the document to walk, not
+		// whether to wait for the document to exist, and a handful of extra
+		// checkpoints lets the emptiness rule in the page look again.
+		if pageStillLoading {
+			maxCheckpoints = renderRetryCheckpoints
+			o.logf("the page was still loading at capture time; allowing %d checkpoints "+
+				"instead of one so the sweep can look again", maxCheckpoints)
+		}
 	}
 	// The sweep's budget is what is actually left, not what was planned.
 	//
@@ -853,7 +873,7 @@ func (b *Browser) runSweep(ctx context.Context, res *Result, col *collector,
 
 	cfg := sweepConfig{
 		BudgetMS:          budget.Milliseconds(),
-		MaxCheckpoints:    o.MaxCheckpoints,
+		MaxCheckpoints:    maxCheckpoints,
 		StableCheckpoints: o.StableCheckpoints,
 		SettleFrames:      o.SettleFrames,
 		SettleMaxMS:       o.SettleTimeout.Milliseconds(),
@@ -960,6 +980,10 @@ func (b *Browser) runSweep(ctx context.Context, res *Result, col *collector,
 		reply.Step, len(raw), reply.ReachedBottom)
 	return nil
 }
+
+// renderRetryCheckpoints is how many looks the render tier gets when its one
+// capture would have landed on a page that had not finished loading.
+const renderRetryCheckpoints = 6
 
 // sweepReserve is held back from the sweep for everything that still has to
 // happen inside the render deadline: the scene walk, the corroboration corpus,

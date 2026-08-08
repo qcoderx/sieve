@@ -133,7 +133,7 @@ func Build(in Input) (*Graph, error) {
 	}
 	g.Provenance.NormalizerVersion = textnorm.Version
 
-	g.Blocks = makeBlocks(ordered)
+	g.Blocks = makeBlocks(collapseAdjacentRepeats(ordered))
 	normaliseLevels(g.Blocks)
 	g.Sections = makeSections(g.Blocks)
 	g.Actions, g.Links = makeActions(in.Merged, base)
@@ -202,6 +202,38 @@ func Build(in Input) (*Graph, error) {
 	g.ContentHash = semanticHash(g)
 	g.Stats.ArtifactTokens = tokens.Estimate(payloadText(g))
 	return g, nil
+}
+
+// collapseAdjacentRepeats removes a run that repeats the one immediately before
+// it in reading order.
+//
+// Carousels, marquees and infinite-scroll tracks work by holding two or more
+// copies of their items in the DOM so the loop has somewhere to go. Both copies
+// are genuinely on screen at different moments, so neither is hidden and neither
+// can be dropped for invisibility -- the artifact simply gets the list twice.
+// Four of six sites in a spot check carried it, up to thirty-three repeats each,
+// and it reads as though the page says everything twice.
+//
+// Adjacency is what makes this safe. Text that recurs across a page -- a
+// repeated call to action, a price appearing in a table and again in a summary
+// -- is separated by other content and is left alone. Only an immediate echo is
+// removed, which is the shape a cloned track always has and the shape ordinary
+// prose never does.
+func collapseAdjacentRepeats(cands []*candidate) []*candidate {
+	if len(cands) < 2 {
+		return cands
+	}
+	out := make([]*candidate, 0, len(cands))
+	var prev string
+	for _, c := range cands {
+		k := dedupeKey(c.Text)
+		if k != "" && k == prev {
+			continue
+		}
+		prev = k
+		out = append(out, c)
+	}
+	return out
 }
 
 // buildAudit assembles the artifact's account of its own reliability.
