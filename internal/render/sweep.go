@@ -459,10 +459,10 @@ func (b *Browser) Sweep(ctx context.Context, rawURL string, guard NavGuard) (*Re
 	settleStart := time.Now()
 	var pageStillLoading bool
 	var firstSettle settleResult
-	readyCtx, cancelReady := context.WithTimeout(tabCtx, readyBudget+replyGrace)
+	readyCtx, cancelReady := context.WithTimeout(tabCtx, readyBudget+b.opts.FirstSettle+replyGrace)
 	err := chromedp.Run(readyCtx,
 		chromedp.Evaluate(`window.__sieve.unsmooth()`, nil),
-		chromedp.Evaluate(b.settleExprMS(readyBudget), &firstSettle, awaitPromise),
+		chromedp.Evaluate(b.readyExpr(readyBudget), &firstSettle, awaitPromise),
 	)
 	cancelReady()
 	if err != nil {
@@ -809,6 +809,13 @@ func (b *Browser) settleExprMS(d time.Duration) string {
 	return fmt.Sprintf(`window.__sieve.settle(%d, %d)`, b.opts.SettleFrames, d.Milliseconds())
 }
 
+// readyExpr waits for the document to load and then, separately and far more
+// briefly, for it to stop moving.
+func (b *Browser) readyExpr(load time.Duration) string {
+	return fmt.Sprintf(`window.__sieve.settle(%d, %d, %d)`,
+		b.opts.SettleFrames, b.opts.FirstSettle.Milliseconds(), load.Milliseconds())
+}
+
 // runSweep hands the whole checkpoint loop to the page and folds the reply in.
 //
 // What used to happen here -- capture, decode, decide, scroll, wait, repeat --
@@ -829,39 +836,10 @@ func (b *Browser) runSweep(ctx context.Context, res *Result, col *collector,
 
 	maxCheckpoints := o.MaxCheckpoints
 	passes := o.Passes
-	if maxCheckpoints <= 1 {
-		// A single post-settle capture is the render tier. There is no second
-		// look to take.
-		passes = 1
-
-		// Unless the page was still loading when that capture was due.
-		//
-		// One capture is the right amount of work for a client-rendered page
-		// whose content is all present once JavaScript has run. It is the wrong
-		// amount when JavaScript has not finished running: techsibiti.com was
-		// captured mid-boot, yielded its loading screen and a search-engine
-		// fallback list, and stopped -- thirteen nodes from a thirty-seven
-		// kilobyte page, with the checkpoint cap reached before anything had
-		// rendered. The tier decides how much of the document to walk, not
-		// whether to wait for the document to exist, and a handful of extra
-		// checkpoints lets the emptiness rule in the page look again.
-		//
-		// It applies whether or not the readiness wait noticed: a page can
-		// report itself loaded and still be a frame away from painting its
-		// content, and one capture either lands on that or does not. techsibiti
-		// returned thirteen nodes on one run and a hundred and fifty-three on
-		// the next, from the same unchanged page, on that coin toss alone.
-		//
-		// A capture costs around twenty milliseconds. Three of them cost less
-		// than the settle wait in front of them, and the stability rule ends the
-		// run early anyway once a checkpoint adds nothing -- so an already-ready
-		// page still finishes in two. The single capture was never saving
-		// anything worth this.
-		maxCheckpoints = renderRetryCheckpoints
-		if pageStillLoading {
-			o.logf("the page was still loading at capture time; the render tier will look again")
-		}
+	if pageStillLoading {
+		o.logf("the page was still loading when its capture was due; the sweep will look again")
 	}
+
 	// The sweep's budget is what is actually left, not what was planned.
 	//
 	// A static fraction of the page budget is wrong in both directions. If
@@ -999,10 +977,6 @@ func (b *Browser) runSweep(ctx context.Context, res *Result, col *collector,
 		reply.Step, len(raw), reply.ReachedBottom)
 	return nil
 }
-
-// renderRetryCheckpoints is how many looks the render tier gets. It is not one,
-// because one is a coin toss on whether the page had painted yet.
-const renderRetryCheckpoints = 4
 
 // sweepReserve is held back from the sweep for everything that still has to
 // happen inside the render deadline: the scene walk, the corroboration corpus,

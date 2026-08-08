@@ -2586,7 +2586,17 @@
     // than measuring every element. Reading 16 rects per frame is affordable;
     // reading 40,000 is not, and the grid catches precisely the transforms
     // that are visible, which is the only kind that matters.
-    settle: function (frames, timeoutMs) {
+    // settle takes two budgets, because it answers two questions.
+    //
+    // readyTimeoutMs bounds the wait for the document to finish loading, which
+    // is the site's time and can legitimately be long. timeoutMs bounds the wait
+    // for it to stop moving *after* that, which is sieve's time and should not
+    // be. Charging both to one clock meant a page that loads promptly and then
+    // animates forever -- suzanne3d.com, and most of this corpus -- burned the
+    // entire loading allowance proving it would never be still: nineteen and a
+    // half seconds to reach a page that had been ready in two.
+    settle: function (frames, timeoutMs, readyTimeoutMs) {
+      if (!readyTimeoutMs) readyTimeoutMs = timeoutMs;
       return new Promise(function (resolve) {
         var t0 =
           typeof performance !== "undefined" && performance.now
@@ -2711,6 +2721,7 @@
 
         var ticks = 0;
         var lastPending = 0;
+        var readyAt = -1;
 
         function tick() {
           var cur = sig();
@@ -2731,11 +2742,11 @@
           // third-party image a veto over the whole budget, so the requirement
           // relaxes to "interactive" once a decent share of the window has gone.
           var ready = document.readyState === "complete" ||
-            (document.readyState === "interactive" && el > timeoutMs * 0.5);
+            (document.readyState === "interactive" && el > readyTimeoutMs * 0.5);
           if (!ready) {
             stable = 0;
             last = null;
-            if (el >= timeoutMs) {
+            if (el >= readyTimeoutMs) {
               done = true;
               resolve({ settled: false, ms: Math.round(el), pending: lastPending });
               return;
@@ -2743,6 +2754,10 @@
             schedule();
             return;
           }
+          // The stillness clock starts when the document does, not when the
+          // call did.
+          if (readyAt < 0) readyAt = el;
+          var still = el - readyAt;
 
           // document.getAnimations() walks every animation on the page, which
           // on an animation-heavy site is the most expensive thing in this
@@ -2766,7 +2781,7 @@
           // alone. The gate still does its job where it matters: a transition
           // that starts the moment we scroll gets its chance to finish.
           var gateWindow = timeoutMs * 0.4;
-          var blocked = lastPending > 0 && el < gateWindow;
+          var blocked = lastPending > 0 && still < gateWindow;
 
           if (cur === last && !blocked) stable++;
           else {
@@ -2778,7 +2793,7 @@
             resolve({ settled: true, ms: Math.round(el), pending: lastPending });
             return;
           }
-          if (el >= timeoutMs) {
+          if (still >= timeoutMs) {
             done = true;
             resolve({ settled: false, ms: Math.round(el), pending: lastPending });
             return;
@@ -2803,7 +2818,7 @@
           if (done) return;
           done = true;
           resolve({ settled: false, ms: Math.round(now() - t0), pending: lastPending });
-        }, timeoutMs);
+        }, readyTimeoutMs + timeoutMs);
 
         var innerResolve = resolve;
         resolve = function (v) {

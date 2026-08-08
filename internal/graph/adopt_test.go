@@ -273,3 +273,34 @@ func TestCollapseAdjacentRepeats(t *testing.T) {
 		t.Errorf("immediate echo survived: %q", got)
 	}
 }
+
+// TestMonospaceIsNotCode covers a site that sets its interface labels in a
+// monospace face, which is an ordinary design choice on anything with a
+// technical aesthetic. Treating the typeface as proof turned suzanne3d.com's
+// feature labels and its copyright line into code blocks.
+func TestMonospaceIsNotCode(t *testing.T) {
+	prose := []string{
+		"Design intent parsing",
+		"Multi-view reconstruction",
+		"Print-ready geometry",
+		"© 2026 Suzanne 3D Inc. · San Francisco, CA",
+		"Make this enclosure lighter while keeping it strong.",
+	}
+	for _, s := range prose {
+		if looksLikeCode(s) {
+			t.Errorf("classified prose as code: %q", s)
+		}
+	}
+	code := []string{
+		"for (i = 0; i < n; i++) {",
+		"const x = await fetch(url);",
+		"npm install --save-dev",
+		"getUserById",
+		"max_retry_count",
+	}
+	for _, s := range code {
+		if !looksLikeCode(s) {
+			t.Errorf("failed to recognise code: %q", s)
+		}
+	}
+}

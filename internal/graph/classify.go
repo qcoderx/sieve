@@ -2,6 +2,7 @@ package graph
 
 import (
 	"strings"
+	"unicode"
 	"unicode/utf8"
 
 	"github.com/qcoderx/sieve/internal/capture"
@@ -405,8 +406,16 @@ func blockType(c *candidate, ts typeScale) BlockType {
 			return TypeHeading
 		}
 	}
+	// Monospace is a typeface, not a statement that something is code.
+	//
+	// It used to be enough on its own, and on a technically-styled site that
+	// turns the whole page into a listing: suzanne3d.com sets its interface
+	// labels in mono and had "Design intent parsing", "Print-ready geometry"
+	// and its copyright line all emitted as code. An author who means code says
+	// so with <code> or <pre>, which is handled above; below that, the typeface
+	// has to be corroborated by the text actually looking like code.
 	if c.Style.Family != "" && isMonospaceFamily(c.Style.Family) &&
-		utf8.RuneCountInString(c.Text) > 12 {
+		utf8.RuneCountInString(c.Text) > 12 && looksLikeCode(c.Text) {
 		return TypeCode
 	}
 	// A large, italic, short run set well above body size is a pull quote in
@@ -416,6 +425,63 @@ func blockType(c *candidate, ts typeScale) BlockType {
 		return TypeQuote
 	}
 	return TypeParagraph
+}
+
+// looksLikeCode reports whether a run carries the syntax of code rather than
+// the shape of a sentence.
+//
+// The test is deliberately about punctuation and identifiers, because that is
+// what separates "for (i = 0; i < n; i++)" from "Design intent parsing". Prose
+// set in mono is still prose, and three ordinary words remain three ordinary
+// words whatever they are set in.
+func looksLikeCode(s string) bool {
+	// Operators and brackets that ordinary prose does not string together.
+	for _, tok := range []string{"{", "}", ";", "=>", "->", "::", "()", "):", "&&", "||", "==", "!=", "</", "/>"} {
+		if strings.Contains(s, tok) {
+			return true
+		}
+	}
+	// A command-line flag: two hyphens immediately followed by a letter. Prose
+	// that uses a double hyphen for a dash puts spaces around it -- like this --
+	// so the two do not collide.
+	for i := 0; i+2 < len(s); i++ {
+		if s[i] == '-' && s[i+1] == '-' &&
+			((s[i+2] >= 'a' && s[i+2] <= 'z') || (s[i+2] >= 'A' && s[i+2] <= 'Z')) {
+			return true
+		}
+	}
+	// An identifier: no spaces, but internal underscores or camelCase.
+	if !strings.ContainsRune(s, ' ') {
+		if strings.ContainsRune(s, '_') || hasInnerCaps(s) {
+			return true
+		}
+	}
+	// A high density of symbols. Ordinary prose, including a copyright line
+	// with a bullet and a comma, sits well under this.
+	symbols := 0
+	for _, r := range s {
+		if r > 127 {
+			continue
+		}
+		if !unicode.IsLetter(r) && !unicode.IsDigit(r) && !unicode.IsSpace(r) &&
+			r != '.' && r != ',' && r != '\'' && r != '-' && r != ':' && r != '?' && r != '!' {
+			symbols++
+		}
+	}
+	return float64(symbols) > 0.12*float64(utf8.RuneCountInString(s))
+}
+
+// hasInnerCaps spots camelCase without treating an initial capital as evidence.
+func hasInnerCaps(s string) bool {
+	seenLower := false
+	for _, r := range s {
+		if unicode.IsLower(r) {
+			seenLower = true
+		} else if unicode.IsUpper(r) && seenLower {
+			return true
+		}
+	}
+	return false
 }
 
 func isMonospaceFamily(f string) bool {

@@ -857,10 +857,18 @@ func (d *Distiller) adoptServed(g *graph.Graph, staticRes *static.Result) {
 func (d *Distiller) sweepOptions(tier escalate.Tier) render.Options {
 	o := d.opts.Render
 	if tier == escalate.TierRender {
-		// One capture after settle, no sweep. Enough for a client-rendered page
-		// whose content is all present once JavaScript has run.
-		o.MaxCheckpoints = 1
+		// A capture after settle, and no second pass: enough for a
+		// client-rendered page whose content is all present once JavaScript has
+		// run.
+		//
+		// This used to pin MaxCheckpoints to one, which is a different and worse
+		// promise. A page is not one screen tall because the served HTML looked
+		// sparse, and techsibiti.com was stopped one checkpoint into a document
+		// it had seven unspent seconds to finish. Requiring only a single stable
+		// checkpoint ends the loop just as quickly on a page that really is one
+		// screen, and lets it continue on a page that is not.
 		o.StableCheckpoints = 1
+		o.Passes = 1
 	}
 	// A canvas screenshot is only ever read by OCR or by a vision model. With
 	// neither configured the rasterisation is decoded, cropped, re-encoded and
