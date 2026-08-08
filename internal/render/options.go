@@ -42,6 +42,10 @@ type Options struct {
 	// SettleFloor is the shortest that wait may be compressed to when the sweep
 	// is rationing its remaining time across the rest of the document.
 	SettleFloor time.Duration
+	// RevealFloor is the settle wait used when text is being captured and none
+	// of it has ever been legible. On such a page the sweep is outrunning the
+	// animation, and the remedy is fewer, slower stops rather than more.
+	RevealFloor time.Duration
 	// SettleFrames is how many consecutive animation frames must show no
 	// layout change before the page counts as settled.
 	SettleFrames int
@@ -160,6 +164,7 @@ func DefaultOptions() Options {
 		FirstSettle:   1200 * time.Millisecond,
 		SettleTimeout: 260 * time.Millisecond,
 		SettleFloor:   60 * time.Millisecond,
+		RevealFloor:   450 * time.Millisecond,
 		SettleFrames:  2,
 		SweepBudget:   5 * time.Second,
 		Budget:        10 * time.Second,
@@ -249,6 +254,7 @@ func (o *Options) ScaleTo(total time.Duration) {
 	o.SweepBudget = scaleDur(render, 3, 4, 800*time.Millisecond, 10*time.Minute)
 	o.SettleTimeout = scaleDur(render, 1, 40, 120*time.Millisecond, 2*time.Second)
 	o.SettleFloor = scaleDur(render, 1, 160, 40*time.Millisecond, 600*time.Millisecond)
+	o.RevealFloor = scaleDur(render, 1, 18, 250*time.Millisecond, 1200*time.Millisecond)
 }
 
 // scaleDur takes num/den of d and clamps it.

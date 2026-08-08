@@ -1898,11 +1898,13 @@
     // sample of three, and acting on it kept igloo.inc -- which has two blocks
     // and no scroll -- dispatching wheel events for sixty-three checkpoints.
     shareUnrevealed.chars = 0;
+    shareUnrevealed.visible = 0;
     for (var i = 0; i < snap.nodes.length; i++) {
       var n = snap.nodes[i];
       var c = n.x.length;
       total += c;
       if (n.o <= MIN_VISIBLE_OPACITY) hidden += c;
+      else if (n.v) shareUnrevealed.visible += c;
     }
     shareUnrevealed.chars = total;
     return total === 0 ? 0 : hidden / total;
@@ -2011,6 +2013,9 @@
     var maxScrollPx = cfg.maxScrollPx || 120000;
     var stepRatio = cfg.stepRatio || 0.75;
     var maxPasses = cfg.passes || 2;
+    // How long a reveal is given to happen on a page where nothing has been
+    // legible yet. Web fades run 300-800ms; this is the low end of useful.
+    var revealFloorMs = cfg.revealFloorMs || 450;
     var throttleGL = cfg.throttleGL !== false;
 
     var t0 = nowMs();
@@ -2064,6 +2069,7 @@
     var cp = 0;
     var pass = 0;
     var settleMisses = 0;
+    var everSawVisible = false;
     var scrollTotal = 0;
     var settleWorst = 0;
     var captureWorst = 0;
@@ -2095,6 +2101,7 @@
       out.throttledCanvases = throttled;
       out.targetedStops = targetedStops;
       out.targetsFound = targets.size;
+      out.sawVisible = everSawVisible;
       out.pausedVideos = pausedVideos;
       out.pinnedChars = pinnedChars;
       out.freeChars = freeChars;
@@ -2124,6 +2131,7 @@
         throttledCanvases: throttled,
         targetedStops: targetedStops,
         targetsFound: targets.size,
+        sawVisible: everSawVisible,
         pausedVideos: pausedVideos,
         pinnedChars: pinnedChars,
         freeChars: freeChars,
@@ -2284,6 +2292,7 @@
       // all cost.
       var lowShare = shareUnrevealed(snap);
       var sampledChars = shareUnrevealed.chars;
+      if (shareUnrevealed.visible > 0) everSawVisible = true;
       var docH = st.container ? st.container.scrollHeight : snap.dh;
       var pos = st.container ? st.container.scrollTop : snap.sy;
       var fresh = reduce(snap, seen);
@@ -2431,6 +2440,30 @@
       // spends on stillness the budget that should be spent on covering the
       // document.
       if (settleMisses >= 3) settleBudget = settleMinMs;
+
+      // Seeing nothing is a reason to slow down, not to hurry.
+      //
+      // The rule above exists for a page with a permanent animation, which will
+      // never report itself still however long we wait; cutting the wait there
+      // buys checkpoints for free. But "never settles" and "never reveals" are
+      // different conditions, and on a page that fades every run in they occur
+      // together -- so the shortcut fires, the wait collapses to its floor, and
+      // the sweep starts capturing faster than the page can animate.
+      //
+      // A portfolio was swept fifty-seven times at sixty-five milliseconds a
+      // stop and observed not one character above the visible-opacity floor.
+      // Every run was dropped, the audit reported nought per cent retention,
+      // and the remedy was not more stops but slower ones: the same page read
+      // correctly at eighteen.
+      //
+      // So when text is being captured and none of it has ever been legible,
+      // the wait is raised instead. It is bounded by the budget, so a page that
+      // genuinely has nothing to reveal costs a handful of checkpoints to find
+      // that out rather than the whole sweep.
+      if (!everSawVisible && cp >= 2 && sampledChars > 0) {
+        var patient = Math.min(revealFloorMs, Math.max(settleMaxMs, remainingMs / 4));
+        if (patient > settleBudget) settleBudget = patient;
+      }
 
       var tScroll = nowMs();
       var before = readPos(probes);

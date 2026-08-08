@@ -158,6 +158,7 @@ type sweepConfig struct {
 	NodeBudget        int     `json:"nodeBudget"`
 	LatentBudget      int     `json:"latentBudget"`
 	MaxScrollPx       float64 `json:"maxScrollPx"`
+	RevealFloorMS     int64   `json:"revealFloorMs"`
 	StepRatio         float64 `json:"stepRatio"`
 	Passes            int     `json:"passes"`
 	ThrottleGL        bool    `json:"throttleGL"`
@@ -179,6 +180,7 @@ type sweepReply struct {
 	TargetedStops  int                `json:"targetedStops"`
 	TargetsFound   int                `json:"targetsFound"`
 	PausedVideos   int                `json:"pausedVideos"`
+	SawVisible     bool               `json:"sawVisible"`
 	PinnedChars    int                `json:"pinnedChars"`
 	FreeChars      int                `json:"freeChars"`
 	ScrollMS       int                `json:"scrollMs"`
@@ -859,6 +861,7 @@ func (b *Browser) runSweep(ctx context.Context, res *Result, col *collector,
 		NodeBudget:        o.NodeBudget,
 		LatentBudget:      o.LatentBudget,
 		MaxScrollPx:       o.MaxScrollPx,
+		RevealFloorMS:     o.RevealFloor.Milliseconds(),
 		StepRatio:         o.StepRatio,
 		Passes:            passes,
 		// Shrinking a WebGL drawing buffer is only safe while nobody is going
@@ -939,6 +942,11 @@ func (b *Browser) runSweep(ctx context.Context, res *Result, col *collector,
 	}
 	if !reply.ReachedBottom {
 		res.note("the sweep did not reach the bottom of the document")
+	}
+	if !reply.SawVisible && reply.Checkpoints > 2 {
+		res.note("no text on this page was ever observed above the visible-opacity threshold, " +
+			"across every checkpoint of the sweep; anything below is text the page declared it " +
+			"would reveal rather than text sieve watched appear")
 	}
 
 	o.logf("sweep: %d checkpoints over %d pass(es) via %s in %dms "+
