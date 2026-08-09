@@ -808,10 +808,25 @@ func (s *speculation) claim(tier escalate.Tier) (*render.Result, error, bool) {
 }
 
 // fetchBudget is how long tier 0 gets before the browser takes over.
+//
+// It follows the load allowance, not the reading budget. Tier 0 is a page load
+// like any other -- the same bytes over the same network as the browser would
+// pull -- so pricing it against the time set aside for *reading* a page was
+// simply the wrong comparison, and it was miserly: two-fifths of the reading
+// budget is a few seconds, and a large marketing site behind a slow first byte
+// exceeds that routinely.
+//
+// The cost of getting this wrong is not a slow tier 0, it is no tier 0 at all.
+// A fetch that times out is recorded as a failure, which forbids the static
+// fallback later, so a page whose HTML was perfectly readable ends up resting
+// entirely on a render that may itself run out of time. Four documentation and
+// marketing sites in a hundred-site sweep -- react.dev, nuxt.com, posthog.com
+// and womp.com -- came back completely empty that way, each having spent the
+// whole budget failing twice at something one of the two would have done.
 func (d *Distiller) fetchBudget() time.Duration {
-	b := d.opts.Render.Budget * 2 / 5
-	if b < 1500*time.Millisecond {
-		b = 1500 * time.Millisecond
+	b := d.opts.Render.LoadBudget / 2
+	if b < 5*time.Second {
+		b = 5 * time.Second
 	}
 	if to := d.opts.Fetch.Timeout; to > 0 && to < b {
 		b = to

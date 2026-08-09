@@ -9,6 +9,7 @@ import (
 	"strconv"
 	"strings"
 	"time"
+	"unicode"
 	"unicode/utf8"
 
 	"github.com/qcoderx/sieve/internal/capture"
@@ -137,6 +138,7 @@ func Build(in Input) (*Graph, error) {
 	normaliseLevels(g.Blocks)
 	g.Sections = makeSections(g.Blocks)
 	g.Actions, g.Links = makeActions(in.Merged, base)
+	g.Blocks = pruneNonContent(g.Blocks, g.Actions)
 	g.MediaAll = mediaAll
 	g.Structured = ParseJSONLD(in.Merged.Meta.JSONLD)
 	g.FAQ = ParseFAQ(in.Merged.Meta.JSONLD)
@@ -275,6 +277,64 @@ func collapseAdjacentRepeats(cands []*candidate) []*candidate {
 // maxRepeatRun is the longest cloned sequence recognised. A track long enough to
 // exceed it is collapsed in pieces, which is still an improvement.
 const maxRepeatRun = 24
+
+// pruneNonContent removes blocks that carry no reading value.
+//
+// Two kinds turned up across a hundred-site sweep, in more than half of them.
+//
+// The first is punctuation on its own. A pager renders its arrows as separate
+// runs and docs.python.org contributed three blocks reading "«", "|" and "»".
+// A run with no letter and no digit in it is a separator, not a sentence.
+//
+// The second is a navigation label that is already in the actions list. go.dev
+// emitted "learn more" four times and "Tour", "Docs" and "Blog" once each as
+// content, when every one of them is a link whose label and destination are
+// recorded properly a few fields away. Repeating them as prose is what made
+// forty-four of a hundred sites look like they were full of duplicates: they
+// were full of menus.
+//
+// Only a block that is the whole of a link's text is removed, and only a short
+// one. A paragraph containing a link is a paragraph, and its block is the
+// prose, not the link.
+func pruneNonContent(blocks []Block, actions []Action) []Block {
+	labels := make(map[string]bool, len(actions))
+	for _, a := range actions {
+		if l := dedupeKey(a.Label); l != "" {
+			labels[l] = true
+		}
+	}
+	out := blocks[:0]
+	for _, b := range blocks {
+		if b.Type != TypeImage && !hasLexicalContent(b.Text) {
+			continue
+		}
+		if b.Href != "" && utf8.RuneCountInString(b.Text) <= maxNavLabelRunes &&
+			labels[dedupeKey(b.Text)] {
+			continue
+		}
+		out = append(out, b)
+	}
+	// IDs are positional, so they are reassigned rather than left with holes.
+	for i := range out {
+		out[i].ID = blockID(i)
+		out[i].Order = i
+	}
+	return out
+}
+
+// maxNavLabelRunes is the length below which a standalone link is a menu item
+// rather than a sentence that happens to be linked.
+const maxNavLabelRunes = 40
+
+// hasLexicalContent reports whether a run contains anything readable at all.
+func hasLexicalContent(s string) bool {
+	for _, r := range s {
+		if unicode.IsLetter(r) || unicode.IsDigit(r) {
+			return true
+		}
+	}
+	return false
+}
 
 // buildAudit assembles the artifact's account of its own reliability.
 func buildAudit(in Input, g *Graph, ord orderResult, flow []*candidate, emittedChars int) Audit {

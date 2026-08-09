@@ -1,5 +1,5 @@
 {
-  "url": "http://127.0.0.1:50970/immersive/",
+  "url": "http://127.0.0.1:61890/immersive/",
   "title": "Aurelia Atelier — Hand-finished furniture",
   "sections": [
     "L3 Lisbon, since 1974",
@@ -207,38 +207,6 @@
       "source": "dom",
       "confidence": "high",
       "text": "Aurelia Atelier, Rua da Cozinha 4, Lisboa. hello@example.com"
-    },
-    {
-      "key": "nav/paragraph/104ab9213e28",
-      "type": "paragraph",
-      "region": "nav",
-      "source": "dom",
-      "confidence": "high",
-      "text": "Work"
-    },
-    {
-      "key": "nav/paragraph/0aa91af2ec4c",
-      "type": "paragraph",
-      "region": "nav",
-      "source": "dom",
-      "confidence": "high",
-      "text": "Studio"
-    },
-    {
-      "key": "nav/paragraph/fd10a146e962",
-      "type": "paragraph",
-      "region": "nav",
-      "source": "dom",
-      "confidence": "high",
-      "text": "Materials"
-    },
-    {
-      "key": "nav/paragraph/2b5c3d26721a",
-      "type": "paragraph",
-      "region": "nav",
-      "source": "dom",
-      "confidence": "high",
-      "text": "Contact"
     }
   ],
   "latent": [
