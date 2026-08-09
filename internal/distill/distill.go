@@ -365,9 +365,29 @@ func (d *Distiller) Distill(ctx context.Context, rawURL string) (*Result, error)
 			Message: "failed, escalating to the browser", Elapsed: time.Since(start)})
 	}
 
+	// A response that is not HTML is a reason to let the browser try, not a
+	// reason to stop.
+	//
+	// patagonia.com answers this client with a bare 404 and an empty body while
+	// serving the site perfectly well to a browser. Whatever the merits of that,
+	// the fact sieve has is "the cheap path did not return a document", and it
+	// already knows what to do with that: the browser has its own TLS, its own
+	// HTTP/2 and its own fingerprint, and it routinely gets a page this client
+	// cannot. Ending the run here refuses a page sieve is capable of reading, at
+	// the one stage that exists only to save time.
+	//
+	// A genuine non-HTML resource -- a PDF, an image -- simply yields nothing in
+	// the browser either, and the artifact says so.
 	if fetchFailure == "" && !resp.IsHTML() && !resp.Blocked {
-		return nil, fmt.Errorf("%s served %q, which is not an HTML document",
-			resp.FinalURL, resp.ContentType)
+		if d.opts.MaxTier == escalate.TierFetch {
+			return nil, fmt.Errorf("%s served %q, which is not an HTML document",
+				resp.FinalURL, resp.ContentType)
+		}
+		d.logf("tier 0 received %q (HTTP %d), which is not a document; handing the page to the browser",
+			resp.ContentType, resp.Status)
+		fetchFailure = fmt.Sprintf("the server answered this client with HTTP %d and no HTML document",
+			resp.Status)
+		resp.Body = nil
 	}
 
 	staticRes, err := static.Extract(resp.FinalURL, strings.NewReader(string(resp.Body)), len(resp.Body))

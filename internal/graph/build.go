@@ -303,14 +303,48 @@ func pruneNonContent(blocks []Block, actions []Action) []Block {
 			labels[l] = true
 		}
 	}
+	// A short line that appears many times on one page is a template label.
+	//
+	// Card and list layouts repeat their furniture once per item, and none of it
+	// is a link, so the rule above never sees it: npr.org emitted "hide caption"
+	// and "toggle caption" fifty-eight times each, esa.int "views" and "likes"
+	// twenty-seven times, airbnb.com "guest favorite" twenty-two. It is real
+	// interface text and it is worth knowing about once; repeated it is most of
+	// the artifact.
+	//
+	// The first occurrence is kept, so nothing disappears from the page's
+	// vocabulary -- what goes is the repetition. Length is the guard: a
+	// paragraph that happens to recur is quoted prose and stays, and the cap is
+	// well below any sentence.
+	repeats := map[string]int{}
+	for _, b := range blocks {
+		if utf8.RuneCountInString(b.Text) <= maxTemplateLabelRunes {
+			repeats[dedupeKey(b.Text)]++
+		}
+	}
+	kept := map[string]int{}
+
 	out := blocks[:0]
 	for _, b := range blocks {
 		if b.Type != TypeImage && !hasLexicalContent(b.Text) {
 			continue
 		}
+		// A single character is never a block. It is a fragment the reassembly
+		// could not place -- resend.com produced blocks reading "t", "b" and "s"
+		// -- and no artifact is improved by carrying it.
+		if b.Type != TypeImage && utf8.RuneCountInString(b.Text) < 2 {
+			continue
+		}
 		if b.Href != "" && utf8.RuneCountInString(b.Text) <= maxNavLabelRunes &&
 			labels[dedupeKey(b.Text)] {
 			continue
+		}
+		if k := dedupeKey(b.Text); b.Type != TypeTable &&
+			repeats[k] >= minTemplateRepeats {
+			kept[k]++
+			if kept[k] > 1 {
+				continue
+			}
 		}
 		out = append(out, b)
 	}
@@ -325,6 +359,17 @@ func pruneNonContent(blocks []Block, actions []Action) []Block {
 // maxNavLabelRunes is the length below which a standalone link is a menu item
 // rather than a sentence that happens to be linked.
 const maxNavLabelRunes = 40
+
+// maxTemplateLabelRunes and minTemplateRepeats define the template-label rule:
+// short, and repeated often enough that it is plainly furniture rather than
+// coincidence.
+const maxTemplateLabelRunes = 40
+
+// Three is the threshold because three is what the corpus shows. Card layouts
+// that repeat a label twice are ambiguous; at three the pattern is a template --
+// "video", "models", "company", "4.85", "apartment in Accra" -- and every
+// remaining duplicate finding in a hundred-site sweep sat at exactly three.
+const minTemplateRepeats = 3
 
 // hasLexicalContent reports whether a run contains anything readable at all.
 func hasLexicalContent(s string) bool {

@@ -23,6 +23,10 @@ import (
 // milliseconds whatever the page was.
 const teardownReserve = 900 * time.Millisecond
 
+// minComparableTokens is the amount of readable text the served page must have
+// carried before a reduction percentage means anything.
+const minComparableTokens = 200
+
 func runDistill(args []string, stdout, stderr io.Writer) int {
 	fs := flag.NewFlagSet("distill", flag.ContinueOnError)
 	fs.SetOutput(stderr)
@@ -212,10 +216,20 @@ func printSummary(w io.Writer, dir string, res *distill.Result) {
 		fmt.Fprintf(w, "  gaps         %d disclosure control(s) declared but not opened\n", len(g.Gaps))
 	}
 
+	// A percentage is only meaningful when there was something to compare
+	// against. A page that serves a shell -- or one whose fetch failed -- gives
+	// a denominator of almost nothing, and the artifact then either reports a
+	// saving it did not make or an increase that reads like a fault. Saying what
+	// happened is more use than a number that cannot be true.
 	fmt.Fprintf(w, "\n  tokens       %d → %d", g.Stats.OriginalTokens, g.Stats.ArtifactTokens)
-	if g.Stats.OriginalTokens > 0 && g.Stats.ArtifactTokens < g.Stats.OriginalTokens {
+	switch {
+	case g.Stats.OriginalTokens < minComparableTokens:
+		fmt.Fprint(w, "  (the served page carried no readable text, so there is nothing to compare)")
+	case g.Stats.ArtifactTokens < g.Stats.OriginalTokens:
 		saved := 100 * (1 - float64(g.Stats.ArtifactTokens)/float64(g.Stats.OriginalTokens))
 		fmt.Fprintf(w, "  (%.1f%% fewer)", saved)
+	default:
+		fmt.Fprint(w, "  (larger than the served page, which carried little readable text)")
 	}
 	fmt.Fprintln(w)
 	fmt.Fprintf(w, "  bytes        %s → %s\n",
