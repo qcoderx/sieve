@@ -54,6 +54,7 @@ func runDistill(args []string, stdout, stderr io.Writer) int {
 		reducedMotion bool
 		private       bool
 		quiet         bool
+		headed        bool
 	)
 	common.register(fs)
 	fs.StringVar(&out, "out", "./artifacts", "directory to write the artifact into")
@@ -69,6 +70,10 @@ func runDistill(args []string, stdout, stderr io.Writer) int {
 	fs.BoolVar(&private, "private", false,
 		"mark the artifact private: never eligible for a shared cache, and snapshots are refused")
 	fs.BoolVar(&quiet, "quiet", false, "print only the artifact path")
+	fs.BoolVar(&headed, "headed", false,
+		"run the browser with a visible window.\n"+
+			"A diagnostic: some sites behave differently when they can tell they are\n"+
+			"being rendered headlessly, and watching one is the fastest way to find out")
 
 	fs.Usage = func() {
 		fmt.Fprint(stderr, "Usage: sieve distill <url> [flags]\n\nFlags:\n")
@@ -107,6 +112,7 @@ func runDistill(args []string, stdout, stderr io.Writer) int {
 	opts.Render.ViewportW, opts.Render.ViewportH = w, h
 	opts.Render.ChromePath = common.chrome
 	opts.Render.ReducedMotion = reducedMotion
+	opts.Render.Headless = !headed
 	opts.Render.Logf = opts.Logf
 	// Every render sub-budget follows the timeout the user actually asked for.
 	opts.Render.ScaleTo(common.timeout)

@@ -128,8 +128,21 @@ func Launch(ctx context.Context, opts Options) (*Browser, error) {
 	// almost every scroll-reveal animation is built on. A sweep under that
 	// combination scrolls past content that never becomes visible and reports a
 	// rich page as nearly empty. See TestFrameProduction.
-	fs.set("use-gl", "swiftshader")
-	fs.set("enable-unsafe-swiftshader", true)
+	// Software rasterisation is the default for the reasons above, but it is the
+	// most likely explanation whenever a WebGL site behaves differently here
+	// from in an ordinary browser -- and "is this SwiftShader?" is a question
+	// worth being able to answer in one run rather than by rebuilding. The
+	// override is deliberately an environment variable rather than a flag: it
+	// changes rendering, so an artifact produced with it is not comparable with
+	// one produced without, and it should be awkward enough to be deliberate.
+	gl := os.Getenv("SIEVE_GL")
+	if gl == "" {
+		gl = "swiftshader"
+	}
+	fs.set("use-gl", gl)
+	if gl == "swiftshader" {
+		fs.set("enable-unsafe-swiftshader", true)
+	}
 	if runtime.GOOS == "linux" {
 		fs.set("disable-dev-shm-usage", true)
 	}

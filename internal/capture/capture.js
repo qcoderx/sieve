@@ -1398,6 +1398,14 @@
   // nothing on the visitor's behalf -- it is the same gesture as following a
   // link, and every human who reads the site makes it.
   //
+  // "Enable sound" belongs here, which is not obvious. A browser will not play
+  // audio until someone has touched the page, so a site built around sound has
+  // no choice but to ask, and asking is the only thing standing between the
+  // reader and the content: hatom.com finishes loading, prints "Click to enable
+  // sound", and waits there indefinitely. Pressing it makes no noise, because
+  // Chromium is launched muted -- see the --mute-audio flag in browser.go --
+  // so what the press actually buys is the gesture, not the audio.
+  //
   // REFUSE_WORDS is the line. An age gate, a cookie banner, a consent wall and
   // a purchase button all look like entry gates and none of them is one: each
   // asks the visitor to *say* something -- that they are of age, that they
@@ -1407,7 +1415,7 @@
   //
   // The refusal list is checked first and wins ties. When the two overlap --
   // "Enter site (I am over 18)" -- the answer is no.
-  var ENTER_WORDS = /^\s*(click|tap)?\s*(here\s*)?(to\s+)?(enter|start|begin|continue|explore|discover|launch|skip|play|view\s+site|go)\b/i;
+  var ENTER_WORDS = /^\s*(click|tap)?\s*(here\s*)?(to\s+)?(enter|start|begin|continue|explore|discover|launch|skip|play|view\s+site|go|enable\s+(sound|audio)|sound\s+on|with\s+sound|unmute)\b/i;
 
   var REFUSE_WORDS = /\b(18|21)\+?\b|over\s*(18|21)|of\s+legal\s+age|\bi\s*am\b|i'?m\s+over|accept|agree|consent|cookie|privacy|terms|gdpr|allow\s+all|sign\s*in|sign\s*up|log\s*in|register|subscribe|newsletter|\bbuy\b|purchase|checkout|add\s+to\s+(cart|bag)|\bpay\b|\border\b|donate|delete|remove|submit|\bsend\b|download|install/i;
 
@@ -1437,16 +1445,37 @@
   function findEntryControl() {
     var vw = window.innerWidth || 1;
     var vh = window.innerHeight || 1;
+    // Two searches, because half of these controls are not controls.
+    //
+    // A site built with a framework attaches its listener in JavaScript, so the
+    // thing a visitor presses is very often a plain div with no role, no href
+    // and no onclick attribute -- invisible to any selector that looks for
+    // semantics. hatom.com's "Click to enable sound" is exactly that, and a
+    // tag-first search finds nothing on the page at all.
+    //
+    // So the second pass matches on the words instead. That is not a loosening
+    // of what will be pressed: the allow list and the deny list are applied to
+    // the label either way, and everything below still has to be visible, hit
+    // testable, of a size a person could aim at, outside a form and not a link
+    // that leaves the page. What changes is only where sieve is willing to look
+    // for it.
     var els;
     try {
-      els = document.querySelectorAll("button,[role=button],a,[onclick],[class*='enter' i],[class*='skip' i]");
+      els = document.querySelectorAll(
+        "button,[role=button],a,[onclick],[class*='enter' i],[class*='skip' i]");
+      if (els.length === 0 || !hasEnterLabel(els)) {
+        els = document.querySelectorAll("body *");
+      }
     } catch (e) {
       return null;
     }
 
     var best = null;
-    for (var i = 0; i < els.length && i < 500; i++) {
+    for (var i = 0; i < els.length && i < 3000; i++) {
       var el = els[i];
+      // In the wide search, prefer the element that owns the words rather than
+      // an ancestor that merely contains them.
+      if (el.children && el.children.length > 3) continue;
 
       // Never inside a form: those controls submit something.
       if (el.closest && el.closest("form")) continue;
@@ -1540,6 +1569,16 @@
       x: Math.round(vw / 2),
       y: Math.round(vh / 2),
     };
+  }
+
+  // hasEnterLabel reports whether any of these already carries a front-door
+  // label, so the wider search is only run when the narrow one came up empty.
+  function hasEnterLabel(els) {
+    for (var i = 0; i < els.length && i < 500; i++) {
+      var t = norm(els[i].innerText || els[i].textContent || "");
+      if (t && t.length <= 40 && !REFUSE_WORDS.test(t) && ENTER_WORDS.test(t)) return true;
+    }
+    return false;
   }
 
   // gateState describes what is standing between sieve and the page.
