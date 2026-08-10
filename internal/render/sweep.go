@@ -1152,6 +1152,15 @@ func (b *Browser) openEntryGate(ctx context.Context, res *Result, deadline time.
 			return
 		}
 
+		if g.Text != lastLoader {
+			ctl := "none"
+			if g.Control != nil {
+				ctl = strconv.Quote(g.Control.Label)
+			}
+			b.opts.logf("gate: chars=%d loading=%v control=%s text=%q",
+				g.Chars, g.Loading, ctl, firstWords(g.Text, 70))
+		}
+
 		// A page that is already showing its content is not behind a gate.
 		if g.Chars > gateTextFloor {
 			return
