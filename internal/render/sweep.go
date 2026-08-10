@@ -8,11 +8,13 @@ import (
 	"errors"
 	"fmt"
 	"net/url"
+	"strconv"
 	"strings"
 	"time"
 
 	"github.com/chromedp/cdproto/emulation"
 	"github.com/chromedp/cdproto/fetch"
+	"github.com/chromedp/cdproto/input"
 	"github.com/chromedp/cdproto/network"
 	"github.com/chromedp/cdproto/page"
 	"github.com/chromedp/cdproto/runtime"
@@ -51,6 +53,8 @@ type Result struct {
 	Scene *capture.SceneIntrospection
 	// Libraries are the animation, scroll and 3D libraries detected in the page.
 	Libraries []string
+	// EnteredGate names an entry screen sieve pressed through, when it did.
+	EnteredGate string
 	// EntryGate names an interstitial the visitor must dismiss before the site
 	// begins -- the "click to enter" screen. It is empty when there is none.
 	//
@@ -477,6 +481,31 @@ func (b *Browser) Sweep(ctx context.Context, rawURL string, guard NavGuard) (*Re
 		pageStillLoading = true
 	}
 	res.Timing.FirstSettle = time.Since(settleStart)
+
+	// The front door.
+	//
+	// A site that puts a "click to enter" screen in front of itself is not
+	// hiding: every visitor presses it, it asks nothing of them, and behind it
+	// is the page sieve was sent to read. Declaring it as a gap was honest and
+	// useless -- hatom.com and quadricodes.tech both returned two or three
+	// blocks of loading-screen furniture and a note explaining why.
+	//
+	// What sieve will press is defined by a short allow list and a longer deny
+	// list, and the deny list wins. An age gate, a cookie wall and a purchase
+	// button all look exactly like entry gates, and none of them is one: each
+	// asks the visitor to say something on their own behalf, and no tool has
+	// standing to say it for them. Those are still declared as gaps.
+	//
+	// The press is a real mouse event at the control's centre, because a great
+	// many of these listen for a trusted event and ignore element.click(). At
+	// most two presses, only while the page is still showing almost nothing,
+	// and every one of them recorded in the artifact.
+	loadDeadline := start.Add(b.opts.LoadBudget)
+	if dl, ok := callerCtx.Deadline(); ok && dl.Before(loadDeadline) {
+		loadDeadline = dl
+	}
+	b.openEntryGate(tabCtx, res, loadDeadline)
+
 	res.Timing.Load = time.Since(start)
 
 	// The clock for reading the page starts now.
@@ -1009,6 +1038,221 @@ func explainNavError(err error) error {
 		}
 	}
 	return err
+}
+
+// gateState is what the page reports about its own front door.
+type gateState struct {
+	Text    string `json:"text"`
+	Chars   int    `json:"chars"`
+	Loading bool   `json:"loading"`
+	Control *struct {
+		Label string  `json:"label"`
+		X     float64 `json:"x"`
+		Y     float64 `json:"y"`
+		Tag   string  `json:"tag"`
+	} `json:"control"`
+	Centre *struct {
+		Tag   string  `json:"tag"`
+		Label string  `json:"label"`
+		X     float64 `json:"x"`
+		Y     float64 `json:"y"`
+	} `json:"centre"`
+	Refused string `json:"refused"`
+}
+
+// gateTextFloor is how little readable text the page must be showing before
+// pressing anything is considered. A page that is already talking is not
+// behind a gate, and sieve does not touch it.
+const gateTextFloor = 600
+
+// maxEntryPresses bounds how many controls sieve will ever press on one page.
+const maxEntryPresses = 2
+
+// maxGateRounds is how many unchanging looks at a page that says it is loading
+// are tolerated before giving up on it.
+const maxGateRounds = 12
+
+// quietRounds is the same for a page that says nothing at all. It is short,
+// because a page with little text and no loader is usually just a page with
+// little text.
+const quietRounds = 3
+
+// press dispatches a real mouse click. Real, because a great many entry screens
+// listen for a trusted event and ignore element.click().
+func (b *Browser) press(ctx context.Context, x, y float64) bool {
+	err := chromedp.Run(ctx, chromedp.ActionFunc(func(c context.Context) error {
+		return input.DispatchMouseEvent(input.MousePressed, x, y).
+			WithButton(input.Left).WithClickCount(1).Do(c)
+	}), chromedp.ActionFunc(func(c context.Context) error {
+		return input.DispatchMouseEvent(input.MouseReleased, x, y).
+			WithButton(input.Left).WithClickCount(1).Do(c)
+	}))
+	if err != nil {
+		b.opts.logf("could not press the entry screen: %v", err)
+		return false
+	}
+	return true
+}
+
+// noteEntered records that sieve went through a front door, and which one.
+func (b *Browser) noteEntered(res *Result, what string) {
+	if res.EnteredGate == "" {
+		res.EnteredGate = what
+	} else {
+		res.EnteredGate += "; " + what
+	}
+	res.note("sieve pressed " + what + " to reach this page, in the way every visitor does. " +
+		"It asks nothing of a visitor and asserts nothing on their behalf: sieve does not press " +
+		"age gates, consent banners, sign-in or purchase controls, and declares those as gaps instead")
+}
+
+// waitABit pauses for one settle's worth of the load budget, and reports
+// whether there is any point continuing.
+func (b *Browser) waitABit(ctx context.Context, deadline time.Time) bool {
+	wait := b.opts.FirstSettle
+	if avail := time.Until(deadline) - time.Second; avail < wait {
+		wait = avail
+	}
+	if wait < 300*time.Millisecond {
+		return false
+	}
+	var sr settleResult
+	wctx, cancel := context.WithTimeout(ctx, wait+replyGrace)
+	_ = chromedp.Run(wctx, chromedp.Evaluate(b.settleExprMS(wait), &sr, awaitPromise))
+	cancel()
+	return true
+}
+
+// firstWords trims a page's text for a log line.
+func firstWords(s string, n int) string {
+	if len(s) <= n {
+		return s
+	}
+	return s[:n] + "…"
+}
+
+// openEntryGate presses through an entry screen, if there is one it may press.
+func (b *Browser) openEntryGate(ctx context.Context, res *Result, deadline time.Time) {
+	presses := 0
+	stalled := 0
+	lastLoader := ""
+	for round := 0; round < maxGateRounds*8; round++ {
+		if time.Until(deadline) < 2*time.Second {
+			return
+		}
+		var raw string
+		gctx, gcancel := context.WithTimeout(ctx, 3*time.Second)
+		err := chromedp.Run(gctx, chromedp.Evaluate(`window.__sieve.gate()`, &raw))
+		gcancel()
+		if err != nil || raw == "" || raw == "null" {
+			return
+		}
+		var g gateState
+		if json.Unmarshal([]byte(raw), &g) != nil {
+			return
+		}
+
+		// A page that is already showing its content is not behind a gate.
+		if g.Chars > gateTextFloor {
+			return
+		}
+
+		// Still assembling itself. Waiting is the right answer and it is the
+		// site's time, not the reading budget's -- hatom.com says "Loading 5
+		// phases" for longer than the default allowance and its entry screen
+		// does not exist until that finishes. Pressing during a loader would
+		// find nothing to press and start the sweep on a progress bar.
+		if g.Control == nil {
+			if g.Refused != "" {
+				res.EntryGate = g.Refused
+				res.note("this page is behind a screen asking the visitor to confirm something on " +
+					"their own behalf (" + g.Refused + "); sieve does not answer for a visitor, so " +
+					"everything past it is absent from this artifact")
+				return
+			}
+
+			// Nothing to press and nothing to read. That is a page still putting
+			// itself together, and waiting is bounded by the clock rather than by
+			// a round count for as long as it is visibly getting somewhere:
+			// hatom.com counts from zero to a hundred across five phases, and a
+			// fixed number of rounds abandons it at ninety-six -- with the entry
+			// screen it was about to draw, and the whole site behind that, never
+			// seen.
+			//
+			// A page that is *not* announcing a loader gets far less patience,
+			// because "almost no text and nothing happening" is also what a
+			// genuinely near-empty page looks like, and igloo.inc should not cost
+			// twenty seconds to establish that it has two blocks on it.
+			limit := quietRounds
+			if g.Loading {
+				limit = maxGateRounds
+			}
+			if g.Text == lastLoader {
+				stalled++
+			} else {
+				stalled = 0
+				if g.Loading {
+					b.opts.logf("the page is still assembling itself (%q); waiting",
+						firstWords(g.Text, 44))
+				}
+			}
+			lastLoader = g.Text
+
+			// A loader that has stopped moving, with a benign surface in the
+			// middle of it, is a page waiting for a gesture rather than for
+			// time. Some entry screens have no control to find: a site that
+			// wants to start audio *must* wait for a visitor to touch the page,
+			// because browsers will not play sound otherwise, and hatom.com
+			// stops at "LOADING 5 PHASES 100 100 HEADPHONES RECOMMENDED" and
+			// waits exactly like that.
+			//
+			// The surface is checked before it is touched -- not a form, not a
+			// link that leaves the page, nothing on it reading as a claim about
+			// the visitor -- and it is only reached after the page has proved it
+			// is not going to proceed on its own.
+			if stalled >= limit {
+				if presses < maxEntryPresses && g.Centre != nil {
+					presses++
+					b.opts.logf("the page has finished loading and is waiting for a gesture; "+
+						"pressing the centre of <%s>", g.Centre.Tag)
+					if !b.press(ctx, g.Centre.X, g.Centre.Y) {
+						return
+					}
+					b.noteEntered(res, "the screen it was waiting behind")
+					stalled = 0
+					lastLoader = ""
+					if !b.waitABit(ctx, deadline) {
+						return
+					}
+					continue
+				}
+				return
+			}
+			if !b.waitABit(ctx, deadline) {
+				return
+			}
+			continue
+		}
+
+		lastLoader = ""
+		stalled = 0
+		if presses >= maxEntryPresses {
+			return
+		}
+		presses++
+
+		label := g.Control.Label
+		b.opts.logf("entry screen found (%q); pressing it", label)
+		if !b.press(ctx, g.Control.X, g.Control.Y) {
+			return
+		}
+		b.noteEntered(res, strconv.Quote(label))
+
+		// Let whatever the press started finish before looking again.
+		if !b.waitABit(ctx, deadline) {
+			return
+		}
+	}
 }
 
 // sweepReserve is held back from the sweep for everything that still has to
