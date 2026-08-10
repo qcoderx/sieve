@@ -304,3 +304,48 @@ func TestMonospaceIsNotCode(t *testing.T) {
 		}
 	}
 }
+
+// TestCJKJoinsWithoutSpaces guards the asymmetry between scripts. In Latin text
+// a missing space invents a word, so the reassembly errs towards inserting one.
+// In Japanese, Chinese and Korean the same instinct breaks a sentence where no
+// boundary exists, and these scripts routinely set one line as several
+// fragments around inline links.
+func TestCJKJoinsWithoutSpaces(t *testing.T) {
+	node := func(text string, x float64) capture.Node {
+		return capture.Node{
+			Path: text, Block: "b", Tag: "p", Text: text,
+			BBox: capture.Box{x, 100, 40, 20}, LineTop: 100,
+			FontSize: 16, Weight: 400, MaxOpacity: 1, EverVisible: true,
+		}
+	}
+	// Two halves of one Japanese phrase, set far enough apart that the geometry
+	// alone would call for a space.
+	groups := reassemble([]capture.Node{
+		node("日本国内や", 0),
+		node("かつての日本領", 200),
+	})
+	var got string
+	for _, g := range groups {
+		for _, r := range g.Runs {
+			got += r.Text
+		}
+	}
+	if strings.Contains(got, " ") {
+		t.Errorf("inserted a space into CJK text: %q", got)
+	}
+
+	// Latin either side of the same gap still gets its space.
+	groups = reassemble([]capture.Node{
+		node("hello", 0),
+		node("world", 200),
+	})
+	got = ""
+	for _, g := range groups {
+		for _, r := range g.Runs {
+			got += r.Text
+		}
+	}
+	if !strings.Contains(got, "hello world") {
+		t.Errorf("dropped the space between Latin words: %q", got)
+	}
+}
