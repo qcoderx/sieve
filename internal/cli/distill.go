@@ -23,6 +23,19 @@ import (
 // milliseconds whatever the page was.
 const teardownReserve = 900 * time.Millisecond
 
+// fetchAllowance mirrors the distiller's tier-0 budget so the command's overall
+// deadline can account for it. Kept in step with Distiller.fetchBudget.
+func fetchAllowance(loadTimeout time.Duration) time.Duration {
+	b := loadTimeout / 3
+	if b < 5*time.Second {
+		b = 5 * time.Second
+	}
+	if b > 8*time.Second {
+		b = 8 * time.Second
+	}
+	return b
+}
+
 // minComparableTokens is the amount of readable text the served page must have
 // carried before a reduction percentage means anything.
 const minComparableTokens = 200
@@ -119,12 +132,21 @@ func runDistill(args []string, stdout, stderr io.Writer) int {
 		fmt.Fprintf(stderr, "sieve %s — distilling %s\n", render.Version, target)
 	}
 
-	// The distillation gets the timeout minus what the command still has to do
-	// after it: write four files and shut a browser down. `--timeout 10s` is a
-	// promise about how long running sieve takes, and a promise that only covers
-	// the part before the artifact is written is not the one anybody made.
-	// The wall clock covers both: waiting for the page, and reading it.
-	ctx, cancel := withTimeout(common.loadTimeout + common.timeout + teardownReserve)
+	// The wall clock has to cover every stage that can actually run, or the
+	// stages eat each other.
+	//
+	// It covered the load wait and the read, but not tier 0 -- so a host that
+	// is slow to the fetch client spent its fetch budget failing, the browser
+	// then began a full, fresh load allowance on top of that, and the overall
+	// deadline expired before a single checkpoint was taken. casper.com and
+	// womp.com both burned ten seconds on a fetch timeout, waited the whole
+	// twenty for the page, and returned nothing with four hundred milliseconds
+	// left on the clock.
+	//
+	// Tier 0 runs before the page is loaded, so its budget belongs in the total
+	// alongside the others rather than inside one of them.
+	ctx, cancel := withTimeout(
+		fetchAllowance(common.loadTimeout) + common.loadTimeout + common.timeout + teardownReserve)
 	defer cancel()
 
 	// One distiller, built once, closed once.

@@ -918,9 +918,16 @@ func (s *speculation) claim(tier escalate.Tier) (*render.Result, error, bool) {
 // and womp.com -- came back completely empty that way, each having spent the
 // whole budget failing twice at something one of the two would have done.
 func (d *Distiller) fetchBudget() time.Duration {
-	b := d.opts.Render.LoadBudget / 2
+	b := d.opts.Render.LoadBudget / 3
 	if b < 5*time.Second {
 		b = 5 * time.Second
+	}
+	if b > 8*time.Second {
+		// Tier 0 is the cheap path. A host that has not answered a plain GET in
+		// eight seconds is one the browser is going to have to handle anyway,
+		// and every further second spent waiting is taken from the stage that
+		// will actually produce the artifact.
+		b = 8 * time.Second
 	}
 	if to := d.opts.Fetch.Timeout; to > 0 && to < b {
 		b = to
