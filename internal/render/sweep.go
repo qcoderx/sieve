@@ -408,7 +408,7 @@ func (b *Browser) Sweep(ctx context.Context, rawURL string, guard NavGuard) (*Re
 		// connection -- comes back as an error text rather than a timeout, and
 		// is still fatal.
 		if !errors.Is(err, context.DeadlineExceeded) && navCtx.Err() == nil {
-			return nil, fmt.Errorf("navigate %s: %w", rawURL, err)
+			return nil, fmt.Errorf("navigate %s: %w", rawURL, explainNavError(err))
 		}
 		res.note("the navigation had not committed when its share of the budget ran out; " +
 			"whatever had arrived was swept")
@@ -976,6 +976,39 @@ func (b *Browser) runSweep(ctx context.Context, res *Result, col *collector,
 		reply.PinnedChars, reply.FreeChars,
 		reply.Step, len(raw), reply.ReachedBottom)
 	return nil
+}
+
+// explainNavError turns Chromium's network error codes into something an
+// operator can act on.
+//
+// These are conditions of the site, not of sieve, and the difference matters:
+// "net::ERR_CERT_COMMON_NAME_INVALID" sends somebody looking for a bug here,
+// when internetarchive.org simply presents a certificate issued for
+// archive.org. Naming the cause is the difference between a filed report and a
+// wasted afternoon.
+func explainNavError(err error) error {
+	msg := err.Error()
+	for _, e := range []struct{ code, plain string }{
+		{"ERR_CERT_COMMON_NAME_INVALID",
+			"the site's TLS certificate is issued for a different hostname"},
+		{"ERR_CERT_AUTHORITY_INVALID",
+			"the site's TLS certificate is not signed by a recognised authority"},
+		{"ERR_CERT_DATE_INVALID",
+			"the site's TLS certificate has expired or is not yet valid"},
+		{"ERR_CERT_", "the site's TLS certificate was rejected"},
+		{"ERR_CONNECTION_RESET", "the site closed the connection without answering"},
+		{"ERR_CONNECTION_REFUSED", "the site refused the connection"},
+		{"ERR_HTTP2_PROTOCOL_ERROR",
+			"the site broke the HTTP/2 connection; it may be refusing clients it does not recognise"},
+		{"ERR_NAME_NOT_RESOLVED", "the browser could not resolve this hostname"},
+		{"ERR_TIMED_OUT", "the site did not answer in time"},
+		{"ERR_TOO_MANY_REDIRECTS", "the site redirected in a loop"},
+	} {
+		if strings.Contains(msg, e.code) {
+			return fmt.Errorf("%s (%s)", e.plain, strings.TrimSpace(msg))
+		}
+	}
+	return err
 }
 
 // sweepReserve is held back from the sweep for everything that still has to
