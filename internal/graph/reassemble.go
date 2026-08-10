@@ -228,6 +228,19 @@ func joinRun(cur, r *run) {
 	if !contiguous {
 		sep = " "
 	}
+	// Japanese, Chinese and Korean do not put spaces between words.
+	//
+	// The rule above errs towards a space because in Latin script a missing one
+	// invents a word. In CJK the same instinct is exactly wrong: an inserted
+	// space breaks a sentence where no boundary exists, and these scripts
+	// legitimately set a line's worth of text as several fragments around inline
+	// links. ja.wikipedia.org came back with spaces inside its own parentheses.
+	//
+	// The test is on the two characters actually meeting at the join, not on the
+	// run as a whole, so a Latin word abutting a CJK one still gets its space.
+	if isWideRune(lastRune(cur.Text)) && isWideRune(firstRune(r.Text)) {
+		sep = ""
+	}
 	// Whitespace the source actually contained overrides the geometric guess.
 	// An inline link sits flush against the sentence it interrupts, so the gap
 	// between their boxes is zero either way; only the recorded padding can say
@@ -357,6 +370,42 @@ func splitSeg(s string) (tag string, idx int) {
 		return s[:i], 0
 	}
 	return s[:i], n
+}
+
+// isWideRune reports whether a rune belongs to a script written without spaces
+// between words: the CJK blocks, the kana, and the full-width forms.
+func isWideRune(r rune) bool {
+	switch {
+	case r >= 0x1100 && r <= 0x115F: // Hangul Jamo
+	case r >= 0x2E80 && r <= 0x303E: // CJK radicals, punctuation
+	case r >= 0x3041 && r <= 0x33FF: // kana, compatibility
+	case r >= 0x3400 && r <= 0x4DBF: // CJK extension A
+	case r >= 0x4E00 && r <= 0x9FFF: // CJK unified
+	case r >= 0xA000 && r <= 0xA4CF: // Yi
+	case r >= 0xAC00 && r <= 0xD7A3: // Hangul syllables
+	case r >= 0xF900 && r <= 0xFAFF: // CJK compatibility ideographs
+	case r >= 0xFE30 && r <= 0xFE4F: // CJK compatibility forms
+	case r >= 0xFF00 && r <= 0xFF60: // full-width forms
+	case r >= 0x20000 && r <= 0x3FFFD: // CJK extensions B and beyond
+	default:
+		return false
+	}
+	return true
+}
+
+func firstRune(s string) rune {
+	for _, r := range s {
+		return r
+	}
+	return 0
+}
+
+func lastRune(s string) rune {
+	var last rune
+	for _, r := range s {
+		last = r
+	}
+	return last
 }
 
 func absf(v float64) float64 {

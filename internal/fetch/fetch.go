@@ -75,10 +75,10 @@ func DefaultOptions() Options {
 
 // Response is a fetched document plus the freshness signals it carried.
 type Response struct {
-	URL        string
-	FinalURL   string
-	Status     int
-	Body       []byte
+	URL         string
+	FinalURL    string
+	Status      int
+	Body        []byte
 	ContentType string
 	// ETag and LastModified are the rung-1 signals, stored so the next run can
 	// make a conditional request.
@@ -97,8 +97,8 @@ type Response struct {
 
 // Freshness is what a previous run stored so the next one can skip work.
 type Freshness struct {
-	ETag         string    `json:"etag,omitempty"`
-	LastModified string    `json:"last_modified,omitempty"`
+	ETag         string `json:"etag,omitempty"`
+	LastModified string `json:"last_modified,omitempty"`
 	// RawHash is the byte hash of the served HTML. It changes on every rebuild
 	// even when nothing a reader would notice changed, so a mismatch proves
 	// nothing -- but a match is conclusive.

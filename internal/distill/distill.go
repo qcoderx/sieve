@@ -260,6 +260,7 @@ func (d *Distiller) Distill(ctx context.Context, rawURL string) (*Result, error)
 	// answered -- and the distinction is recorded in the artifact rather than
 	// resolved silently in either direction.
 	var robotsNote string
+	var blockedAtFetch string
 	if d.opts.Robots != nil {
 		rctx, rcancel := context.WithTimeout(ctx, d.robotsBudget())
 		err := d.opts.Robots.Allowed(rctx, u)
@@ -450,6 +451,30 @@ func (d *Distiller) Distill(ctx context.Context, rawURL string) (*Result, error)
 	// A refusal degrades rather than failing. A labelled partial artifact from
 	// the served HTML is more useful than an error, and pretending the page was
 	// empty would be worse than both.
+	// A refusal of *this* client is not necessarily a refusal of the tool.
+	//
+	// moma.org, ox.ac.uk and vanguardngr.com all answer the Go client with 403
+	// on their apex host while serving the identical user agent 200 on their www
+	// host, reproducibly. Freezing at tier 0 there emits the CDN's error page as
+	// the artifact -- zero blocks for a site that was refusing nothing -- and it
+	// does not honour anything, because the site never expressed a preference
+	// that a second client would violate.
+	//
+	// So the browser is allowed one attempt. It is not a disguise: it carries the
+	// same identifying user agent and contact URL, obeys the same robots.txt, and
+	// is the tool's other ordinary client. If it is refused as well, that is two
+	// independent refusals and the artifact says so and stops. Nothing here
+	// retries a refusal, spoofs a fingerprint, or asks twice with the same
+	// client.
+	if resp.Blocked && decision.Tier.Rank() >= escalate.TierRender.Rank() {
+		d.logf("tier 0 was refused (%s); the browser is a different client and gets one attempt",
+			resp.BlockedReason)
+		blockedAtFetch = resp.BlockedReason
+		resp.Blocked = false
+		prov.Blocked = false
+		prov.BlockedReason = ""
+	}
+
 	if resp.Blocked {
 		d.logf("site refused this client (%s); staying at tier 0 and labelling the artifact", resp.BlockedReason)
 		prov.Tier = string(escalate.TierFetch)
@@ -603,6 +628,15 @@ func (d *Distiller) Distill(ctx context.Context, rawURL string) (*Result, error)
 	}
 
 	notes := res.Notes
+	if blockedAtFetch != "" {
+		if res.Blocked {
+			notes = append(notes, "both the direct fetch and the browser were refused by this site ("+
+				blockedAtFetch+"); this artifact is whatever the refusal page contained")
+		} else {
+			notes = append(notes, "the direct fetch of this page was refused ("+blockedAtFetch+
+				"), but the browser was served normally; this artifact rests on the rendered page")
+		}
+	}
 	if robotsNote != "" {
 		notes = append(notes, robotsNote)
 	}
