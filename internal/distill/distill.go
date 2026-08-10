@@ -532,7 +532,47 @@ func (d *Distiller) Distill(ctx context.Context, rawURL string) (*Result, error)
 		var err error
 		res, err = b.Sweep(ctx, rawURL, d.guardFunc())
 		if err != nil {
-			return nil, err
+			// The browser could not reach a page that tier 0 already has.
+			//
+			// This happens for reasons that are entirely the network's: an
+			// expired or mismatched certificate, a reset connection, an HTTP/2
+			// protocol error. Four sites in a hundred hit one of them --
+			// internetarchive.org presents a certificate for archive.org, muji
+			// resets the connection, uniqlo breaks the HTTP/2 framing -- and
+			// every one of them was returned to the caller as a failed run,
+			// discarding served HTML that was sitting in memory and was
+			// perfectly readable.
+			//
+			// A refusal still ends the run: that is a decision rather than a
+			// failure, and the browser must not be used to go around it.
+			if errors.Is(err, safety.ErrBlocked) || fetchFailure != "" {
+				return nil, err
+			}
+			d.logf("the browser could not load this page (%v); falling back to the served HTML", err)
+			bprov := prov
+			bprov.Tier = string(escalate.TierFetch)
+			bprov.TierReason = fmt.Sprintf("escalated to %q, but the browser could not load the page "+
+				"(%v), so the served HTML was used instead", decision.Tier, err)
+			bg, berr := d.buildGraph(rawURL, resp, staticRes.Merged, staticRes, bprov,
+				append(notesFor(robotsNote),
+					"the browser was unable to load this page ("+err.Error()+"); this artifact was "+
+						"built from the served HTML alone, so anything this page renders with "+
+						"JavaScript is absent from it"),
+				false, "")
+			if berr != nil {
+				return nil, err
+			}
+			d.adoptServed(bg, staticRes)
+			decision.Tier = escalate.TierFetch
+			decision.Reason = bprov.TierReason
+			timing["render"] = time.Since(tr)
+			timing["total"] = time.Since(start)
+			d.progress(Progress{Stage: "done", Tier: decision.Tier, Elapsed: time.Since(start)})
+			return &Result{
+				Graph: bg, Freshness: freshness, Decision: decision, Timing: timing,
+				Capture: staticRes.Merged, StaticHTML: staticRes.RawHTML,
+				Status: int64(resp.Status),
+			}, nil
 		}
 	}
 	timing["render"] = time.Since(tr)
@@ -866,6 +906,14 @@ func (d *Distiller) robotsBudget() time.Duration {
 		b = 10 * time.Second
 	}
 	return b
+}
+
+// notesFor turns an optional robots note into a note slice.
+func notesFor(robotsNote string) []string {
+	if robotsNote == "" {
+		return nil
+	}
+	return []string{robotsNote}
 }
 
 // adoptServed folds corroborated served-HTML text into a graph and records what
