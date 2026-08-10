@@ -643,7 +643,7 @@ func (d *Distiller) Distill(ctx context.Context, rawURL string) (*Result, error)
 	for _, n := range render.LibraryNotes(res.Libraries) {
 		notes = append(notes, n)
 	}
-	if res.EntryGate != "" {
+	if res.EntryGate != "" && res.EnteredGate == "" {
 		notes = append(notes, "this site is behind an entry screen labelled "+
 			strconv.Quote(res.EntryGate)+"; the page past it never loaded, so this artifact "+
 			"describes the interstitial and not the site")

@@ -1391,7 +1391,192 @@
   // that says why it is thin -- which is the whole of the honesty claim.
   // ---------------------------------------------------------------------------
 
-  var ENTER_WORDS = /^(enter|click to enter|enter site|enter the site|start|begin|continue|explore|discover|launch|play|accept|i am over|yes)\b/i;
+  // What sieve will press, and what it will never press.
+  //
+  // ENTER_WORDS is the front door: the control a site puts between a visitor
+  // and itself that carries no meaning beyond "begin". Pressing it asserts
+  // nothing on the visitor's behalf -- it is the same gesture as following a
+  // link, and every human who reads the site makes it.
+  //
+  // REFUSE_WORDS is the line. An age gate, a cookie banner, a consent wall and
+  // a purchase button all look like entry gates and none of them is one: each
+  // asks the visitor to *say* something -- that they are of age, that they
+  // accept terms, that they want to buy -- and a tool has no standing to say it
+  // for them. Those are declared as gaps instead, which is what the artifact
+  // did for every gate before this and still does for these.
+  //
+  // The refusal list is checked first and wins ties. When the two overlap --
+  // "Enter site (I am over 18)" -- the answer is no.
+  var ENTER_WORDS = /^\s*(click|tap)?\s*(here\s*)?(to\s+)?(enter|start|begin|continue|explore|discover|launch|skip|play|view\s+site|go)\b/i;
+
+  var REFUSE_WORDS = /\b(18|21)\+?\b|over\s*(18|21)|of\s+legal\s+age|\bi\s*am\b|i'?m\s+over|accept|agree|consent|cookie|privacy|terms|gdpr|allow\s+all|sign\s*in|sign\s*up|log\s*in|register|subscribe|newsletter|\bbuy\b|purchase|checkout|add\s+to\s+(cart|bag)|\bpay\b|\border\b|donate|delete|remove|submit|\bsend\b|download|install/i;
+
+  // The maximum this will ever do to a page: two presses, and only while the
+  // page is still refusing to show anything.
+  var MAX_ENTRY_CLICKS = 2;
+
+  // looksLikeLoader reports that the page is still assembling itself rather
+  // than waiting for a visitor. hatom.com says "Loading 5 phases" for longer
+  // than the load allowance, and pressing something during that is both futile
+  // and the wrong response: what it needs is patience.
+  function looksLikeLoader(text) {
+    return /loading|please wait|preparing|initialis|initializ|loading|\d{1,3}\s*%/i.test(text);
+  }
+
+  // findEntryControl locates the front door, and refuses to find anything else.
+  //
+  // It returns viewport coordinates rather than clicking, so the press can be
+  // dispatched as a real input event from outside the page. A great many
+  // gates listen for a trusted event and ignore element.click().
+  //
+  // Everything about the search is deny-first. A control is a candidate only if
+  // its accessible name reads as "begin" and does not read as a claim about the
+  // visitor, a transaction, or an account; it must be visible, of a size a
+  // person could hit, and not inside a form. Anything ambiguous is left alone
+  // and declared as a gap, which is what happened to every gate before this.
+  function findEntryControl() {
+    var vw = window.innerWidth || 1;
+    var vh = window.innerHeight || 1;
+    var els;
+    try {
+      els = document.querySelectorAll("button,[role=button],a,[onclick],[class*='enter' i],[class*='skip' i]");
+    } catch (e) {
+      return null;
+    }
+
+    var best = null;
+    for (var i = 0; i < els.length && i < 500; i++) {
+      var el = els[i];
+
+      // Never inside a form: those controls submit something.
+      if (el.closest && el.closest("form")) continue;
+
+      // Never a link that leaves this page. An in-page anchor is fine, and is
+      // how a good many intros are built.
+      if (el.tagName === "A") {
+        var href = el.getAttribute("href") || "";
+        if (href && href.charAt(0) !== "#" && !/^javascript:/i.test(href)) continue;
+      }
+      if (el.disabled === true || el.getAttribute("aria-disabled") === "true") continue;
+
+      var label = norm(el.innerText || el.textContent ||
+        el.getAttribute("aria-label") || el.getAttribute("title") || "");
+      if (!label || label.length > 40) continue;
+
+      // The refusal is checked first and wins ties.
+      if (REFUSE_WORDS.test(label)) continue;
+      if (!ENTER_WORDS.test(label)) continue;
+
+      var cs;
+      try {
+        cs = getComputedStyle(el);
+      } catch (e) {
+        continue;
+      }
+      if (cs.display === "none" || cs.visibility === "hidden") continue;
+      if (parseFloat(cs.opacity) < 0.1) continue;
+      if (cs.pointerEvents === "none") continue;
+
+      var r = el.getBoundingClientRect();
+      if (r.width < 8 || r.height < 8) continue;
+      if (r.bottom <= 0 || r.top >= vh || r.right <= 0 || r.left >= vw) continue;
+
+      var x = r.left + r.width / 2;
+      var y = r.top + r.height / 2;
+
+      // Whatever is actually on top at that point has to be the control or a
+      // part of it, or the press would land somewhere else entirely.
+      var hit = null;
+      try {
+        hit = document.elementFromPoint(x, y);
+      } catch (e) {}
+      if (hit && hit !== el && !el.contains(hit)) continue;
+
+      // Prefer a real button, then the largest target: on a page with both a
+      // "skip" and an "enter" the bigger one is the primary way in.
+      var score = (el.tagName === "BUTTON" ? 1e6 : 0) + r.width * r.height;
+      if (!best || score > best.score) {
+        best = { label: label, x: Math.round(x), y: Math.round(y), score: score,
+          tag: el.tagName.toLowerCase() };
+      }
+    }
+    if (!best) return null;
+    return { label: best.label, x: best.x, y: best.y, tag: best.tag };
+  }
+
+  // centreTarget describes whatever is sitting in the middle of the viewport.
+  //
+  // Some entry screens have no control to find: the loader finishes and the
+  // page waits for a gesture anywhere, which is how a site that wants to start
+  // audio must behave, because browsers will not play sound until a visitor has
+  // touched the page. hatom.com stops at "LOADING 5 PHASES 100 100 HEADPHONES
+  // RECOMMENDED" and waits exactly like that.
+  function centreTarget() {
+    var vw = window.innerWidth || 1;
+    var vh = window.innerHeight || 1;
+    var el = null;
+    try {
+      el = document.elementFromPoint(vw / 2, vh / 2);
+    } catch (e) {}
+    if (!el) return null;
+
+    // Walk up a little to find whatever carries the meaning, and refuse the
+    // moment anything on the way says this is not a front door.
+    var node = el;
+    var label = "";
+    for (var i = 0; node && i < 6; i++, node = node.parentElement) {
+      if (node.closest && node.closest("form")) return null;
+      if (node.tagName === "A") {
+        var href = node.getAttribute("href") || "";
+        if (href && href.charAt(0) !== "#" && !/^javascript:/i.test(href)) return null;
+      }
+      var t = norm(node.innerText || node.textContent || "");
+      if (t && t.length <= 60 && !label) label = t;
+      if (t && REFUSE_WORDS.test(t)) return null;
+    }
+    return {
+      tag: el.tagName ? el.tagName.toLowerCase() : "",
+      label: label,
+      x: Math.round(vw / 2),
+      y: Math.round(vh / 2),
+    };
+  }
+
+  // gateState describes what is standing between sieve and the page.
+  function gateState() {
+    var text = "";
+    try {
+      text = norm((document.body && document.body.innerText) || "").slice(0, 400);
+    } catch (e) {}
+    var ctl = findEntryControl();
+    return {
+      text: text,
+      chars: text.length,
+      loading: looksLikeLoader(text),
+      control: ctl,
+      centre: ctl ? null : centreTarget(),
+      refused: ctl ? null : refusedGateLabel(),
+    };
+  }
+
+  // refusedGateLabel names a gate sieve will not press, so the artifact can say
+  // that the page is behind one rather than merely appearing empty.
+  function refusedGateLabel() {
+    var els;
+    try {
+      els = document.querySelectorAll("button,[role=button],a");
+    } catch (e) {
+      return null;
+    }
+    for (var i = 0; i < els.length && i < 300; i++) {
+      var label = norm(els[i].innerText || els[i].textContent || "");
+      if (label && label.length <= 40 && REFUSE_WORDS.test(label) &&
+        /enter|continue|proceed|yes|agree|accept/i.test(label)) {
+        return label;
+      }
+    }
+    return null;
+  }
 
   function detectEntryGate() {
     var vw = window.innerWidth || 1;
@@ -2540,6 +2725,16 @@
     // throw them away because the last one did not fit.
     sweepResult: function () {
       return JSON.stringify(window.__sieveSweepOut || null);
+    },
+
+    // gate reports what is standing between sieve and the page: a loader, a
+    // control it may press, or one it will not.
+    gate: function () {
+      try {
+        return JSON.stringify(gateState());
+      } catch (e) {
+        return "null";
+      }
     },
 
     // probe answers, in one call, everything the sweep needs to know about the
