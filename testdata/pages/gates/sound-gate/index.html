@@ -1,0 +1,44 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>Sound gate — gate fixture</title>
+<style>
+  html, body { margin: 0; background: #05070a; color: #cfe0ff;
+               font: 16px/1.6 system-ui, sans-serif; }
+  #gate { position: fixed; inset: 0; display: flex; flex-direction: column;
+          align-items: center; justify-content: center; background: #05070a; z-index: 9; }
+  #gate .hint { opacity: .5; font-size: 12px; letter-spacing: .3em; margin-bottom: 2rem; }
+  #gate button { background: none; border: 1px solid #cfe0ff; color: #cfe0ff;
+                 padding: 1rem 2rem; letter-spacing: .2em; font-size: 13px; }
+  main { display: none; padding: 3rem; max-width: 40rem; }
+</style>
+</head>
+<body>
+  <!-- A site built around audio has no choice but to ask: a browser will not
+       play sound until someone has touched the page. Pressing this asserts
+       nothing on a visitor's behalf and makes no noise either, because the
+       browser sieve drives is launched muted. -->
+  <div id="gate">
+    <div class="hint">HEADPHONES RECOMMENDED</div>
+    <button type="button" id="go">Enable sound</button>
+  </div>
+  <main id="content">
+    <h1>Tide Tables</h1>
+    <p>THE STUDIO IS OPEN. A documentary series recorded along the Bristol
+       Channel over three winters, following the people who still work the
+       highest tidal range in Europe.</p>
+    <p>Nine episodes, each built around a single day's fieldwork, with the
+       ambient recordings presented unedited alongside the cut.</p>
+    <h2>Method</h2>
+    <p>Everything was captured on a pair of omnidirectional microphones at a
+       fixed height, so the episodes can be compared to one another honestly.</p>
+  </main>
+<script>
+  document.getElementById("go").addEventListener("click", function () {
+    document.getElementById("gate").style.display = "none";
+    document.getElementById("content").style.display = "block";
+  });
+</script>
+</body>
+</html>

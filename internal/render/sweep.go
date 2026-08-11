@@ -19,6 +19,7 @@ import (
 	"github.com/chromedp/cdproto/page"
 	"github.com/chromedp/cdproto/runtime"
 	"github.com/chromedp/chromedp"
+	"github.com/chromedp/chromedp/kb"
 
 	"github.com/qcoderx/sieve/internal/capture"
 	"github.com/qcoderx/sieve/internal/corroborate"
@@ -743,7 +744,14 @@ func (b *Browser) probePage(ctx context.Context, res *Result) {
 	}
 	res.FinalURL = p.URL
 	res.Libraries = p.Libraries
-	res.EntryGate = p.Gate
+	// Only when the page still has a gate to report. This runs after the sweep,
+	// by which time a gate sieve refused to open may no longer be findable --
+	// and assigning unconditionally erased the refusal recorded on the way in,
+	// leaving an age-gated page looking like a page with nothing on it, which
+	// is the one thing this must never be ambiguous about.
+	if p.Gate != "" {
+		res.EntryGate = p.Gate
+	}
 }
 
 // collectCorpus builds the confirm-only membership index.
@@ -1046,6 +1054,8 @@ type gateState struct {
 	Chars   int    `json:"chars"`
 	Loading bool   `json:"loading"`
 	Invites bool   `json:"invites"`
+	// Keys is the page asking for a keystroke rather than a pointer.
+	Keys bool `json:"keys"`
 	Control *struct {
 		Label string  `json:"label"`
 		X     float64 `json:"x"`
@@ -1058,7 +1068,38 @@ type gateState struct {
 		X     float64 `json:"x"`
 		Y     float64 `json:"y"`
 	} `json:"centre"`
+	// Cover is a layer painted over the whole viewport, with the number of
+	// characters of the page's own text that are underneath it rather than on
+	// it. See findCover in capture.js.
+	Cover *struct {
+		Tag    string  `json:"tag"`
+		Label  string  `json:"label"`
+		Hidden int     `json:"hidden"`
+		X      float64 `json:"x"`
+		Y      float64 `json:"y"`
+	} `json:"cover"`
 	Refused string `json:"refused"`
+}
+
+// gated reports whether this page is behind something, as opposed to merely
+// being quiet. It is the precondition for pressing anything that is not a
+// clearly labelled control, and it exists because the previous rule -- press
+// the middle of anything that has little text and has stopped changing --
+// pressed the middle of a maintenance notice, a "your browser is not
+// supported" page and an ordinary studio homepage in a single test run.
+//
+// Silence is not a door. A door announces itself: in words, or by covering
+// the page with something opaque.
+func (g *gateState) gated() bool {
+	return g.Invites || g.Keys || g.Control != nil || g.Cover != nil
+}
+
+// hidesRealText reports that a cover is over actual prose. A page whose whole
+// text is on the splash screen itself is a page with nothing behind the
+// splash yet; a page with thousands of characters underneath is one a visitor
+// is being kept out of.
+func (g *gateState) hidesRealText() bool {
+	return g.Cover != nil && g.Cover.Hidden > gateTextFloor
 }
 
 // gateTextFloor is how little readable text the page must be showing before
@@ -1069,9 +1110,13 @@ const gateTextFloor = 600
 // maxEntryPresses bounds how many controls sieve will ever press on one page.
 const maxEntryPresses = 2
 
-// maxGateRounds is how many unchanging looks at a page that says it is loading
-// are tolerated before giving up on it.
-const maxGateRounds = 12
+// gatePace is the minimum interval between two looks at the page, and
+// maxGateProbes the runaway guard on how many there may be. Together they
+// cover more wall-clock time than any deadline this loop runs under, so the
+// clock decides when to stop waiting and this pair only stops a spin.
+const gatePace = 150 * time.Millisecond
+
+const maxGateProbes = 400
 
 // maxGateDuration is the absolute ceiling on getting through a front door,
 // whatever the load budget says. Beyond this the page is not opening.
@@ -1107,6 +1152,19 @@ func (b *Browser) press(ctx context.Context, x, y float64) bool {
 	return true
 }
 
+// pressKey sends a real Enter keystroke to the page.
+//
+// The counterpart to press, for the gates that only ever wanted a key. It is
+// Enter and nothing else: a single keystroke that means "proceed" wherever it
+// is understood at all, cannot fill a field, and cannot answer a question.
+func (b *Browser) pressKey(ctx context.Context) bool {
+	if err := chromedp.Run(ctx, chromedp.KeyEvent(kb.Enter)); err != nil {
+		b.opts.logf("could not send a keystroke to the entry screen: %v", err)
+		return false
+	}
+	return true
+}
+
 // noteEntered records that sieve went through a front door, and which one.
 func (b *Browser) noteEntered(res *Result, what string) {
 	if res.EnteredGate == "" {
@@ -1129,11 +1187,74 @@ func (b *Browser) waitABit(ctx context.Context, deadline time.Time) bool {
 	if wait < 300*time.Millisecond {
 		return false
 	}
+	started := time.Now()
 	var sr settleResult
 	wctx, cancel := context.WithTimeout(ctx, wait+replyGrace)
 	_ = chromedp.Run(wctx, chromedp.Evaluate(b.settleExprMS(wait), &sr, awaitPromise))
 	cancel()
+
+	// Pace the loop.
+	//
+	// The settle expression returns the instant the page stops moving, which on
+	// a page showing a spinner is a few milliseconds, so a gate loop that waits
+	// on it alone probes dozens of times a second and exhausts its round
+	// allowance in five seconds while achieving nothing. A loader that reaches
+	// a hundred per cent and then goes still for a few seconds before opening
+	// -- the exact shape hatom.com has -- was abandoned by the round count long
+	// before any deadline was near, which made the deadline that is supposed to
+	// bound this wait irrelevant.
+	if rest := gatePace - time.Since(started); rest > 0 {
+		select {
+		case <-ctx.Done():
+			return false
+		case <-time.After(rest):
+		}
+	}
 	return true
+}
+
+// openWindow is how long a press is given to take effect before the page is
+// judged not to have reacted to it.
+//
+// A door does not open instantly. An intro that has been asked to skip still
+// has to play its exit, and a splash that has been dismissed still has to hand
+// over to whatever renders the page. quadricodes.tech was pressed correctly,
+// looked at again about four hundred milliseconds later, found saying exactly
+// what it had said before, and written off -- so the extraction began on the
+// intro and the artifact fell from ninety-odd blocks to one. The press was
+// never the problem; the patience after it was.
+const openWindow = 3 * time.Second
+
+// awaitOpening gives a press time to work, and reports whether there is enough
+// of the budget left to carry on afterwards.
+func (b *Browser) awaitOpening(ctx context.Context, deadline time.Time, before *gateState) bool {
+	stop := time.Now().Add(openWindow)
+	if deadline.Before(stop) {
+		stop = deadline
+	}
+	started := time.Now()
+	for time.Now().Before(stop) {
+		if !b.waitABit(ctx, stop) {
+			break
+		}
+		var raw string
+		gctx, gcancel := context.WithTimeout(ctx, gateProbeTimeout)
+		err := chromedp.Run(gctx, chromedp.Evaluate(`window.__sieve.gate()`, &raw))
+		gcancel()
+		if err != nil || raw == "" || raw == "null" {
+			continue
+		}
+		var g gateState
+		if json.Unmarshal([]byte(raw), &g) != nil {
+			continue
+		}
+		if g.Text != before.Text || (before.Cover != nil && g.Cover == nil) {
+			b.opts.logf("gate: the page opened %v after the press",
+				time.Since(started).Round(time.Millisecond))
+			break
+		}
+	}
+	return time.Until(deadline) > 2*time.Second
 }
 
 // firstWords trims a page's text for a log line.
@@ -1143,8 +1264,6 @@ func firstWords(s string, n int) string {
 	}
 	return s[:n] + "…"
 }
-
-// openEntryGate presses through an entry screen, if there is one it may press.
 
 // openEntryGate presses through an entry screen, if there is one it may press.
 func (b *Browser) openEntryGate(ctx context.Context, res *Result, deadline time.Time) {
@@ -1177,7 +1296,29 @@ func (b *Browser) openEntryGate(ctx context.Context, res *Result, deadline time.
 	// budget to confirm that costs a minute on a page that is not going to open.
 	pressedAt := ""
 	lastLoader := ""
-	for round := 0; round < maxGateRounds*8; round++ {
+	// Whether a keystroke has already been sent. One is the whole allowance.
+	keyed := false
+	// What the page was last seen saying while it was still loading. If the
+	// budget runs out here, the artifact has to say the site was still on its
+	// way in rather than let a loading screen pass for a thin site.
+	stillLoading := ""
+	// Deferred rather than called at each exit: this loop leaves from a dozen
+	// places -- out of time, out of probes, a wait that could not be afforded --
+	// and the first version of this note was attached to two of them, so the
+	// site it was written for did not get it. What matters is the state on the
+	// way out, not which statement did the leaving.
+	defer func() {
+		if stillLoading == "" {
+			return
+		}
+		res.EntryGate = stillLoading
+		res.note("this page was still loading when the time allowed for it ran out, so " +
+			"nothing behind its loading screen is in this artifact. Sites that spend " +
+			"this long assembling themselves can be read by raising -load-timeout, " +
+			"which bounds the wait for a page to arrive and is separate from the " +
+			"budget for reading one")
+	}()
+	for round := 0; round < maxGateProbes; round++ {
 		if !time.Now().Before(deadline) {
 			b.opts.logf("gate: leaving (out of time)")
 			return
@@ -1216,12 +1357,28 @@ func (b *Browser) openEntryGate(ctx context.Context, res *Result, deadline time.
 			if g.Control != nil {
 				ctl = strconv.Quote(g.Control.Label)
 			}
-			b.opts.logf("gate: chars=%d loading=%v control=%s text=%q",
-				g.Chars, g.Loading, ctl, firstWords(g.Text, 70))
+			cov := "none"
+			if g.Cover != nil {
+				cov = fmt.Sprintf("<%s> hiding %d chars", g.Cover.Tag, g.Cover.Hidden)
+			}
+			b.opts.logf("gate: chars=%d loading=%v control=%s cover=%s text=%q",
+				g.Chars, g.Loading, ctl, cov, firstWords(g.Text, 70))
 		}
 
-		// A page that is already showing its content is not behind a gate.
-		if g.Chars > gateTextFloor {
+		if g.Loading && g.Cover != nil {
+			stillLoading = firstWords(g.Text, 60)
+		} else {
+			stillLoading = ""
+		}
+
+		// A page that is already showing its content is not behind a gate --
+		// unless something opaque is painted over all of it, which is the one
+		// case where the amount of text says nothing about whether any of it
+		// can be seen. A splash laid over a rendered page reports the whole
+		// site through innerText while showing the visitor a black rectangle
+		// and one word, and leaving here on the strength of that character
+		// count is how a fully gated page gets read as an open one.
+		if g.Chars > gateTextFloor && !g.hidesRealText() {
 			return
 		}
 
@@ -1236,6 +1393,22 @@ func (b *Browser) openEntryGate(ctx context.Context, res *Result, deadline time.
 				res.note("this page is behind a screen asking the visitor to confirm something on " +
 					"their own behalf (" + g.Refused + "); sieve does not answer for a visitor, so " +
 					"everything past it is absent from this artifact")
+				return
+			}
+
+			// Nothing here announces itself as a door and the page is not
+			// claiming to be busy. That is an ordinary quiet page, and the
+			// right thing to do with one is leave it alone.
+			//
+			// The rule this guards was the worst behaviour in the whole
+			// feature: press the middle of anything showing little text that
+			// has stopped changing. Across twenty sites it pressed a
+			// maintenance notice, a "your browser is not supported" page, a
+			// canvas homepage and an ordinary studio site -- four presses, no
+			// gates, and every one of them an interaction sieve had no reason
+			// to perform. A tool that clicks pages on the chance that they are
+			// hiding something is worse than one that never clicks at all.
+			if !g.gated() && !g.Loading {
 				return
 			}
 
@@ -1286,6 +1459,25 @@ func (b *Browser) openEntryGate(ctx context.Context, res *Result, deadline time.
 			// the window -- hatom.com prints CLICK TO ENTER exactly so. The
 			// middle of the page is then the honest place to press, and the
 			// surface there is still checked before it is touched.
+			// A keystroke, when the page asked for one. Tried before any
+			// verdict that the door will not open, because a screen that only
+			// listens for a key looks exactly like a screen that ignored the
+			// press it was given.
+			if g.Keys && !keyed {
+				keyed = true
+				b.opts.logf("the page asks for a key (%q); pressing Enter",
+					firstWords(g.Text, 44))
+				if b.pressKey(ctx) {
+					b.noteEntered(res, "the screen asking a visitor to press a key")
+					stalled = 0
+					lastLoader = ""
+					if !b.awaitOpening(ctx, deadline, &g) {
+						return
+					}
+					continue
+				}
+			}
+
 			if g.Invites && g.Text == pressedAt {
 				b.opts.logf("gate: leaving (the press changed nothing)")
 				res.EntryGate = firstWords(g.Text, 60)
@@ -1302,7 +1494,7 @@ func (b *Browser) openEntryGate(ctx context.Context, res *Result, deadline time.
 				pressedAt = g.Text
 				stalled = 0
 				lastLoader = ""
-				if !b.waitABit(ctx, deadline) {
+				if !b.awaitOpening(ctx, deadline, &g) {
 					return
 				}
 				continue
@@ -1320,18 +1512,23 @@ func (b *Browser) openEntryGate(ctx context.Context, res *Result, deadline time.
 			// link that leaves the page, nothing on it reading as a claim about
 			// the visitor -- and it is only reached after the page has proved it
 			// is not going to proceed on its own.
+			//
+			// The cover is the licence. Without something opaque over the
+			// whole viewport there is no evidence of a door here at all, and
+			// the press would be a guess.
 			if stalled >= limit {
-				if presses < maxEntryPresses && g.Centre != nil {
+				if presses < maxEntryPresses && g.Centre != nil && g.Cover != nil {
 					presses++
-					b.opts.logf("the page has finished loading and is waiting for a gesture; "+
-						"pressing the centre of <%s>", g.Centre.Tag)
+					b.opts.logf("the page has finished loading and is waiting for a gesture "+
+						"behind a full-screen <%s>; pressing its centre", g.Cover.Tag)
 					if !b.press(ctx, g.Centre.X, g.Centre.Y) {
 						return
 					}
 					b.noteEntered(res, "the screen it was waiting behind")
+					pressedAt = g.Text
 					stalled = 0
 					lastLoader = ""
-					if !b.waitABit(ctx, deadline) {
+					if !b.awaitOpening(ctx, deadline, &g) {
 						return
 					}
 					continue
@@ -1356,6 +1553,23 @@ func (b *Browser) openEntryGate(ctx context.Context, res *Result, deadline time.
 			// The page has not reacted yet, or is not going to. Pressing the
 			// same control again while it still says the same thing is not
 			// persistence, it is a double click nobody asked for.
+			//
+			// A key is worth one try first, though, when the page named one:
+			// quadricodes.tech offers "SKIP INTRO OR PRESS ENTER" and means
+			// both, and a site that means only the second is indistinguishable
+			// from here.
+			if g.Keys && !keyed {
+				keyed = true
+				b.opts.logf("the control did not answer, and the page also asks for a key; "+
+					"pressing Enter")
+				if b.pressKey(ctx) {
+					b.noteEntered(res, "the screen asking a visitor to press a key")
+					if !b.awaitOpening(ctx, deadline, &g) {
+						return
+					}
+					continue
+				}
+			}
 			b.opts.logf("gate: leaving (the press changed nothing)")
 			return
 		}
@@ -1367,7 +1581,7 @@ func (b *Browser) openEntryGate(ctx context.Context, res *Result, deadline time.
 		pressedAt = g.Text
 
 		// Let whatever the press started finish before looking again.
-		if !b.waitABit(ctx, deadline) {
+		if !b.awaitOpening(ctx, deadline, &g) {
 			return
 		}
 	}

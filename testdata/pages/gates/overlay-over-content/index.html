@@ -1,0 +1,43 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>Overlay over content — gate fixture</title>
+<style>
+  html, body { margin: 0; background: #fff; color: #111; font: 16px/1.6 Georgia, serif; }
+  #gate { position: fixed; inset: 0; display: flex; align-items: center;
+          justify-content: center; background: #000; color: #fff; z-index: 99; }
+  #gate button { background: none; border: 1px solid #fff; color: #fff;
+                 padding: 1rem 2rem; letter-spacing: .2em; font-size: 14px; }
+  main { padding: 3rem; max-width: 40rem; }
+</style>
+</head>
+<body>
+  <!-- The hard case. The page is fully rendered underneath -- innerText already
+       returns a great deal of prose -- and an opaque full-viewport overlay is
+       painted over all of it. Judging "is this gated?" by how much text the
+       body reports says "not gated", and a reader gets a page they cannot see
+       a word of on screen. What settles it is the overlay's own geometry. -->
+  <main>
+    <h1>Marlow &amp; Vance</h1>
+    <p>THE STUDIO IS OPEN. A practice of eleven people working on typography,
+       identity and the slower kinds of editorial design.</p>
+    <p>We began in a single room above a bookbinder in 2009 and have kept the
+       shop deliberately small since. The work is better when the people who
+       sold it are the people who make it.</p>
+    <h2>Selected work</h2>
+    <p>Wayfinding for the Lowlands Museum, a twelve-year identity programme for
+       Harrow Press, and the reissue of the Coleridge letters in three volumes.</p>
+    <p>We publish a short letter four times a year about what we have been
+       reading. It is not a newsletter about us.</p>
+    <h2>Contact</h2>
+    <p>Correspondence is welcome at the Chandlery, Bristol.</p>
+  </main>
+  <div id="gate"><button type="button" id="go">ENTER</button></div>
+<script>
+  document.getElementById("go").addEventListener("click", function () {
+    document.getElementById("gate").remove();
+  });
+</script>
+</body>
+</html>

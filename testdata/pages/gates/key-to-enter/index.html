@@ -1,0 +1,40 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>Key to enter — gate fixture</title>
+<style>
+  html, body { margin: 0; background: #111; color: #f2f2f2;
+               font: 16px/1.6 system-ui, sans-serif; }
+  #gate { position: fixed; inset: 0; display: flex; align-items: center;
+          justify-content: center; background: #111; z-index: 9; }
+  #gate .caption { letter-spacing: .3em; font-size: 13px; }
+  main { display: none; padding: 3rem; max-width: 40rem; }
+</style>
+</head>
+<body>
+  <!-- Asks for a key rather than a click, and ignores the mouse entirely.
+       quadricodes.tech says "SKIP INTRO OR PRESS ENTER" and means both; plenty
+       of others mean only the second. A tool that can only click reads these
+       as doors that would not open. -->
+  <div id="gate"><div class="caption">PRESS ENTER TO CONTINUE</div></div>
+  <main id="content">
+    <h1>Bellwether</h1>
+    <p>THE STUDIO IS OPEN. A forecasting practice working with ports and
+       inland freight terminals on congestion and berth scheduling.</p>
+    <p>We build models that operators can argue with: every projection comes
+       with the handful of assumptions that actually move it, rather than a
+       single number presented as though it were measured.</p>
+    <h2>Engagements</h2>
+    <p>Typically nine months, beginning with a season of observation before any
+       model is written.</p>
+  </main>
+<script>
+  window.addEventListener("keydown", function (e) {
+    if (e.key !== "Enter") return;
+    document.getElementById("gate").style.display = "none";
+    document.getElementById("content").style.display = "block";
+  });
+</script>
+</body>
+</html>

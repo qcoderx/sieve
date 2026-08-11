@@ -1,0 +1,52 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>Loader then gate — gate fixture</title>
+<style>
+  html, body { margin: 0; background: #000; color: #fff;
+               font: 16px/1.6 system-ui, sans-serif; }
+  #gate { position: fixed; inset: 0; display: flex; align-items: center;
+          justify-content: center; background: #000; z-index: 9; }
+  #gate .caption { letter-spacing: .35em; font-size: 13px; }
+  main { display: none; padding: 3rem; max-width: 40rem; }
+</style>
+</head>
+<body>
+  <!-- hatom.com's shape, compressed. A counter runs to a hundred, the page then
+       sits perfectly still for a while longer while it builds its scene, and
+       only after that does the door appear. Anything that treats stillness as
+       a verdict gives up in the gap and reports an empty site. -->
+  <div id="gate"><div class="caption" id="cap">LOADING 0%</div></div>
+  <main id="content">
+    <h1>Kestrel Works</h1>
+    <p>THE STUDIO IS OPEN. Industrial design for measurement instruments:
+       housings, mounts, and the parts of a device a technician actually touches
+       in the field.</p>
+    <p>We work almost entirely in aluminium and glass-filled nylon, and we build
+       every enclosure at full scale before anything is tooled, because a part
+       that is comfortable on screen is frequently unusable in a glove.</p>
+    <h2>Sectors</h2>
+    <p>Hydrology, air quality, and grid metering. Long deployment cycles and
+       equipment that has to survive a decade outdoors without attention.</p>
+  </main>
+<script>
+  var n = 0, cap = document.getElementById("cap");
+  var tick = setInterval(function () {
+    n += 12;
+    if (n >= 100) {
+      n = 100;
+      clearInterval(tick);
+      // The still gap: a hundred per cent, and nothing at all for a while.
+      setTimeout(function () { cap.textContent = "CLICK TO ENTER"; }, 3500);
+    }
+    cap.textContent = "LOADING " + n + "%";
+  }, 220);
+  window.addEventListener("click", function () {
+    if (cap.textContent !== "CLICK TO ENTER") return;
+    document.getElementById("gate").style.display = "none";
+    document.getElementById("content").style.display = "block";
+  });
+</script>
+</body>
+</html>

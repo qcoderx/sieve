@@ -1415,7 +1415,13 @@
   //
   // The refusal list is checked first and wins ties. When the two overlap --
   // "Enter site (I am over 18)" -- the answer is no.
-  var ENTER_WORDS = /^\s*(click|tap)?\s*(here\s*)?(to\s+)?(enter|start|begin|continue|explore|discover|launch|skip|play|view\s+site|go|enable\s+(sound|audio)|sound\s+on|with\s+sound|unmute)\b/i;
+  // The leading character class, rather than \s*, is what lets an ornamented
+  // label through. Half of these controls are typeset as "→ Enter site" or
+  // "— begin —", and a pattern anchored to the first character never matches
+  // one, though it plainly says the same thing to a person. Only leading
+  // punctuation is skipped; the word itself still has to start the label, so
+  // "we will never enter into a contract" is still not a front door.
+  var ENTER_WORDS = /^[^A-Za-z0-9]*(click|tap|press|push)?\s*(here\s*)?(to\s+)?(enter|start|begin|continue|explore|discover|launch|skip|play|view\s+site|go\b|enable\s+(sound|audio)|sound\s+on|with\s+sound|unmute|step\s+inside|come\s+in|dive\s+in|let'?s\s+go)\b/i;
 
   var REFUSE_WORDS = /\b(18|21)\+?\b|over\s*(18|21)|of\s+legal\s+age|\bi\s*am\b|i'?m\s+over|accept|agree|consent|cookie|privacy|terms|gdpr|allow\s+all|sign\s*in|sign\s*up|log\s*in|register|subscribe|newsletter|\bbuy\b|purchase|checkout|add\s+to\s+(cart|bag)|\bpay\b|\border\b|donate|delete|remove|submit|\bsend\b|download|install/i;
 
@@ -1429,6 +1435,15 @@
   // still applied to the surface before anything is touched.
   var ENTER_INVITE = /\b(click|tap|press)\s+(anywhere\s+)?(here\s+)?to\s+(enter|start|begin|continue|explore|play)\b|\benter\s+site\b|\bclick\s+anywhere\b/i;
 
+  // KEY_INVITE is the same request made of the keyboard.
+  //
+  // Some entry screens listen only for a key and ignore the mouse entirely,
+  // and they say so: "press enter to continue", "hit space to begin".
+  // quadricodes.tech offers both -- "SKIP INTRO OR PRESS ENTER" -- and plenty
+  // of sites offer only the second, which a tool that can only click reads as
+  // a door that would not open.
+  var KEY_INVITE = /\b(press|hit|tap)\s+(the\s+)?(enter|return|space(bar)?|any\s+key)\b/i;
+
   // The maximum this will ever do to a page: two presses, and only while the
   // page is still refusing to show anything.
   var MAX_ENTRY_CLICKS = 2;
@@ -1438,7 +1453,12 @@
   // than the load allowance, and pressing something during that is both futile
   // and the wrong response: what it needs is patience.
   function looksLikeLoader(text) {
-    return /loading|please wait|preparing|initialis|initializ|loading|\d{1,3}\s*%/i.test(text);
+    if (/loading|please wait|preparing|initialis|initializ/i.test(text)) return true;
+    // A bare percentage counts only on a page that is showing almost nothing
+    // else. A progress figure is a loader; "98% of our clients renew" is copy,
+    // and treating every percentage as progress made pear.no wait out rounds it
+    // did not need and then run short of budget for the read itself.
+    return text.length < 120 && /\d{1,3}\s*%/.test(text);
   }
 
   // findEntryControl locates the front door, and refuses to find anything else.
@@ -1483,9 +1503,6 @@
     var best = null;
     for (var i = 0; i < els.length && i < 3000; i++) {
       var el = els[i];
-      // In the wide search, prefer the element that owns the words rather than
-      // an ancestor that merely contains them.
-      if (el.children && el.children.length > 3) continue;
 
       // Never inside a form: those controls submit something.
       if (el.closest && el.closest("form")) continue;
@@ -1505,6 +1522,20 @@
       // The refusal is checked first and wins ties.
       if (REFUSE_WORDS.test(label)) continue;
       if (!ENTER_WORDS.test(label)) continue;
+
+      // Prefer the innermost element that carries the whole label: if a child
+      // says exactly the same thing, the child is the control and this is
+      // merely its wrapper.
+      //
+      // This replaced a cap on how many children a candidate could have, which
+      // was the same idea done crudely and which excluded the commonest way an
+      // entry control is built. Every site that animates its entry text splits
+      // the label into one element per letter -- GSAP's SplitText and its
+      // imitators all do this -- so the button a person sees reading "ENTER"
+      // has five children, none of which says "ENTER". A child count rejected
+      // exactly the controls most worth finding; asking whether anything
+      // inside repeats the label rejects only true wrappers.
+      if (!ownsLabel(el, label)) continue;
 
       var cs;
       try {
@@ -1548,6 +1579,109 @@
     }
     if (!best) return null;
     return { label: best.label, x: best.x, y: best.y, tag: best.tag };
+  }
+
+  // ownsLabel reports that no child of this element repeats the whole label,
+  // which is what distinguishes a control from an ancestor containing one.
+  function ownsLabel(el, label) {
+    var kids = el.children || [];
+    for (var i = 0; i < kids.length && i < 40; i++) {
+      if (norm(kids[i].innerText || kids[i].textContent || "") === label) return false;
+    }
+    return true;
+  }
+
+  // opaqueSurface reports whether an element paints over what is behind it,
+  // rather than being one of the many invisible full-screen boxes a modern
+  // page is full of -- scroll proxies, gesture catchers, focus traps.
+  function opaqueSurface(cs) {
+    if (cs.backdropFilter && cs.backdropFilter !== "none") return true;
+    if (cs.backgroundImage && cs.backgroundImage !== "none") return true;
+    var bg = cs.backgroundColor || "";
+    if (!bg || bg === "transparent") return false;
+    var m = bg.match(/^rgba?\(([^)]+)\)/);
+    if (!m) return false;
+    var parts = m[1].split(",");
+    if (parts.length < 4) return true;
+    return parseFloat(parts[3]) >= 0.85;
+  }
+
+  // findCover locates a layer painted over the whole viewport.
+  //
+  // This is the signal that judging a gate by how much text the page reports
+  // cannot see. A splash screen laid over a fully rendered page leaves
+  // document.body.innerText returning the entire site -- every word of it
+  // present, none of it visible -- so a text threshold concludes "not gated"
+  // about a page a visitor cannot read a syllable of. Geometry is the honest
+  // test: something opaque is covering everything.
+  //
+  // What it deliberately does not do is treat every full-screen layer as a
+  // door. The element must actually paint (an invisible overlay hides nothing)
+  // and the decision to press still needs a reason beyond the cover itself --
+  // words that invite a press, a control that reads as an entrance, or real
+  // content measurably hidden underneath.
+  function findCover() {
+    var vw = window.innerWidth || 1;
+    var vh = window.innerHeight || 1;
+    var area = vw * vh;
+    var els;
+    try {
+      els = document.querySelectorAll("body *");
+    } catch (e) {
+      return null;
+    }
+    var best = null;
+    var bestZ = -1e9;
+    for (var i = 0; i < els.length && i < 4000; i++) {
+      var el = els[i];
+
+      // Geometry first, style second. getComputedStyle forces a style recalc
+      // and this runs on every look at the page, several times a second, for
+      // as long as a loading screen is up -- so asking it about every element
+      // of a large document would slow down the very page being waited for.
+      // A bounding rect is cheap and rejects all but a handful of candidates.
+      var r = el.getBoundingClientRect();
+      if (r.width * r.height < area * 0.9) continue;
+      if (r.top > 2 || r.left > 2 || r.bottom < vh - 2 || r.right < vw - 2) continue;
+
+      var cs;
+      try {
+        cs = getComputedStyle(el);
+      } catch (e) {
+        continue;
+      }
+      if (cs.position !== "fixed" && cs.position !== "absolute") continue;
+      if (cs.display === "none" || cs.visibility === "hidden") continue;
+      if (parseFloat(cs.opacity) < 0.85) continue;
+      if (!opaqueSurface(cs)) continue;
+
+      var z = parseInt(cs.zIndex, 10);
+      if (isNaN(z)) z = 0;
+      if (!best || z >= bestZ) {
+        best = el;
+        bestZ = z;
+      }
+    }
+    if (!best) return null;
+
+    // How much of the page's prose is underneath rather than on the cover
+    // itself. Real text hidden by the layer is the strongest evidence that
+    // this is a door and not simply a dark background.
+    var hidden = 0;
+    try {
+      var all = norm((document.body && document.body.innerText) || "").length;
+      var mine = norm(best.innerText || best.textContent || "").length;
+      hidden = all - mine;
+      if (hidden < 0) hidden = 0;
+    } catch (e) {}
+
+    return {
+      tag: best.tagName ? best.tagName.toLowerCase() : "",
+      label: norm(best.innerText || best.textContent || "").slice(0, 60),
+      hidden: hidden,
+      x: Math.round(vw / 2),
+      y: Math.round(vh / 2),
+    };
   }
 
   // centreTarget describes whatever is sitting in the middle of the viewport.
@@ -1610,7 +1744,9 @@
       chars: text.length,
       loading: looksLikeLoader(text),
       invites: ENTER_INVITE.test(text) && !REFUSE_WORDS.test(text),
+      keys: KEY_INVITE.test(text) && !REFUSE_WORDS.test(text),
       control: ctl,
+      cover: findCover(),
       centre: ctl ? null : centreTarget(),
       refused: ctl ? null : refusedGateLabel(),
     };

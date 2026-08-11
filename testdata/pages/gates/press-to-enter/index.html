@@ -1,0 +1,38 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>Press to enter — gate fixture</title>
+<style>
+  html, body { margin: 0; background: #0d0f14; color: #dfe4ec;
+               font: 16px/1.6 system-ui, sans-serif; }
+  #gate { position: fixed; inset: 0; display: flex; align-items: center;
+          justify-content: center; background: #0d0f14; z-index: 9; }
+  #gate .caption { letter-spacing: .35em; font-size: 13px; }
+  main { display: none; padding: 3rem; max-width: 40rem; }
+</style>
+</head>
+<body>
+  <!-- "PRESS TO ENTER", with the words on a caption that is not itself the
+       control: the listener is on the window, as it is on most sites built
+       this way, and the caption is decorative. -->
+  <div id="gate"><div class="caption">PRESS TO ENTER</div></div>
+  <main id="content">
+    <h1>Ferrous</h1>
+    <p>THE STUDIO IS OPEN. An independent record label operating out of Leeds
+       since 2014, releasing between four and six records a year.</p>
+    <p>Everything is mastered at half speed and pressed on 180 gram vinyl at a
+       plant we have used since the beginning. We do not licence to streaming
+       services for the first ninety days.</p>
+    <h2>Catalogue</h2>
+    <p>Forty-one releases to date, of which nine remain in print. The back
+       catalogue is repressed when demand justifies a run of five hundred.</p>
+  </main>
+<script>
+  window.addEventListener("click", function () {
+    document.getElementById("gate").style.display = "none";
+    document.getElementById("content").style.display = "block";
+  });
+</script>
+</body>
+</html>
