@@ -3,7 +3,10 @@ package safety
 import (
 	"context"
 	"errors"
+	"io"
 	"net"
+	"net/http"
+	"net/http/httptest"
 	"net/url"
 	"testing"
 	"time"
@@ -187,6 +190,46 @@ func TestRobotsWildcards(t *testing.T) {
 	}
 	if !r.Allowed("/tmp/x/public") {
 		t.Error("non-matching path should be allowed")
+	}
+}
+
+// TestRobotsStatusCodes pins the half of RFC 9309 that reads backwards.
+//
+// A 4xx on robots.txt means the rules are unavailable, and the standard says a
+// crawler may then fetch anything. A 5xx means the server could not answer,
+// which might be concealing a Disallow, so that one requires assuming the
+// whole site is forbidden. Getting these the wrong way round is not a subtle
+// failure: sieve declined all of sciencedirect.com because its robots.txt
+// answers 403 to unfamiliar user agents.
+func TestRobotsStatusCodes(t *testing.T) {
+	cases := []struct {
+		status  int
+		blocked bool
+		why     string
+	}{
+		{200, false, "a robots.txt that was served is simply parsed"},
+		{404, false, "no robots.txt means no restrictions"},
+		{401, false, "unavailable rules are not a refusal of the site"},
+		{403, false, "sciencedirect.com serves its articles and hides its robots.txt"},
+		{429, true, "the one 4xx that is a refusal of this client, not of the file"},
+		{500, true, "unreachable rules might be hiding a Disallow"},
+		{503, true, "the same, and the commonest of them"},
+	}
+	for _, tc := range cases {
+		srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+			w.WriteHeader(tc.status)
+			_, _ = io.WriteString(w, "User-agent: *\nAllow: /\n")
+		}))
+		u, err := url.Parse(srv.URL)
+		if err != nil {
+			t.Fatalf("parse: %v", err)
+		}
+		_, err = FetchRobots(context.Background(), srv.Client(), u)
+		srv.Close()
+
+		if got := errors.Is(err, ErrBlocked); got != tc.blocked {
+			t.Errorf("status %d: blocked = %v, want %v (%s)", tc.status, got, tc.blocked, tc.why)
+		}
 	}
 }
 
