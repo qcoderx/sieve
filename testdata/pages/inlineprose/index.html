@@ -1,0 +1,38 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>Inline prose — fixture</title>
+<style>
+  body { margin: 0; padding: 2rem; font: 16px/1.7 Georgia, serif; max-width: 46rem; }
+  code { font-family: ui-monospace, Menlo, monospace; background: #f2f2f2; padding: 0 .2em; }
+</style>
+</head>
+<body>
+  <!-- Paragraphs broken up by inline elements: code spans, links, emphasis.
+       This is what technical prose looks like everywhere, and it is where the
+       reassembly has to put the pieces back in reading order rather than in
+       whatever order the layout happens to hand them over.
+
+       Each paragraph below is checked as one sentence in the test, so a
+       fragment that lands out of order fails loudly instead of producing
+       plausible-looking nonsense. -->
+  <h1>Configuration</h1>
+
+  <p id="p1">This version of the text assumes you are using Rust 1.90.0 or later
+  with <code>edition = "2024"</code> in the <em>Cargo.toml</em> file of all
+  projects to configure them to use Rust 2024 Edition idioms.</p>
+
+  <p id="p2">The HTML format is available online at
+  <a href="https://doc.rust-lang.org/book/">the official site</a> and offline
+  with installations of Rust made with <code>rustup</code>; run
+  <code>rustup doc --book</code> to open it in a browser.</p>
+
+  <p id="p3">See the <a href="/ch01">Installation section of Chapter 1</a> for
+  instructions on installing or updating Rust, and see
+  <a href="/appendix-e">Appendix E</a> for information on editions.</p>
+
+  <p id="p4">A sentence with <strong>bold text in the middle</strong> of it, and
+  a trailing clause after that.</p>
+</body>
+</html>

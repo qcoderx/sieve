@@ -163,13 +163,13 @@ func Extract(pageURL string, body io.Reader, sizeHint int) (*Result, error) {
 	// with an inline style; they use a class, and without this pass the static
 	// tier would ingest exactly the material the rendered tiers quarantine.
 	ex.scanStyles(doc)
-	ex.walk(doc, "html", "html", "", "", 0, false)
+	ex.walk(doc, "html", "html", "", "", 0, false, 0)
 
 	snap := &capture.Snapshot{
 		Checkpoint:   0,
 		ViewportW:    1440,
 		ViewportH:    900,
-		DocHeight:    float64(ex.order) * 40,
+		DocHeight:    float64(ex.lineNo+1) * 40,
 		Nodes:        ex.nodes,
 		Latent:       ex.latent,
 		Actions:      ex.actions,
@@ -211,6 +211,11 @@ type extractor struct {
 	seen      map[string]bool
 	order     int
 	hiding    *hidingRules
+
+	// line, lineX and lineBlock lay out the synthetic geometry: one line per
+	// block-level container, with fragments placed along it in document order.
+	lineNo int
+	lineW  map[int]float64
 
 	// lmSeen and lmTotal resolve which <header> and <footer> are the page's own,
 	// matching the rendered walk exactly. Tier 0 and tier 2 have to agree about
@@ -309,7 +314,7 @@ func countExternalStylesheets(root *html.Node) int {
 
 // walk descends the parsed tree, carrying the same inherited facts the rendered
 // walk does so that the two produce comparable output.
-func (e *extractor) walk(n *html.Node, path, blockPath, landmark, href string, depth int, sectioned bool) {
+func (e *extractor) walk(n *html.Node, path, blockPath, landmark, href string, depth int, sectioned bool, parentLine int) {
 	switch n.Type {
 	case html.ElementNode:
 		if skipTags[n.DataAtom] {
@@ -388,16 +393,61 @@ func (e *extractor) walk(n *html.Node, path, blockPath, landmark, href string, d
 		if isBlockish(n.DataAtom) {
 			blockPath = path
 		}
-		e.emitOwnText(n, path, blockPath, landmark, href, depth)
 
 	case html.TextNode:
 		return
 	}
 
+	// Children and this element's own text, interleaved in document order.
+	//
+	// The element's text used to be emitted in one piece before any recursion,
+	// which put every fragment of a paragraph ahead of the link that belongs in
+	// the middle of it. Order is the whole product at this tier -- there is no
+	// geometry to fall back on, and source order is the only evidence of
+	// reading order there is -- so the walk has to preserve it exactly.
+	// Which synthetic line this element's text belongs on.
+	//
+	// One line is one element's own text flow: the words it holds directly,
+	// plus any inline children standing between them. That is exactly the span
+	// the reassembler should be able to join back into a sentence, and exactly
+	// the span a browser would lay out as continuous text.
+	//
+	// An element with no text of its own is only a container, and its children
+	// each start fresh. The distinction matters: danluu.com lists posts as
+	// <li><d>08/26</d><a>How do programming languages…</a></li>, where the <li>
+	// holds no words itself, and putting a bare container's children on one
+	// line welded the date onto the title as "08/26How do programming…" -- a
+	// missing space invents a word that is not on the page.
+	line := parentLine
+	if line == 0 && ownsText(n) {
+		e.lineNo++
+		line = e.lineNo
+	}
+
 	counts := map[string]int{}
+	var sb strings.Builder
+	flush := func() {
+		e.emitFragment(n, sb.String(), path, blockPath, landmark, href, depth, line)
+		sb.Reset()
+	}
 	for c := n.FirstChild; c != nil; c = c.NextSibling {
-		if c.Type != html.ElementNode {
+		switch {
+		case c.Type == html.TextNode:
+			sb.WriteString(c.Data)
 			continue
+		case c.Type != html.ElementNode:
+			continue
+		case c.DataAtom == atom.Br:
+			// A <br> between two text children is a word boundary, and
+			// concatenating across it welds the words together: "African soul."
+			// and "European cut." on the two lines of a heading come back as
+			// "African soul.European cut."
+			sb.WriteByte(' ')
+			continue
+		case skipTags[c.DataAtom]:
+			// Contributes no text, so it is not a boundary in the prose.
+		default:
+			flush()
 		}
 		tag := c.Data
 		idx := counts[tag]
@@ -406,33 +456,36 @@ func (e *extractor) walk(n *html.Node, path, blockPath, landmark, href string, d
 		if idx > 0 {
 			seg = fmt.Sprintf("%s[%d]", tag, idx)
 		}
-		e.walk(c, path+"/"+seg, blockPath, landmark, href, depth+1, sectioned)
+		// An inline child continues this element's line; a block-level one
+		// begins its own, as it would on screen.
+		childLine := 0
+		if !isBlockish(c.DataAtom) {
+			childLine = line
+		}
+		e.walk(c, path+"/"+seg, blockPath, landmark, href, depth+1, sectioned, childLine)
 	}
+	flush()
 }
 
-// emitOwnText records the element's direct text children, matching the rendered
-// walk's granularity.
-func (e *extractor) emitOwnText(n *html.Node, path, blockPath, landmark, href string, depth int) {
-	// A <br> between two text children is a word boundary, and concatenating
-	// across it welds the words together: "African soul." and "European cut."
-	// on the two lines of a heading come back as "African soul.European cut."
-	//
-	// The rendered walk never has this problem, because there the two halves sit
-	// on different lines and the geometry says so. Here the line break is the
-	// only evidence there is, so it has to be honoured explicitly.
-	var sb strings.Builder
+// ownsText reports whether an element holds any words of its own, as opposed to
+// only holding other elements.
+func ownsText(n *html.Node) bool {
 	for c := n.FirstChild; c != nil; c = c.NextSibling {
-		switch {
-		case c.Type == html.TextNode:
-			sb.WriteString(c.Data)
-		case c.Type == html.ElementNode && c.DataAtom == atom.Br:
-			sb.WriteByte(' ')
+		if c.Type == html.TextNode && strings.TrimSpace(c.Data) != "" {
+			return true
 		}
 	}
-	text := normalizeSpace(sb.String())
+	return false
+}
+
+// emitFragment records one stretch of text with its surrounding whitespace.
+func (e *extractor) emitFragment(n *html.Node, raw, path, blockPath, landmark, href string, depth, line int) {
+	text := normalizeSpace(raw)
 	if text == "" {
 		return
 	}
+	sb := strings.Builder{}
+	sb.WriteString(raw)
 
 	// Whitespace that surrounded this fragment in the source, recorded the way
 	// the rendered walk records it. Where an inline link abuts the text beside
@@ -461,20 +514,44 @@ func (e *extractor) emitOwnText(n *html.Node, path, blockPath, landmark, href st
 	if runes <= maxShatteredRun {
 		e.signals.ShortRuns++
 	}
-	e.order++
-
 	// Static extraction has no geometry. Positions are synthesised from
 	// document order so the ordering pass has a consistent, monotonic input:
 	// on a served document, source order *is* reading order, which is exactly
 	// the assumption the rendered path exists to stop relying on.
-	y := float64(e.order) * 40
+	//
+	// One line per block-level container, and fragments laid out along it in
+	// the order the document has them. A paragraph broken by an inline link is
+	// three fragments of one sentence, and putting them on one synthetic line
+	// is what lets the reassembler join them back into that sentence -- the
+	// same code path, and the same result, as when the browser reports three
+	// boxes on one rendered line.
+	//
+	// Giving each fragment its own line instead made every one of them a
+	// separate block, so a paragraph arrived as rubble and the link inside it
+	// as a stray line of its own.
+	if line == 0 {
+		e.lineNo++
+		line = e.lineNo
+	}
+	if e.lineW == nil {
+		e.lineW = map[int]float64{}
+	}
+	y := float64(line) * 40
+	x := e.lineW[line]
+	// Advance by the fragment's own width at a nominal character width, so the
+	// gap between two fragments is zero and joinRun's contiguity test sees them
+	// as adjacent. Whether a space belongs between them is then decided by the
+	// recorded padding, which is the only real evidence at this tier.
+	e.lineW[line] += float64(runes)*7 + 1
+
+	e.order++
 	e.nodes = append(e.nodes, capture.Node{
 		Path: path, Block: blockPath, Tag: strings.ToLower(n.Data), Text: text,
 		Role: attr(n, "role"), Landmark: landmark, Href: href,
 		FontSize: size, Weight: weight, Family: "static",
 		Opacity: 1, Visible: true,
 		Pad:     pad,
-		BBox:    capture.Box{0, y, 800, 32},
+		BBox:    capture.Box{x, y, float64(runes)*7 + 1, 32},
 		LineTop: y, Depth: depth,
 	})
 }
