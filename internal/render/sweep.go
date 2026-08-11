@@ -1135,6 +1135,11 @@ const maxUnansweredProbes = 30
 // little text.
 const quietRounds = 3
 
+// blankRounds is the same for a page showing nothing whatsoever, which is a
+// page that has not started rather than a page with nothing on it. At gatePace
+// this is about three seconds.
+const blankRounds = 20
+
 // press dispatches a real mouse click. Real, because a great many entry screens
 // listen for a trusted event and ignore element.click().
 func (b *Browser) press(ctx context.Context, x, y float64) bool {
@@ -1408,7 +1413,16 @@ func (b *Browser) openEntryGate(ctx context.Context, res *Result, deadline time.
 			// gates, and every one of them an interaction sieve had no reason
 			// to perform. A tool that clicks pages on the chance that they are
 			// hiding something is worse than one that never clicks at all.
-			if !g.gated() && !g.Loading {
+			//
+			// A page showing literally nothing is the exception. Zero
+			// characters is not a quiet page, it is a page that has not drawn
+			// yet, and igloo.inc is blank for about a second and a half before
+			// it puts up a loading bar. Leaving on the first look meant the
+			// whole read happened against the loader, so the artifact was
+			// twenty-four frames of an animated progress bar -- correctly
+			// pruned as punctuation, correctly reported as nothing at all.
+			// A blank page gets the same few rounds as any other quiet one.
+			if !g.gated() && !g.Loading && g.Chars > 0 {
 				return
 			}
 
@@ -1439,8 +1453,17 @@ func (b *Browser) openEntryGate(ctx context.Context, res *Result, deadline time.
 			// The load budget is the right bound, and it is the one the operator
 			// set.
 			limit := quietRounds
-			if g.Loading {
+			switch {
+			case g.Loading:
 				limit = 1 << 30
+			case g.Chars == 0:
+				// Blank, and blank is not an answer yet. Long enough to draw
+				// something, not long enough to matter on a page that never
+				// will: a canvas site with no text at all costs this and
+				// nothing more, while igloo.inc uses it to get as far as
+				// putting up its loading bar, after which the rule above
+				// takes over and waits for the site properly.
+				limit = blankRounds
 			}
 			if g.Text == lastLoader {
 				stalled++
