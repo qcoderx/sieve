@@ -1,0 +1,37 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>Cookie banner — gate fixture</title>
+<style>
+  html, body { margin: 0; background: #fff; color: #111;
+               font: 16px/1.6 system-ui, sans-serif; }
+  #banner { position: fixed; left: 0; right: 0; bottom: 0; background: #111;
+            color: #fff; padding: 1rem 2rem; z-index: 9; font-size: 14px; }
+  #banner button { margin-left: 1rem; padding: .5rem 1.2rem; }
+  main { padding: 3rem; max-width: 40rem; }
+</style>
+</head>
+<body>
+  <!-- Not a gate at all: the page underneath is readable and the banner is a
+       strip at the bottom. Nothing here should be pressed, and nothing here
+       should stop the read either -- the failure to avoid is a tool that
+       treats every overlay as a door and starts clicking. -->
+  <main>
+    <h1>Pellew Cartography</h1>
+    <p>THE STUDIO IS OPEN. We draw maps for walking guides, mostly upland
+       Britain, at scales between 1:12,500 and 1:40,000.</p>
+    <p>Every sheet is walked before it is drawn. Field survey is slower than
+       tracing an open dataset and it is the reason our paths are where the
+       paths actually are.</p>
+    <h2>Sheets in print</h2>
+    <p>Thirty-one titles covering the Cambrians, the Peak, and the eastern
+       Highlands, revised on a six-year cycle.</p>
+  </main>
+  <div id="banner">
+    We use cookies to analyse traffic.
+    <button type="button">Accept all</button>
+    <button type="button">Reject</button>
+  </div>
+</body>
+</html>

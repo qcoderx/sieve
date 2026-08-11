@@ -1,0 +1,40 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>Arrow prefix — gate fixture</title>
+<style>
+  html, body { margin: 0; background: #f5f2ea; color: #1a1a1a;
+               font: 16px/1.6 system-ui, sans-serif; }
+  #gate { position: fixed; inset: 0; display: flex; align-items: center;
+          justify-content: center; background: #f5f2ea; z-index: 9; }
+  #gate a { color: #1a1a1a; text-decoration: none; border-bottom: 1px solid;
+            padding-bottom: .3rem; font-size: 18px; }
+  main { display: none; padding: 3rem; max-width: 40rem; }
+</style>
+</head>
+<body>
+  <!-- The label is ornamented: an arrow, then the word. A pattern anchored to
+       the start of the string never matches it, though it plainly says the
+       same thing to a person. -->
+  <div id="gate"><a href="#" id="go">→ Enter site</a></div>
+  <main id="content">
+    <h1>Ostend Type</h1>
+    <p>THE STUDIO IS OPEN. A type foundry publishing text faces for long-form
+       reading, with an emphasis on scripts that are usually an afterthought.</p>
+    <p>Our families ship with full Cyrillic and Greek coverage from the first
+       release rather than as a later extension, because retrofitting a script
+       produces a face that reads like a translation.</p>
+    <h2>Licensing</h2>
+    <p>Desktop, web and application licences are perpetual. We do not meter
+       page views and we do not phone home.</p>
+  </main>
+<script>
+  document.getElementById("go").addEventListener("click", function (e) {
+    e.preventDefault();
+    document.getElementById("gate").style.display = "none";
+    document.getElementById("content").style.display = "block";
+  });
+</script>
+</body>
+</html>

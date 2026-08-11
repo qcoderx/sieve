@@ -1,0 +1,30 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>Sign-in wall — gate fixture</title>
+<style>
+  html, body { margin: 0; background: #fbfbfd; color: #111;
+               font: 16px/1.6 system-ui, sans-serif; }
+  #gate { position: fixed; inset: 0; display: flex; flex-direction: column;
+          align-items: center; justify-content: center; background: #fbfbfd; z-index: 9; }
+  #gate button { padding: .8rem 1.6rem; margin: .4rem; font-size: 14px; }
+  main { display: none; padding: 3rem; max-width: 40rem; }
+</style>
+</head>
+<body>
+  <!-- Also never pressed, for the same reason and one more: it would create an
+       account or a session belonging to nobody. -->
+  <div id="gate">
+    <p>Members only. Sign in to continue to the archive.</p>
+    <form>
+      <button type="submit" id="go">Sign in and continue</button>
+    </form>
+  </div>
+  <main id="content">
+    <h1>The Archive</h1>
+    <p>THE STUDIO IS OPEN. Eleven thousand catalogued photographs of the
+       northern railways between 1948 and 1968.</p>
+  </main>
+</body>
+</html>
