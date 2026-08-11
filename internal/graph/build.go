@@ -411,6 +411,20 @@ func buildAudit(in Input, g *Graph, ord orderResult, flow []*candidate, emittedC
 		FramesBlocked:   in.Merged.FramesBlocked,
 		Notes:           in.Notes,
 	}
+	// A link's label is kept, not lost.
+	//
+	// Retention answers "how much of what the browser showed is in this
+	// artifact", and text that became an action is in the artifact -- with its
+	// destination attached, which is more than a block would have carried.
+	// Counting only blocks made every link-dense page accuse itself: arxiv.org
+	// reported 25.8% retention while losing nothing at all, because it is an
+	// index and 4118 of its 5439 visible characters are the labels of 257
+	// links. An audit that cries wolf on the sites it handled perfectly is
+	// worse than no audit, because the number it reports on a page that really
+	// did lose something no longer stands out.
+	for _, ac := range g.Actions {
+		a.EmittedChars += utf8.RuneCountInString(ac.Label)
+	}
 	if a.ObservedChars > 0 {
 		r := float64(a.EmittedChars) / float64(a.ObservedChars)
 		if r > 1 {

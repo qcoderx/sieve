@@ -232,3 +232,29 @@ func short(s string) string {
 	}
 	return s[:90] + "…"
 }
+
+// TestRetentionCountsLinkLabels covers an audit figure that accused sieve of
+// losing text it had kept.
+//
+// Retention answers "how much of what the browser showed reached this
+// artifact". A link's label reaches it as an action, with the destination
+// attached, which is more than a block would have carried -- but the figure
+// counted blocks alone, so a page that is mostly an index reported a dismal
+// score while losing nothing. arxiv.org read 25.8% with 4118 of its 5439
+// visible characters sitting correctly in 257 actions.
+//
+// The damage is not the number itself. An audit that cries wolf on pages it
+// handled perfectly makes the number meaningless on the page that really did
+// drop something.
+func TestRetentionCountsLinkLabels(t *testing.T) {
+	g := buildFixture(t, "linkindex/")
+
+	if len(g.Actions) < 10 {
+		t.Fatalf("fixture produced %d actions, want the link list", len(g.Actions))
+	}
+	if g.Audit.GraphRetention < 0.9 {
+		t.Errorf("retention = %.1f%% on a page whose text is almost all link labels, "+
+			"and every label is in the artifact: %d blocks, %d actions",
+			g.Audit.GraphRetention*100, len(g.Blocks), len(g.Actions))
+	}
+}
