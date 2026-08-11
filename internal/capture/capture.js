@@ -743,7 +743,19 @@
   function emitRun(el, path, blockPath, text, textNode, env, ctx, pad) {
     if (!text || isIconGlyph(text)) return;
 
-    var rect, lineTop;
+    // Where the run begins, as distinct from how far it extends.
+    //
+    // A run that wraps gets a bounding box that is the union of its lines, and
+    // the union's left edge is the left margin -- because some later line
+    // starts there -- not the point on the first line where the words actually
+    // begin. Ordering fragments by that left edge puts a wrapped run before
+    // everything that precedes it on its own first line, which tears an inline
+    // link out of the sentence around it and re-emits it afterwards.
+    //
+    // The first client rect is the first line box, and its left edge is the
+    // real starting point. The union stays as the box, because it is the
+    // honest extent and everything else downstream wants that.
+    var rect, lineTop, lineLeft;
     if (textNode) {
       var rng = ctx.doc.createRange();
       try {
@@ -753,15 +765,23 @@
       }
       rect = rng.getBoundingClientRect();
       lineTop = rect.top;
+      lineLeft = rect.left;
       var rrs = rng.getClientRects();
-      if (rrs && rrs.length) lineTop = rrs[0].top;
+      if (rrs && rrs.length) {
+        lineTop = rrs[0].top;
+        lineLeft = rrs[0].left;
+      }
       rng.detach && rng.detach();
     } else {
       rect = el.getBoundingClientRect();
       lineTop = rect.top;
+      lineLeft = rect.left;
       try {
         var rs = el.getClientRects();
-        if (rs && rs.length) lineTop = rs[0].top;
+        if (rs && rs.length) {
+          lineTop = rs[0].top;
+          lineLeft = rs[0].left;
+        }
       } catch (e) {}
     }
     if (rect.width <= 0 && rect.height <= 0) return;
@@ -819,6 +839,7 @@
       rv: (env.op <= MIN_VISIBLE_OPACITY && env.reveal) || undefined,
       bb: [round2(docX), round2(docY), round2(rect.width), round2(rect.height)],
       lt: Math.round(env.fixed ? lineTop : lineTop + env.off.y + ctx.sy),
+      lx: Math.round(env.fixed ? lineLeft : lineLeft + env.off.x + ctx.sx),
       d: env.depth,
     });
   }

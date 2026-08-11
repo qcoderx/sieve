@@ -11,11 +11,12 @@ import (
 // run is a reassembled piece of text: one or more captured nodes that rendered
 // as a single run on a single line.
 type run struct {
-	Text    string
-	Nodes   []*capture.Node
-	Block   string
-	LineTop float64
-	BBox    capture.Box
+	Text     string
+	Nodes    []*capture.Node
+	Block    string
+	LineTop  float64
+	LineLeft float64
+	BBox     capture.Box
 	// Lead is the first node in document order, which supplies the run's tag,
 	// landmark, link target and checkpoint.
 	Lead *capture.Node
@@ -75,7 +76,7 @@ func reassemble(nodes []capture.Node) []*group {
 		}
 		g.Runs = append(g.Runs, &run{
 			Text: n.Text, Nodes: []*capture.Node{n}, Block: n.Block,
-			LineTop: n.LineTop, BBox: n.BBox, Lead: n,
+			LineTop: n.LineTop, LineLeft: n.LineLeft, BBox: n.BBox, Lead: n,
 			MaxOpacity: n.MaxOpacity, EverVisible: n.EverVisible, Fixed: n.Fixed,
 			leadPad: n.Pad&1 != 0, trailPad: n.Pad&2 != 0,
 			Revealable: n.Revealable,
@@ -111,8 +112,11 @@ func mergeLines(runs []*run) []*run {
 		if a.LineTop != b.LineTop {
 			return a.LineTop < b.LineTop
 		}
-		if a.BBox.X() != b.BBox.X() {
-			return a.BBox.X() < b.BBox.X()
+		// Where each run starts reading, not where its box begins. A run
+		// that wraps has a box starting at the left margin, and sorting by
+		// that puts it ahead of everything before it on its own first line.
+		if a.LineLeft != b.LineLeft {
+			return a.LineLeft < b.LineLeft
 		}
 		return comparePath(a.Lead.Path, b.Lead.Path) < 0
 	})

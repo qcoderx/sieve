@@ -550,9 +550,11 @@ func (e *extractor) emitFragment(n *html.Node, raw, path, blockPath, landmark, h
 		Role: attr(n, "role"), Landmark: landmark, Href: href,
 		FontSize: size, Weight: weight, Family: "static",
 		Opacity: 1, Visible: true,
-		Pad:     pad,
-		BBox:    capture.Box{x, y, float64(runes)*7 + 1, 32},
-		LineTop: y, Depth: depth,
+		Pad:      pad,
+		BBox:     capture.Box{x, y, float64(runes)*7 + 1, 32},
+		LineTop:  y,
+		LineLeft: x,
+		Depth:    depth,
 	})
 }
 
