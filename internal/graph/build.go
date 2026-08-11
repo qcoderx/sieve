@@ -138,7 +138,7 @@ func Build(in Input) (*Graph, error) {
 	normaliseLevels(g.Blocks)
 	g.Sections = makeSections(g.Blocks)
 	g.Actions, g.Links = makeActions(in.Merged, base)
-	g.Blocks = pruneNonContent(g.Blocks, g.Actions)
+	g.Blocks = pruneNonContent(g.Blocks, g.Actions, dropStats)
 	g.MediaAll = mediaAll
 	g.Structured = ParseJSONLD(in.Merged.Meta.JSONLD)
 	g.FAQ = ParseFAQ(in.Merged.Meta.JSONLD)
@@ -296,7 +296,23 @@ const maxRepeatRun = 24
 // Only a block that is the whole of a link's text is removed, and only a short
 // one. A paragraph containing a link is a paragraph, and its block is the
 // prose, not the link.
-func pruneNonContent(blocks []Block, actions []Action) []Block {
+// dropStats records the punctuation-only removals so the artifact can account
+// for them. It is the one reason here that can consume an entire page: a site
+// whose loading screen is an animated ASCII bar produces dozens of runs, every
+// one of them correctly discarded, and without a record of that the artifact
+// says "no content" and offers a reader nothing to act on. igloo.inc draws
+// "++==------", then "=++==-----", then "==++==----", and sieve called it a
+// page.
+func pruneNonContent(blocks []Block, actions []Action, dropStats map[string]*DropCount) []Block {
+	note := func(reason string, b Block) {
+		d, ok := dropStats[reason]
+		if !ok {
+			d = &DropCount{Reason: reason}
+			dropStats[reason] = d
+		}
+		d.Runs++
+		d.Chars += utf8.RuneCountInString(b.Text)
+	}
 	labels := make(map[string]bool, len(actions))
 	for _, a := range actions {
 		if l := dedupeKey(a.Label); l != "" {
@@ -327,6 +343,7 @@ func pruneNonContent(blocks []Block, actions []Action) []Block {
 	out := blocks[:0]
 	for _, b := range blocks {
 		if b.Type != TypeImage && !hasLexicalContent(b.Text) {
+			note(DropNonLexical, b)
 			continue
 		}
 		// A single character is never a block. It is a fragment the reassembly

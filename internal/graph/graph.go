@@ -408,6 +408,13 @@ type Audit struct {
 //
 // Counts and reasons carry the diagnostic value. Anyone who needs to see the
 // text itself can replay a snapshot, where it is labelled for what it is.
+// DropNonLexical is the reason recorded for a run containing no letter and no
+// digit. It is named because the CLI recognises it: it is the one exclusion
+// that can account for a whole page, and a page excluded entirely for this
+// reason is a page whose words are not in the DOM at all.
+const DropNonLexical = "no letter or digit in the run: a separator, a progress " +
+	"indicator or decorative glyphs rather than prose"
+
 type DropCount struct {
 	Reason string `json:"reason"`
 	Runs   int    `json:"runs"`

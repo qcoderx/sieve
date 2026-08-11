@@ -300,6 +300,17 @@ func emptyDiagnosis(g *graph.Graph) string {
 	case g.Provenance.Blocked:
 		return "The site refused this client (" + g.Provenance.BlockedReason +
 			"). sieve respects that rather than working around it."
+	case len(g.Audit.Dropped) == 1 && g.Audit.Dropped[0].Reason == graph.DropNonLexical:
+		// Everything the browser rendered was punctuation. That is not a page
+		// sieve mishandled; it is a page with no words in it. igloo.inc serves
+		// an empty <body>, boots a WebGL scene into a bare div, and shows an
+		// animated ASCII bar while it does -- so the only text that ever
+		// existed was the loading bar, and the site itself is geometry.
+		return "Everything the browser rendered was punctuation — a loading indicator " +
+			"or separators — and no run of it contained a letter or a digit. This page " +
+			"draws its content into a canvas or a WebGL surface rather than writing it " +
+			"into the document, so there is no text on it to extract. A vision pass " +
+			"(-vision) is the only thing that would describe it."
 	case len(g.Audit.Dropped) > 0:
 		d := g.Audit.Dropped[0]
 		return fmt.Sprintf("Every run that was captured was excluded: %s. "+

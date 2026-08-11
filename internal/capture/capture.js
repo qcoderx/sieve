@@ -1458,7 +1458,15 @@
     // else. A progress figure is a loader; "98% of our clients renew" is copy,
     // and treating every percentage as progress made pear.no wait out rounds it
     // did not need and then run short of budget for the read itself.
-    return text.length < 120 && /\d{1,3}\s*%/.test(text);
+    if (text.length < 120 && /\d{1,3}\s*%/.test(text)) return true;
+    // A page whose entire visible text contains not one letter and not one
+    // digit is not showing content. It is showing a progress indicator drawn
+    // out of punctuation, and igloo.inc counts itself in with a ten-character
+    // ASCII bar -- "++==------", then "=++==-----", then "==++==----" -- which
+    // sieve read twenty-four frames of and called the page. The letters are
+    // tested by Unicode class rather than A-Z, or every CJK page short enough
+    // would be mistaken for a spinner.
+    return text.length > 0 && text.length < 120 && !/[\p{L}\p{N}]/u.test(text);
   }
 
   // findEntryControl locates the front door, and refuses to find anything else.
