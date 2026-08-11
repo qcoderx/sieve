@@ -4,7 +4,13 @@
 <meta charset="utf-8">
 <title>Inline prose — fixture</title>
 <style>
-  body { margin: 0; padding: 2rem; font: 16px/1.7 Georgia, serif; max-width: 46rem; }
+  /* A named family would resolve differently on each machine, and the whole
+     point of this fixture is where the line breaks fall: Georgia here and
+     DejaVu on a CI runner wrap the same paragraph in different places, so the
+     bug it guards against would appear on one and hide on the other. Generic
+     families keep the shape stable enough to reason about, and the assertions
+     below do not depend on any particular wrapping in any case. */
+  body { margin: 0; padding: 2rem; font: 16px/1.7 serif; max-width: 34rem; }
   code { font-family: ui-monospace, Menlo, monospace; background: #f2f2f2; padding: 0 .2em; }
 </style>
 </head>

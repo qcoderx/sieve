@@ -38,6 +38,12 @@ func TestInlineProseStaysInOrder(t *testing.T) {
 	}
 
 	// The specific sentence that was being broken, in the specific way.
+	//
+	// The anchors are single words rather than phrases, because where the lines
+	// break depends on the font the machine happens to have and a phrase that
+	// is contiguous under one family is split under another. What must hold on
+	// every machine is the order of the words and the fact that nothing from a
+	// different paragraph gets in between them.
 	var joined []string
 	for _, b := range g.Blocks {
 		if !b.Region.IsChrome() {
@@ -45,15 +51,31 @@ func TestInlineProseStaysInOrder(t *testing.T) {
 		}
 	}
 	all := strings.Join(joined, " ")
-	before := strings.Index(all, "See the Installation")
-	after := strings.Index(all, "Appendix E for information")
-	switch {
-	case before < 0 || after < 0:
-		t.Fatalf("fixture text missing from the artifact:\n%s", all)
-	case after < before:
-		t.Errorf("the end of the sentence was emitted before its beginning")
-	case after-before > 200:
-		t.Errorf("the two halves of one sentence are %d characters apart; "+
-			"the paragraph was split and its conclusion filed elsewhere", after-before)
+
+	for _, want := range []string{"Installation", "Appendix E", "trailing clause"} {
+		if !strings.Contains(all, want) {
+			t.Fatalf("%q is missing from the artifact entirely:\n%s", want, all)
+		}
+	}
+
+	seeIdx := strings.Index(all, "See the")
+	installIdx := strings.Index(all, "Installation")
+	appendixIdx := strings.Index(all, "Appendix E")
+	trailingIdx := strings.Index(all, "trailing clause")
+
+	// Within the sentence: the link text sits where the author put it, between
+	// the words on either side of it.
+	if installIdx < seeIdx {
+		t.Errorf("the link text was emitted before the words that introduce it")
+	}
+	if appendixIdx < installIdx {
+		t.Errorf("the second link was emitted before the first")
+	}
+	// Across paragraphs: the next paragraph must not appear inside this one.
+	// This is the shape of the original bug -- the end of the sentence was
+	// filed as furniture and re-emitted after the paragraph that follows it.
+	if trailingIdx < appendixIdx {
+		t.Errorf("the following paragraph was emitted inside this one; "+
+			"the sentence was split and its conclusion filed elsewhere:\n%s", all)
 	}
 }

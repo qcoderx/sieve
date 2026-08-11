@@ -100,6 +100,16 @@ type Node struct {
 	// which is how a heading shattered into per-character spans is put back
 	// together.
 	LineTop float64 `json:"lt"`
+	// LineLeft is the left edge of that same first client rect: where the run
+	// starts reading, as opposed to how far it extends.
+	//
+	// The two differ whenever a run wraps. BBox is the union of every line, so
+	// its left edge is the left margin as soon as any line but the first begins
+	// there -- which makes a wrapped run sort as though it started at the
+	// margin, ahead of everything that really precedes it on its own first
+	// line. Ordering by this instead is what keeps an inline link inside the
+	// sentence it interrupts.
+	LineLeft float64 `json:"lx"`
 
 	// Depth is the element's depth in the composed tree, used as a tiebreaker
 	// when two runs occupy the same geometry.

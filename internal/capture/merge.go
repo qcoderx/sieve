@@ -320,6 +320,7 @@ func (a *Accumulator) reinforce(dst *Node, n *Node) {
 		dst.Visible = n.Visible
 		dst.BBox = n.BBox
 		dst.LineTop = n.LineTop
+		dst.LineLeft = n.LineLeft
 		dst.FontSize = n.FontSize
 		dst.Weight = n.Weight
 		dst.Tracking = n.Tracking
