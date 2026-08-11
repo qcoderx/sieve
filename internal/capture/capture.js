@@ -1419,6 +1419,16 @@
 
   var REFUSE_WORDS = /\b(18|21)\+?\b|over\s*(18|21)|of\s+legal\s+age|\bi\s*am\b|i'?m\s+over|accept|agree|consent|cookie|privacy|terms|gdpr|allow\s+all|sign\s*in|sign\s*up|log\s*in|register|subscribe|newsletter|\bbuy\b|purchase|checkout|add\s+to\s+(cart|bag)|\bpay\b|\border\b|donate|delete|remove|submit|\bsend\b|download|install/i;
 
+  // ENTER_INVITE is the page saying, in words, what it wants done.
+  //
+  // Some entry screens have no findable control at all: the words are painted
+  // on a decorative layer with pointer-events disabled, and the handler listens
+  // on the window for a click anywhere. hatom.com prints CLICK TO ENTER exactly
+  // that way. When a page asks in plain language and there is nothing to aim
+  // at, the middle of it is the honest place to press -- and the deny list is
+  // still applied to the surface before anything is touched.
+  var ENTER_INVITE = /\b(click|tap|press)\s+(anywhere\s+)?(here\s+)?to\s+(enter|start|begin|continue|explore|play)\b|\benter\s+site\b|\bclick\s+anywhere\b/i;
+
   // The maximum this will ever do to a page: two presses, and only while the
   // page is still refusing to show anything.
   var MAX_ENTRY_CLICKS = 2;
@@ -1504,7 +1514,12 @@
       }
       if (cs.display === "none" || cs.visibility === "hidden") continue;
       if (parseFloat(cs.opacity) < 0.1) continue;
-      if (cs.pointerEvents === "none") continue;
+      // pointer-events:none is not a reason to skip it -- it is a reason the
+      // hit test below would fail. Such an element is painted over a handler
+      // that is listening somewhere else, usually the window, and a click at
+      // its coordinates passes straight through to exactly that handler. This
+      // is how a "CLICK TO ENTER" caption is normally built.
+      var throughOnly = cs.pointerEvents === "none";
 
       var r = el.getBoundingClientRect();
       if (r.width < 8 || r.height < 8) continue;
@@ -1515,11 +1530,13 @@
 
       // Whatever is actually on top at that point has to be the control or a
       // part of it, or the press would land somewhere else entirely.
-      var hit = null;
-      try {
-        hit = document.elementFromPoint(x, y);
-      } catch (e) {}
-      if (hit && hit !== el && !el.contains(hit)) continue;
+      if (!throughOnly) {
+        var hit = null;
+        try {
+          hit = document.elementFromPoint(x, y);
+        } catch (e) {}
+        if (hit && hit !== el && !el.contains(hit)) continue;
+      }
 
       // Prefer a real button, then the largest target: on a page with both a
       // "skip" and an "enter" the bigger one is the primary way in.
@@ -1592,6 +1609,7 @@
       text: text,
       chars: text.length,
       loading: looksLikeLoader(text),
+      invites: ENTER_INVITE.test(text) && !REFUSE_WORDS.test(text),
       control: ctl,
       centre: ctl ? null : centreTarget(),
       refused: ctl ? null : refusedGateLabel(),
