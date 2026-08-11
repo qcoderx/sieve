@@ -1,8 +1,11 @@
 package static
 
 import (
+	"sort"
 	"strings"
 	"testing"
+
+	"github.com/qcoderx/sieve/internal/capture"
 )
 
 const docPage = `<!doctype html>
@@ -168,4 +171,56 @@ func allText(r *Result) string {
 		sb.WriteByte('\n')
 	}
 	return sb.String()
+}
+
+// TestInlineElementsKeepTheirPlace covers a silent corruption of prose.
+//
+// The extractor gathered an element's direct text children into one string and
+// emitted it before recursing, so a paragraph broken by an inline link had the
+// hole welded shut and the link's own words emitted somewhere else entirely.
+// "Several community <a>translations</a> are also available." came out as
+// "Several community are also available." -- fluent, grammatical, and not what
+// the page says. An agent quoting that is quoting something nobody wrote.
+//
+// The test reads the fragments back in laid-out order, which is what the
+// reassembler does, and asks whether the sentence survived.
+func TestInlineElementsKeepTheirPlace(t *testing.T) {
+	const page = `<!doctype html><html><body>
+<p>Several community <a href="/t">translations</a> are also available.</p>
+<p>This version assumes <code>edition = "2024"</code> in the <em>Cargo.toml</em> file of all projects.</p>
+</body></html>`
+	res := extract(t, page)
+
+	byBlock := map[string][]capture.Node{}
+	var order []string
+	for _, n := range res.Merged.Nodes {
+		if _, seen := byBlock[n.Block]; !seen {
+			order = append(order, n.Block)
+		}
+		byBlock[n.Block] = append(byBlock[n.Block], n)
+	}
+
+	var got []string
+	for _, blk := range order {
+		ns := byBlock[blk]
+		sort.SliceStable(ns, func(i, j int) bool { return ns[i].BBox.X() < ns[j].BBox.X() })
+		var parts []string
+		for _, n := range ns {
+			parts = append(parts, n.Text)
+		}
+		got = append(got, strings.Join(parts, " "))
+	}
+
+	want := []string{
+		"Several community translations are also available.",
+		`This version assumes edition = "2024" in the Cargo.toml file of all projects.`,
+	}
+	if len(got) != len(want) {
+		t.Fatalf("got %d paragraphs, want %d:\n%q", len(got), len(want), got)
+	}
+	for i := range want {
+		if got[i] != want[i] {
+			t.Errorf("paragraph %d reassembled as:\n  %q\nwant:\n  %q", i, got[i], want[i])
+		}
+	}
 }

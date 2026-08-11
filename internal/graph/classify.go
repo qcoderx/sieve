@@ -328,7 +328,7 @@ func assignRegions(cands []*candidate, m *capture.Merged) {
 		// that is short, small and linked is a menu; text in the last screen
 		// that is short and linked is a footer.
 		short := utf8.RuneCountInString(c.Text) <= 40
-		if docH > 0 && c.BBox.Bottom() > docH-vh*0.75 && short && c.Href != "" {
+		if docH > vh && c.BBox.Bottom() > footerBand(docH, vh) && short && c.Href != "" {
 			c.Region = RegionFooter
 			continue
 		}
@@ -338,6 +338,66 @@ func assignRegions(cands []*candidate, m *capture.Merged) {
 		}
 		c.Region = RegionMain
 	}
+
+	keepParagraphsWhole(cands)
+}
+
+// keepParagraphsWhole stops one paragraph being filed in two places.
+//
+// Every rule above judges a run on its own: how long it is, whether it links
+// somewhere, where it sits. A paragraph containing an inline link arrives here
+// as several runs, and those runs can be judged differently -- the prose stays
+// in the reading order and the line carrying the link is taken for furniture,
+// so the paragraph is torn in half and its second clause emitted somewhere
+// else entirely.
+//
+// The block-level container is the arbiter. It is the page's own statement
+// about what belongs together: fragments sharing one do not belong to two
+// different parts of the document, whatever any individual fragment looks
+// like. So if any run in a container is body text, they all are.
+//
+// This only ever rescues runs into the flow. A container whose every fragment
+// reads as furniture -- a real navigation list, a real footer -- has nothing
+// to disagree about and is left alone.
+func keepParagraphsWhole(cands []*candidate) {
+	hasMain := make(map[string]bool)
+	for _, c := range cands {
+		if c.Block != "" && c.Region == RegionMain {
+			hasMain[c.Block] = true
+		}
+	}
+	if len(hasMain) == 0 {
+		return
+	}
+	for _, c := range cands {
+		// A landmark is the page saying so itself, and outranks this.
+		if c.Region != RegionMain && c.Block != "" && hasMain[c.Block] && leadLandmark(c) == "" {
+			c.Region = RegionMain
+		}
+	}
+}
+
+// footerBand is where the closing furniture of a page begins.
+//
+// It used to be "one document height minus three quarters of a viewport", and
+// that arithmetic goes negative on any page shorter than three quarters of a
+// screen: the band then covers the entire document, and every short linked run
+// anywhere on it is filed as footer furniture, pulled out of the reading order
+// and appended after the content.
+//
+// It is not a hypothetical. A paragraph ending "...and see Appendix E for
+// information on editions." was classified as a footer link and moved to the
+// end of the artifact, so the sentence before it stopped mid-clause and its
+// conclusion turned up several paragraphs later. On doc.rust-lang.org that is
+// exactly what happened, and nothing in the output marked it as reordered.
+//
+// Two guards. The band is never more than the last quarter of the document, so
+// it cannot swallow the page however short the page is; and a document that
+// fits within one viewport has no footer band at all, because "the bottom of
+// the page" and "the page" are the same region there and the distinction the
+// rule depends on does not exist.
+func footerBand(docH, vh float64) float64 {
+	return maxf(docH-vh*0.75, docH*0.75)
 }
 
 func leadLandmark(c *candidate) string {
