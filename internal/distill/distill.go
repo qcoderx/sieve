@@ -653,6 +653,24 @@ func (d *Distiller) Distill(ctx context.Context, rawURL string) (*Result, error)
 			"); the browser reached it instead, so this artifact rests on the rendered page alone "+
 			"and the served-HTML comparison is unavailable")
 	}
+	// What the browser was actually served.
+	//
+	// The status was collected and never looked at, so a page the server
+	// answered with an error was distilled as though it were the page asked
+	// for: patagonia.com returns 404 to this client at both tiers, and the
+	// artifact was one block reading "Not found" with a full-marks retention
+	// score and nothing to say that the site had refused. An artifact that
+	// describes an error page must say it is describing an error page --
+	// otherwise an agent reads "Not found" as the content of patagonia.com.
+	if res.Status >= 400 {
+		prov.Blocked = true
+		if prov.BlockedReason == "" {
+			prov.BlockedReason = fmt.Sprintf("HTTP %d", res.Status)
+		}
+		notes = append(notes, fmt.Sprintf("the browser was served HTTP %d for this URL, so what "+
+			"follows is the error page the site returned and not the page that was asked for",
+			res.Status))
+	}
 
 	// --- Tier 3: canvas recovery -------------------------------------------
 	var recovered []canvas.Recovery

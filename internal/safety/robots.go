@@ -43,11 +43,25 @@ type robotRule struct {
 
 // FetchRobots retrieves and parses robots.txt for a URL's origin.
 //
-// A robots.txt that cannot be fetched is treated as permissive, which is what
-// the standard and every major crawler do: a 404 means no restrictions, and a
-// network error means we could not ask. A 401 or 403 on robots.txt itself is
-// treated as a refusal of the whole site, because a site that will not even
-// show its rules has not invited us in.
+// The status codes follow RFC 9309, which divides them in a way that is worth
+// stating because the obvious reading is backwards.
+//
+// "Unavailable" is the 4xx range, and it means the rules do not exist for us:
+// the standard says a crawler may then access any resource, and Google
+// documents the same behaviour. That covers 401 and 403 as well as 404.
+// sieve used to treat those two as a refusal of the entire site, reasoning
+// that a site which will not show its rules has not invited us in -- which
+// sounds careful and is not: sciencedirect.com returns 403 on robots.txt to
+// user agents it does not recognise while serving its articles to anyone, and
+// sieve declined the whole domain over it.
+//
+// "Unreachable" is the 5xx range, and that is the one that means stop. A
+// server that cannot answer might be hiding a Disallow we are obliged to
+// honour, so the standard requires assuming a full disallow. That is the
+// opposite of the 4xx case and it is the direction the caution belongs in.
+//
+// A transport error is neither: we could not ask, nobody refused, and the
+// request itself will fail in a moment anyway.
 func FetchRobots(ctx context.Context, client *http.Client, target *url.URL) (*Robots, error) {
 	r, _, err := fetchRobotsWithBody(ctx, client, target)
 	return r, err
@@ -72,9 +86,14 @@ func fetchRobotsWithBody(ctx context.Context, client *http.Client, target *url.U
 	defer resp.Body.Close()
 
 	switch {
-	case resp.StatusCode == http.StatusUnauthorized || resp.StatusCode == http.StatusForbidden:
-		return nil, "", fmt.Errorf("%w: robots.txt returned %d, treating the whole site as disallowed",
-			ErrBlocked, resp.StatusCode)
+	case resp.StatusCode == http.StatusTooManyRequests:
+		// Not "no rules": an explicit instruction to come back later, and the
+		// one 4xx that is a refusal of this client rather than of the file.
+		return nil, "", fmt.Errorf("%w: robots.txt returned 429, so the site is asking for less traffic",
+			ErrBlocked)
+	case resp.StatusCode >= 500:
+		return nil, "", fmt.Errorf("%w: robots.txt returned %d, so the site's rules could not be "+
+			"read and the standard requires assuming they forbid this", ErrBlocked, resp.StatusCode)
 	case resp.StatusCode >= 400:
 		return &Robots{Missing: true}, "", nil
 	}
