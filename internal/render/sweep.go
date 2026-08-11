@@ -1045,6 +1045,7 @@ type gateState struct {
 	Text    string `json:"text"`
 	Chars   int    `json:"chars"`
 	Loading bool   `json:"loading"`
+	Invites bool   `json:"invites"`
 	Control *struct {
 		Label string  `json:"label"`
 		X     float64 `json:"x"`
@@ -1071,6 +1072,18 @@ const maxEntryPresses = 2
 // maxGateRounds is how many unchanging looks at a page that says it is loading
 // are tolerated before giving up on it.
 const maxGateRounds = 12
+
+// maxGateDuration is the absolute ceiling on getting through a front door,
+// whatever the load budget says. Beyond this the page is not opening.
+const maxGateDuration = 45 * time.Second
+
+// gateProbeTimeout bounds one look at the page. It is generous because the
+// answer matters more than the latency: the pages this runs on are busy.
+const gateProbeTimeout = 5 * time.Second
+
+// maxUnansweredProbes is how many silent looks are tolerated. Bounded by the
+// load deadline in any case.
+const maxUnansweredProbes = 30
 
 // quietRounds is the same for a page that says nothing at all. It is short,
 // because a page with little text and no loader is usually just a page with
@@ -1132,21 +1145,67 @@ func firstWords(s string, n int) string {
 }
 
 // openEntryGate presses through an entry screen, if there is one it may press.
+
+// openEntryGate presses through an entry screen, if there is one it may press.
 func (b *Browser) openEntryGate(ctx context.Context, res *Result, deadline time.Time) {
+	// One wall-clock bound on the whole thing, checked before every look.
+	//
+	// The waiting rules below are deliberately patient -- a page that says it is
+	// loading is given the operator's whole load budget, and a page too busy to
+	// answer is given the benefit of the doubt -- and patience composed with
+	// patience is how a loop stops terminating. An earlier version of this ran
+	// for a quarter of an hour on hatom.com, because every individual rule was
+	// bounded and nothing bounded their sum.
+	gateStart := time.Now()
+	hardStop := gateStart.Add(maxGateDuration)
+	if deadline.Before(hardStop) {
+		hardStop = deadline
+	}
+	if dl, ok := ctx.Deadline(); ok && dl.Before(hardStop) {
+		hardStop = dl
+	}
+	deadline = hardStop
+	defer func() {
+		b.opts.logf("gate: finished after %v", time.Since(gateStart).Round(time.Millisecond))
+	}()
+
 	presses := 0
 	stalled := 0
+	unanswered := 0
+	// What the page said when it was last pressed. If pressing changed nothing,
+	// pressing again will change nothing either, and waiting out the rest of the
+	// budget to confirm that costs a minute on a page that is not going to open.
+	pressedAt := ""
 	lastLoader := ""
 	for round := 0; round < maxGateRounds*8; round++ {
+		if !time.Now().Before(deadline) {
+			b.opts.logf("gate: leaving (out of time)")
+			return
+		}
 		if time.Until(deadline) < 2*time.Second {
 			return
 		}
 		var raw string
-		gctx, gcancel := context.WithTimeout(ctx, 3*time.Second)
+		gctx, gcancel := context.WithTimeout(ctx, gateProbeTimeout)
 		err := chromedp.Run(gctx, chromedp.Evaluate(`window.__sieve.gate()`, &raw))
 		gcancel()
 		if err != nil || raw == "" || raw == "null" {
-			return
+			// A page too busy to answer is a page that is busy, which is the
+			// thing being waited for. hatom.com stops answering entirely while
+			// it builds its scene -- the same twenty seconds in which it is
+			// about to print CLICK TO ENTER -- and treating that silence as a
+			// refusal to proceed abandoned it at exactly the wrong moment.
+			unanswered++
+			if unanswered > maxUnansweredProbes {
+				b.opts.logf("the page stopped answering; giving up on its entry screen")
+				return
+			}
+			if !b.waitABit(ctx, deadline) {
+				return
+			}
+			continue
 		}
+		unanswered = 0
 		var g gateState
 		if json.Unmarshal([]byte(raw), &g) != nil {
 			return
@@ -1192,9 +1251,23 @@ func (b *Browser) openEntryGate(ctx context.Context, res *Result, deadline time.
 			// because "almost no text and nothing happening" is also what a
 			// genuinely near-empty page looks like, and igloo.inc should not cost
 			// twenty seconds to establish that it has two blocks on it.
+			// A page that says it is loading is waited out against the clock,
+			// not against a count of unchanging looks.
+			//
+			// The count was the bug. hatom.com reaches a hundred per cent and
+			// then sits at "LOADING 5 PHASES 100 100" for a further twenty
+			// seconds -- building its scene, with no exception, no console
+			// output and no failed request -- before finally printing CLICK TO
+			// ENTER. Twelve unchanging looks is about fourteen seconds of
+			// patience, so sieve gave up a few seconds before the door appeared,
+			// every time, and concluded the site was broken.
+			//
+			// Stillness is not evidence when a page has told you it is working.
+			// The load budget is the right bound, and it is the one the operator
+			// set.
 			limit := quietRounds
 			if g.Loading {
-				limit = maxGateRounds
+				limit = 1 << 30
 			}
 			if g.Text == lastLoader {
 				stalled++
@@ -1206,6 +1279,34 @@ func (b *Browser) openEntryGate(ctx context.Context, res *Result, deadline time.
 				}
 			}
 			lastLoader = g.Text
+
+			// The page has asked, in words, to be pressed, and there is nothing
+			// to aim at. That is an entry screen whose text sits on a decorative
+			// layer with pointer events disabled while the handler listens on
+			// the window -- hatom.com prints CLICK TO ENTER exactly so. The
+			// middle of the page is then the honest place to press, and the
+			// surface there is still checked before it is touched.
+			if g.Invites && g.Text == pressedAt {
+				b.opts.logf("gate: leaving (the press changed nothing)")
+				res.EntryGate = firstWords(g.Text, 60)
+				return
+			}
+			if g.Invites && presses < maxEntryPresses && g.Centre != nil {
+				presses++
+				b.opts.logf("the page asks to be pressed (%q) and offers nothing to aim at; "+
+					"pressing the middle of <%s>", firstWords(g.Text, 44), g.Centre.Tag)
+				if !b.press(ctx, g.Centre.X, g.Centre.Y) {
+					return
+				}
+				b.noteEntered(res, "the screen inviting a visitor to click to enter")
+				pressedAt = g.Text
+				stalled = 0
+				lastLoader = ""
+				if !b.waitABit(ctx, deadline) {
+					return
+				}
+				continue
+			}
 
 			// A loader that has stopped moving, with a benign surface in the
 			// middle of it, is a page waiting for a gesture rather than for
@@ -1251,11 +1352,19 @@ func (b *Browser) openEntryGate(ctx context.Context, res *Result, deadline time.
 		presses++
 
 		label := g.Control.Label
+		if g.Text == pressedAt {
+			// The page has not reacted yet, or is not going to. Pressing the
+			// same control again while it still says the same thing is not
+			// persistence, it is a double click nobody asked for.
+			b.opts.logf("gate: leaving (the press changed nothing)")
+			return
+		}
 		b.opts.logf("entry screen found (%q); pressing it", label)
 		if !b.press(ctx, g.Control.X, g.Control.Y) {
 			return
 		}
 		b.noteEntered(res, strconv.Quote(label))
+		pressedAt = g.Text
 
 		// Let whatever the press started finish before looking again.
 		if !b.waitABit(ctx, deadline) {
