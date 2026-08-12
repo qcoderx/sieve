@@ -1,0 +1,59 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>WebGL scene — fixture</title>
+<style>
+  html, body { margin: 0; height: 100%; background: #05070c; color: #eee; }
+</style>
+</head>
+<body>
+  <!-- A page whose words are drawn into a 3D scene and never written into the
+       document. igloo.inc is built exactly this way: it serves an empty body,
+       renders every paragraph as MSDF glyph geometry, and never attaches a
+       canvas element at all -- so every DOM-shaped question returns nothing
+       while a reader sees a full page of prose.
+
+       This fixture stands in for three.js rather than shipping it. What sieve
+       depends on is the contract, not the library: three.js checks for
+       __THREE_DEVTOOLS__ inside the Scene constructor and dispatches an
+       "observe" event carrying the scene. Reproducing that exchange tests the
+       half sieve owns -- that bootstrap.js installed the hook before page
+       script ran, that the walk finds the text objects, and that their words
+       reach the artifact -- and does it without a megabyte of vendored code
+       whose internals could change under the test. -->
+<script>
+  function textMesh(name, text) {
+    return { name: name, type: "Mesh", isMesh: true, children: [], _options: { text: text } };
+  }
+
+  var scene = {
+    isScene: true,
+    type: "Scene",
+    name: "root",
+    children: [
+      { name: "projects", type: "Group", children: [
+        textMesh("Text (MSDF)", "////// Summary"),
+        textMesh("Text (MSDF)",
+          "Kestrel Works builds measurement instruments for hydrology and air " +
+          "quality. Every enclosure is made at full scale before anything is " +
+          "tooled, because a part that is comfortable on screen is frequently " +
+          "unusable in a glove."),
+      ] },
+      { name: "manifesto", type: "Group", children: [
+        textMesh("Text (MSDF)", "////// Manifesto"),
+        textMesh("Text (MSDF)",
+          "Our mission is to make instruments that survive a decade outdoors " +
+          "without attention, and that a technician can repair in the field."),
+      ] },
+    ],
+  };
+
+  // What three.js does inside the Scene constructor.
+  if (typeof window.__THREE_DEVTOOLS__ !== "undefined") {
+    window.__THREE_DEVTOOLS__.dispatchEvent(
+      new CustomEvent("observe", { detail: scene }));
+  }
+</script>
+</body>
+</html>

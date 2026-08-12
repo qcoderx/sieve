@@ -296,3 +296,8 @@ func weightedMedian(w map[float64]int) float64 {
 	}
 	return keys[len(keys)-1]
 }
+
+// RoundTo is roundTo, exported for callers that recompute audit figures after
+// Build has returned -- the scene walk appends text no DOM walk could have
+// produced, and the retention ratio has to be redone when it does.
+func RoundTo(v, step float64) float64 { return roundTo(v, step) }

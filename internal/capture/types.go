@@ -256,6 +256,20 @@ type Canvas struct {
 type SceneIntrospection struct {
 	Names []string `json:"n"`
 	Texts []string `json:"t"`
+	// Runs are the text objects found in the scene, each with the words it was
+	// built from, in the order the scene was assembled.
+	//
+	// Texts flattens the same material into a summary for the canvas recovery
+	// tier. This keeps them separate, because a site that draws its whole body
+	// copy into WebGL -- igloo.inc draws every paragraph as glyph geometry --
+	// deserves its paragraphs as paragraphs rather than one welded blob.
+	Runs []SceneRun `json:"r,omitempty"`
+}
+
+// SceneRun is one text object from a 3D scene.
+type SceneRun struct {
+	Text string `json:"x"`
+	Name string `json:"n,omitempty"`
 }
 
 // Meta carries page-level facts that only the page can report.

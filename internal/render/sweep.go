@@ -653,13 +653,30 @@ func (b *Browser) Sweep(ctx context.Context, rawURL string, guard NavGuard) (*Re
 		defer cancelPost()
 	}
 
-	if len(res.Merged.Canvases) > 0 {
-		// The scene walk runs after every animation has settled and any lazily
-		// constructed geometry exists.
-		tScene := time.Now()
-		b.introspectScene(postCtx, res)
-		b.opts.logf("scene introspection took %v", time.Since(tScene).Round(time.Millisecond))
+	// The scene walk runs after every animation has settled and any lazily
+	// constructed geometry exists.
+	//
+	// It is no longer conditional on the document containing a canvas. A page
+	// can hold a whole three.js scene without one ever being attached: igloo.inc
+	// renders every paragraph of its site as glyph geometry, and
+	// querySelectorAll("canvas") returns nothing at any point in its life. That
+	// condition was asking the wrong question -- whether a surface is in the
+	// document, rather than whether a scene exists -- and the answer cost the
+	// entire page.
+	//
+	// The cost on a page with no scene is one evaluate that returns immediately:
+	// the walk starts from the scenes three.js announced to the hook in
+	// bootstrap.js, and only falls back to scanning globals when the document
+	// does have a canvas to justify looking.
+	tScene := time.Now()
+	b.introspectScene(sceneCtx(tabCtx, postCtx), res)
+	if res.Scene != nil {
+		b.opts.logf("scene introspection took %v (%d name(s), %d text run(s))",
+			time.Since(tScene).Round(time.Millisecond),
+			len(res.Scene.Names), len(res.Scene.Runs))
+	}
 
+	if len(res.Merged.Canvases) > 0 {
 		tCorpus := time.Now()
 		col.drainBodies(postCtx)
 		b.collectCorpus(postCtx, col)
@@ -785,6 +802,35 @@ func (b *Browser) collectCorpus(ctx context.Context, col *collector) {
 // introspectScene walks the live 3D scene graph. Parsing a .glb only works when
 // the site loaded one; a scene built procedurally in JavaScript never produces
 // an asset to intercept, and its object names exist only in memory.
+// sceneFloor is the time the scene walk is guaranteed even when the sweep has
+// already spent the extraction budget.
+//
+// The reserve held back for post-sweep work is gone the moment the sweep
+// overruns, and on the pages where the scene matters most it always overruns:
+// igloo.inc has no text in its document, so the sweep scrolls a blank page to
+// the end of its allowance while every word of the site sits in the scene
+// graph, unread. Handing the walk an already-expired deadline meant the one
+// cheap question that would have answered the page was never asked.
+//
+// One evaluate against an object graph already in memory. It buys a whole
+// site on the pages that need it and is never reached on the pages that do
+// not, because a page with no scene returns from the walk immediately.
+const sceneFloor = 2 * time.Second
+
+// sceneCtx gives the scene walk whatever is left of the extraction budget, or
+// the floor above, whichever is longer -- bounded in every case by the tab.
+func sceneCtx(tabCtx, postCtx context.Context) context.Context {
+	if dl, ok := postCtx.Deadline(); ok && time.Until(dl) >= sceneFloor {
+		return postCtx
+	}
+	ctx, cancel := context.WithTimeout(tabCtx, sceneFloor)
+	// The walk is synchronous and returns before this function's caller
+	// continues, so cancelling on a timer rather than deferring is safe and
+	// keeps the signature free of a cleanup the caller has to remember.
+	time.AfterFunc(sceneFloor+time.Second, cancel)
+	return ctx
+}
+
 func (b *Browser) introspectScene(ctx context.Context, res *Result) {
 	var raw string
 	if err := chromedp.Run(ctx, chromedp.Evaluate(`window.__sieve.scene()`, &raw)); err != nil {
@@ -797,7 +843,7 @@ func (b *Browser) introspectScene(ctx context.Context, res *Result) {
 	if err := json.Unmarshal([]byte(raw), &sc); err != nil {
 		return
 	}
-	if len(sc.Names) > 0 || len(sc.Texts) > 0 {
+	if len(sc.Names) > 0 || len(sc.Texts) > 0 || len(sc.Runs) > 0 {
 		res.Scene = &sc
 	}
 }
