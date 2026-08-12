@@ -3,6 +3,7 @@ package safety
 import (
 	"context"
 	"errors"
+	"fmt"
 	"io"
 	"net"
 	"net/http"
@@ -270,5 +271,47 @@ func TestResolveConfirmsNegativeIndependently(t *testing.T) {
 		t.Fatal("a name both resolvers refuse must not pass the guard")
 	} else if !errors.Is(err, ErrUnreachable) {
 		t.Errorf("error = %v, want ErrUnreachable", err)
+	}
+}
+
+// TestGuardBudgetIsPerPage covers a bug that only appears on the Nth page.
+//
+// The redirect budget belongs to one page's chain. Sharing a guard across
+// pages counts every hop every page has ever taken, so a long-lived process
+// works for a handful of URLs and then refuses everything -- the MCP server
+// answered four pages and rejected the next hundred and eighty with "more than
+// 8 redirects", including pages that redirect exactly once. Nothing in the CLI
+// could show it, because there every run is a fresh process.
+func TestGuardBudgetIsPerPage(t *testing.T) {
+	cfg := DefaultGuardConfig()
+	cfg.AllowPrivate = true
+	cfg.MaxRedirects = 8
+	shared := NewGuard(cfg)
+
+	// Twenty pages, each following two redirects: well inside the budget for
+	// any single page, and well past it for all of them added together.
+	for page := 0; page < 20; page++ {
+		g := shared.ForPage()
+		for hop := 0; hop < 3; hop++ {
+			u, _ := url.Parse(fmt.Sprintf("http://example.com/p%d/hop%d", page, hop))
+			if err := g.Check(u); err != nil {
+				t.Fatalf("page %d hop %d refused: %v\n"+
+					"the budget is accumulating across pages instead of belonging to one",
+					page, hop, err)
+			}
+		}
+	}
+
+	// The budget must still bite within a single page.
+	g := shared.ForPage()
+	var last error
+	for hop := 0; hop < 20; hop++ {
+		u, _ := url.Parse(fmt.Sprintf("http://example.com/loop/hop%d", hop))
+		if last = g.Check(u); last != nil {
+			break
+		}
+	}
+	if last == nil {
+		t.Error("a page that redirects twenty times was allowed; the budget is not enforced")
 	}
 }

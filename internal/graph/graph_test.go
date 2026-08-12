@@ -258,3 +258,45 @@ func TestRetentionCountsLinkLabels(t *testing.T) {
 			g.Audit.GraphRetention*100, len(g.Blocks), len(g.Actions))
 	}
 }
+
+// TestEveryAdvertisedSectionHasBlocks pins the contract between the manifest
+// and the content tools.
+//
+// Sections used to be built before the non-content prune, so a section whose
+// only block was then dropped stayed in the manifest pointing at a block that
+// no longer existed. moma.org advertised s_00 with one block, that block was
+// punctuation, and get_content answered "no section s_00" for a section the
+// manifest had just described. A human would shrug; an agent following the
+// manifest has no way to tell an empty section from a wrong request, and stops.
+func TestEveryAdvertisedSectionHasBlocks(t *testing.T) {
+	for _, page := range []string{"immersive/", "linkindex/", "inlineprose/", "adversarial/"} {
+		g := buildFixture(t, page)
+
+		have := make(map[string]bool, len(g.Blocks))
+		for _, b := range g.Blocks {
+			have[b.ID] = true
+		}
+		inSection := map[string]int{}
+		for _, b := range g.Blocks {
+			if b.SectionID != "" {
+				inSection[b.SectionID]++
+			}
+		}
+
+		for _, s := range g.Sections {
+			if !have[s.FirstBlock] {
+				t.Errorf("%s: section %q points at first_block %q, which is not in the artifact",
+					page, s.ID, s.FirstBlock)
+			}
+			if !have[s.LastBlock] {
+				t.Errorf("%s: section %q points at last_block %q, which is not in the artifact",
+					page, s.ID, s.LastBlock)
+			}
+			if inSection[s.ID] == 0 {
+				t.Errorf("%s: section %q is advertised but no block belongs to it; "+
+					"a caller asking for it gets an error for a section the manifest described",
+					page, s.ID)
+			}
+		}
+	}
+}

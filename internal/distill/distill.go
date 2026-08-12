@@ -161,6 +161,19 @@ func New(opts Options) *Distiller {
 	if mem == nil {
 		mem = escalate.NewMemory()
 	}
+	// A redirect budget belongs to a page, not to a process.
+	//
+	// Sharing one guard across every distillation counts every hop every page
+	// has ever taken, so a long-lived server works for a handful of URLs and
+	// then refuses everything: the MCP server answered four pages and rejected
+	// the next hundred and eighty with "more than 8 redirects", including pages
+	// that redirect exactly once. The CLI never showed it, because there each
+	// run is a new process with a new guard.
+	//
+	// Taking a copy here rather than resetting the caller's is what makes it
+	// safe under concurrency -- the MCP server runs jobs in parallel, and
+	// clearing a shared counter mid-chain would spend another page's budget.
+	opts.Guard = opts.Guard.ForPage()
 	fo := opts.Fetch
 	if fo.Guard == nil {
 		fo.Guard = opts.Guard
@@ -220,6 +233,11 @@ func (d *Distiller) Distill(ctx context.Context, rawURL string) (*Result, error)
 
 	tGuard := time.Now()
 	if d.opts.Guard != nil {
+		// One page, one budget. The guard is this distiller's own -- see New --
+		// so clearing it here cannot disturb a page being fetched elsewhere,
+		// and a distiller reused for a second page starts that page's redirect
+		// chain from zero rather than from wherever the last one ended.
+		d.opts.Guard.Reset()
 		if err := d.opts.Guard.Check(u); err != nil {
 			return nil, err
 		}
