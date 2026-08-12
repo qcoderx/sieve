@@ -1206,14 +1206,46 @@
   // catches those, and costs nothing when there is no scene to walk.
   // ---------------------------------------------------------------------------
 
+  // sceneTextOf reads the words a 3D text object was built from.
+  //
+  // Text drawn into WebGL is glyph geometry by the time it reaches the screen,
+  // but the library that laid it out keeps the string it was given, and every
+  // implementation keeps it somewhere slightly different. TextGeometry puts it
+  // on geometry.parameters; troika exposes a .text property; the MSDF renderer
+  // igloo.inc uses hangs an _options object off the mesh. Reading the handful
+  // of places they actually use costs nothing and is exact -- these are the
+  // site's own strings, not a guess about pixels.
+  function sceneTextOf(o) {
+    var cands = [];
+    try {
+      if (o._options && typeof o._options.text === "string") cands.push(o._options.text);
+      if (o.options && typeof o.options.text === "string") cands.push(o.options.text);
+      if (typeof o.text === "string") cands.push(o.text);
+      if (o.geometry && o.geometry.parameters &&
+        typeof o.geometry.parameters.text === "string") {
+        cands.push(o.geometry.parameters.text);
+      }
+    } catch (e) {}
+    for (var i = 0; i < cands.length; i++) {
+      var t = norm(cands[i]);
+      if (t && t.length > 1) return t.slice(0, 4000);
+    }
+    return "";
+  }
+
   function introspectScene() {
     var names = [];
     var texts = [];
+    var runs = [];
     var seen = new Set();
+    var seenText = new Set();
+    var seenObj = new Set();
     var count = 0;
 
     function visit(obj, depth) {
-      if (!obj || depth > 24 || count > 4000) return;
+      if (!obj || depth > 24 || count > 8000) return;
+      if (seenObj.has(obj)) return;
+      seenObj.add(obj);
       count++;
       try {
         if (obj.name && typeof obj.name === "string" && !seen.has(obj.name)) {
@@ -1226,10 +1258,14 @@
             if (typeof v === "string" && v.length > 3 && v.length < 400) texts.push(v);
           }
         }
-        // Text geometry carries the actual words when a headline is rendered
-        // as 3D type.
-        if (obj.geometry && obj.geometry.parameters && typeof obj.geometry.parameters.text === "string") {
-          texts.push(obj.geometry.parameters.text);
+        // The words themselves, in the order the scene was assembled, which is
+        // the order the author wrote them and the best evidence of reading
+        // order available on a surface that has no layout to consult.
+        var t = sceneTextOf(obj);
+        if (t && !seenText.has(t) && runs.length < 400) {
+          seenText.add(t);
+          texts.push(t);
+          runs.push({ x: t, n: (obj.name && String(obj.name).slice(0, 60)) || undefined });
         }
         var ch = obj.children;
         if (ch && ch.length) {
@@ -1240,13 +1276,25 @@
 
     var roots = [];
     try {
-      // The devtools hook is the reliable way in when a page uses three.js.
+      // The devtools hook is the reliable way in when a page uses three.js,
+      // and bootstrap.js installs it before any page script runs precisely so
+      // that this is available. See the note there.
       var hook = window.__THREE_DEVTOOLS__;
       if (hook && hook.scenes) {
         for (var i = 0; i < hook.scenes.length; i++) roots.push(hook.scenes[i]);
       }
     } catch (e) {}
-    if (!roots.length) {
+    // Scanning the global scope means touching up to eight hundred properties
+    // of window, any of which may be a getter with side effects. That is worth
+    // doing on a page that has a canvas -- there is plainly something to find --
+    // and not worth doing on a page that has neither a canvas nor a scene, which
+    // is almost every page. The hook above is what makes this affordable: a
+    // scene announces itself, so the scan is only a fallback for older builds.
+    var worthScanning = false;
+    try {
+      worthScanning = !!document.querySelector("canvas");
+    } catch (e) {}
+    if (!roots.length && worthScanning) {
       // Otherwise scan the global scope shallowly for something scene-shaped.
       try {
         var keys = Object.keys(window);
@@ -1266,9 +1314,12 @@
         }
       } catch (e) {}
     }
-    for (var r = 0; r < roots.length && r < 8; r++) visit(roots[r], 0);
+    // A page can register many scenes -- igloo.inc announces seventeen -- and
+    // the text is spread across them, so the cap is on work done rather than
+    // on how many roots are considered.
+    for (var r = 0; r < roots.length && r < 64; r++) visit(roots[r], 0);
     if (!names.length && !texts.length) return undefined;
-    return { n: names.slice(0, 400), t: texts.slice(0, 200) };
+    return { n: names.slice(0, 400), t: texts.slice(0, 200), r: runs };
   }
 
   // ---------------------------------------------------------------------------

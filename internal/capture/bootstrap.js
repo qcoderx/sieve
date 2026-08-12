@@ -12,6 +12,42 @@
   if (window.__sieveBoot) return;
   window.__sieveBoot = true;
 
+  // Announce ourselves to three.js.
+  //
+  // three.js checks for __THREE_DEVTOOLS__ inside the Scene and WebGLRenderer
+  // constructors and, when it exists, dispatches an "observe" event carrying
+  // the object. That is the only dependable way into a scene built inside a
+  // bundled ES module, which puts nothing on window at all: without it the
+  // scene walk has to guess by scanning globals, and on a modern build there
+  // is nothing there to find.
+  //
+  // igloo.inc is the case in point. Its entire site -- every paragraph -- is
+  // drawn as MSDF glyph geometry inside the scene, and the page serves an
+  // empty <body>. Scanning globals found nothing, so the artifact reported a
+  // page with no words on it while a reader could see several hundred.
+  //
+  // This has to be installed before any page script runs, which is what this
+  // file is for. It is inert: an object with a dispatchEvent that records
+  // what it is handed. Nothing is read back until the sweep asks.
+  try {
+    if (!window.__THREE_DEVTOOLS__) {
+      var scenes = [];
+      window.__THREE_DEVTOOLS__ = {
+        scenes: scenes,
+        dispatchEvent: function (e) {
+          try {
+            var d = e && e.detail;
+            if (d && d.isScene && scenes.indexOf(d) < 0 && scenes.length < 64) {
+              scenes.push(d);
+            }
+          } catch (err) {}
+        },
+        addEventListener: function () {},
+        removeEventListener: function () {},
+      };
+    }
+  } catch (e) {}
+
   try {
     var ctxOf = new WeakMap();
     var proto = HTMLCanvasElement.prototype;

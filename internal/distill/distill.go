@@ -698,6 +698,7 @@ func (d *Distiller) Distill(ctx context.Context, rawURL string) (*Result, error)
 		return nil, err
 	}
 	appendRecoveries(g, recovered)
+	appendSceneRuns(g, res.Scene)
 
 	// The served HTML is not thrown away because a browser ran.
 	//
@@ -1127,6 +1128,97 @@ func shotBytes(shots map[string]*render.CanvasShot) map[string]canvas.Shot {
 // They are appended rather than woven into the reading order because a canvas
 // has a position but its recovered text does not: the words came from a scene
 // graph or a caption, not from a rectangle on the page.
+// appendSceneRuns adds the text a page drew into a 3D scene.
+//
+// Some sites put their whole body copy on a WebGL surface. igloo.inc serves an
+// empty <body>, builds every paragraph as MSDF glyph geometry, and never
+// attaches a canvas element to the document -- so every DOM-shaped question
+// sieve can ask returns nothing, and the artifact said the page had no words
+// on it while a reader could see several hundred.
+//
+// These are not a guess about pixels. They are the strings the site handed its
+// text renderer, read back off the objects it built, which makes them exactly
+// as exact as text read out of the DOM and is why they need no corroboration.
+// What they lack is layout: a scene has no line boxes, so the order is the
+// order the scene was assembled in, and the artifact says so.
+//
+// Anything the DOM already yielded is skipped. A page that draws a headline in
+// 3D and also writes it into the document should not have it twice.
+func appendSceneRuns(g *graph.Graph, sc *capture.SceneIntrospection) {
+	if sc == nil || len(sc.Runs) == 0 {
+		return
+	}
+	have := make(map[string]bool, len(g.Blocks))
+	for _, b := range g.Blocks {
+		if k := sceneKey(b.Text); k != "" {
+			have[k] = true
+		}
+	}
+
+	added, sceneChars := 0, 0
+	for _, r := range sc.Runs {
+		k := sceneKey(r.Text)
+		if k == "" || have[k] {
+			continue
+		}
+		have[k] = true
+		sceneChars += utf8.RuneCountInString(r.Text)
+		g.Blocks = append(g.Blocks, graph.Block{
+			ID:         fmt.Sprintf("b_s%02d", added),
+			Type:       graph.TypeParagraph,
+			Text:       r.Text,
+			Order:      len(g.Blocks),
+			Source:     graph.SourceCanvasScene,
+			Score:      sceneRunScore,
+			Confidence: graph.Bucket(sceneRunScore),
+			Verified:   graph.VerificationNone,
+			Region:     graph.RegionMain,
+		})
+		added++
+	}
+	if added == 0 {
+		return
+	}
+
+	g.Recount()
+
+	// Scene text counts on both sides of the retention ratio.
+	//
+	// Retention asks how much of what the browser put on screen reached the
+	// artifact, and its denominator is the characters the DOM walk saw. Glyph
+	// geometry is on screen and is not in the DOM, so a page drawn entirely in
+	// WebGL scored zero per cent while every word of it sat in the payload --
+	// the audit calling a complete extraction a total loss.
+	//
+	// Adding the run to both sides says the honest thing: this text was on the
+	// page, and it is in the artifact.
+	g.Audit.ObservedChars += sceneChars
+	g.Audit.EmittedChars += sceneChars
+	if g.Audit.ObservedChars > 0 {
+		r := float64(g.Audit.EmittedChars) / float64(g.Audit.ObservedChars)
+		if r > 1 {
+			r = 1
+		}
+		g.Audit.GraphRetention = graph.RoundTo(r, 0.001)
+	}
+
+	g.Audit.Notes = append(g.Audit.Notes, fmt.Sprintf(
+		"%d run(s) of text on this page are drawn into a 3D scene rather than written "+
+			"into the document; they were read back from the scene's own text objects, so "+
+			"the words are exact, but a scene has no line boxes and their order is the "+
+			"order the page assembled them in rather than a measured reading order", added))
+}
+
+// sceneRunScore is the confidence attached to text read off a scene object. It
+// is high because the string is the site's own, and short of certain because
+// where it sat on screen is not known.
+const sceneRunScore = 0.85
+
+// sceneKey normalises a run for the duplicate check.
+func sceneKey(s string) string {
+	return strings.ToLower(strings.Join(strings.Fields(s), " "))
+}
+
 func appendRecoveries(g *graph.Graph, recs []canvas.Recovery) {
 	if len(recs) == 0 {
 		return
@@ -1160,11 +1252,6 @@ func appendRecoveries(g *graph.Graph, recs []canvas.Recovery) {
 			BBox:       r.BBox,
 		})
 	}
-	g.Stats.ContentNodes = 0
-	for _, b := range g.Blocks {
-		if !b.Region.IsChrome() {
-			g.Stats.ContentNodes++
-		}
-	}
+	g.Recount()
 	g.Audit.CanvasesUnrecovered = unrecovered
 }

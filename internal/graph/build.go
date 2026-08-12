@@ -202,8 +202,34 @@ func Build(in Input) (*Graph, error) {
 	// site look different every time, defeating the point of a content-addressed
 	// cache; so would a rewritten asset URL or a whitespace change.
 	g.ContentHash = semanticHash(g)
-	g.Stats.ArtifactTokens = tokens.Estimate(payloadText(g))
+	g.Recount()
 	return g, nil
+}
+
+// Recount refreshes the figures that describe the payload.
+//
+// Blocks are still added after Build returns: canvas recovery and the 3D scene
+// walk both append text that no DOM walk could have produced. Everything
+// derived from the block list has to be recomputed when they do, and it was
+// not -- so a page whose entire content came from a scene reported the token
+// count of the empty document it started from. igloo.inc, whose whole site is
+// glyph geometry, announced twenty-eight tokens for twenty-three paragraphs
+// and a ninety-four per cent saving it had not made.
+//
+// The hash is deliberately not recomputed here: it identifies the semantic
+// graph, and the callers that append re-derive it themselves when they are
+// done. Recount is about what the artifact claims of itself.
+func (g *Graph) Recount() {
+	g.Stats.ContentNodes = 0
+	g.Stats.ChromeNodes = 0
+	for _, b := range g.Blocks {
+		if b.Region.IsChrome() {
+			g.Stats.ChromeNodes++
+		} else {
+			g.Stats.ContentNodes++
+		}
+	}
+	g.Stats.ArtifactTokens = tokens.Estimate(payloadText(g))
 }
 
 // collapseAdjacentRepeats removes a sequence of runs that repeats the sequence
