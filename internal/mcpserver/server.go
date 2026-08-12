@@ -141,6 +141,20 @@ func (s *Server) MCPServer() *mcp.Server {
 	}, &mcp.ServerOptions{
 		Instructions: Instructions,
 		KeepAlive:    30 * time.Second,
+		// Tolerate a missed pong rather than dropping the session on one.
+		//
+		// Left unset this is 1, and a single unanswered ping closes the
+		// connection. That is a harsh trade here: every content tool is keyed
+		// by job_id and the jobs live in this process, so losing the session
+		// loses every distillation the caller has already paid for -- in
+		// exchange for noticing a dead peer fifteen seconds sooner.
+		//
+		// The spec's own language is that multiple failed pings MAY trigger a
+		// reset, and the SDK exposes this threshold precisely so a transient
+		// miss does not tear down a session that is otherwise alive. Three
+		// misses is ninety seconds of genuine silence, which is a dead peer
+		// rather than a busy one.
+		KeepAliveFailureThreshold: 3,
 	})
 
 	s.registerTools(srv)

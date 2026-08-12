@@ -282,6 +282,26 @@ func (g *Guard) Reset() {
 	g.mu.Unlock()
 }
 
+// ForPage returns a guard with the same policy and a fresh redirect budget.
+//
+// The budget belongs to one page's redirect chain, not to the process. A
+// long-lived server that shares a single guard across pages is counting every
+// hop every page has ever taken, so it works for a handful of URLs and then
+// refuses everything: the MCP server answered four pages and rejected the next
+// hundred and eighty with "more than 8 redirects", including pages that redirect
+// exactly once. The CLI never showed it because each run is a new process.
+//
+// This is a copy rather than a Reset because pages can be in flight at the same
+// time, and resetting a shared counter mid-chain would clear a budget another
+// page is still spending. Nothing here is per-URL state except the counters, so
+// the copy is cheap and the policy is identical.
+func (g *Guard) ForPage() *Guard {
+	if g == nil {
+		return nil
+	}
+	return &Guard{cfg: g.cfg, seen: map[string]int{}}
+}
+
 func (g *Guard) schemeAllowed(s string) bool {
 	s = strings.ToLower(s)
 	for _, a := range g.cfg.AllowedSchemes {

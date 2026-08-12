@@ -136,9 +136,19 @@ func Build(in Input) (*Graph, error) {
 
 	g.Blocks = makeBlocks(collapseAdjacentRepeats(ordered))
 	normaliseLevels(g.Blocks)
-	g.Sections = makeSections(g.Blocks)
 	g.Actions, g.Links = makeActions(in.Merged, base)
 	g.Blocks = pruneNonContent(g.Blocks, g.Actions, dropStats)
+	// Sections are built from the blocks that survived, not from the ones that
+	// were proposed.
+	//
+	// Running this before the prune advertised sections whose only block was
+	// then removed, so the manifest promised something no content tool could
+	// deliver: moma.org listed s_00 with one block, that block was punctuation
+	// and was dropped, and get_content answered "no section s_00" for a section
+	// the manifest had just described. An agent following the manifest walks
+	// straight into it, and has no way to tell a section that is empty from one
+	// it asked for wrongly.
+	g.Sections = makeSections(g.Blocks)
 	g.MediaAll = mediaAll
 	g.Structured = ParseJSONLD(in.Merged.Meta.JSONLD)
 	g.FAQ = ParseFAQ(in.Merged.Meta.JSONLD)
