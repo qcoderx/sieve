@@ -122,10 +122,10 @@ type Answer struct {
 	Error      string    `json:"error,omitempty"`
 
 	// Accuracy and FactsFound are filled by the grader.
-	Accuracy   float64  `json:"accuracy"`
-	FactsFound []string `json:"facts_found,omitempty"`
+	Accuracy    float64  `json:"accuracy"`
+	FactsFound  []string `json:"facts_found,omitempty"`
 	FactsMissed []string `json:"facts_missed,omitempty"`
-	GraderNote string   `json:"grader_note,omitempty"`
+	GraderNote  string   `json:"grader_note,omitempty"`
 }
 
 // Report is a complete benchmark run.
@@ -136,6 +136,18 @@ type Report struct {
 	GraderModel string    `json:"grader_model"`
 	ContentHash string    `json:"content_hash"`
 	Tier        string    `json:"tier"`
+
+	// RawTokens is the size of the page an unaided agent would have been
+	// handed, and RawTokensSent is how much of it actually fitted.
+	//
+	// These differ on exactly the pages sieve exists for. A context ceiling is
+	// not a limitation of this benchmark, it is the condition the control is
+	// under in real use -- an agent given a four-hundred-thousand-token page
+	// does not read four hundred thousand tokens of it either. Recording both
+	// is what keeps that honest rather than hidden.
+	RawTokens     int  `json:"raw_tokens"`
+	RawTokensSent int  `json:"raw_tokens_sent"`
+	RawTruncated  bool `json:"raw_truncated"`
 
 	Answers []Answer `json:"answers"`
 	Metrics struct {
@@ -149,8 +161,22 @@ type Report struct {
 	// Fidelity is the share of sampled artifact statements verifiable in the
 	// source. It gates the release: a distiller that invents content is worse
 	// than no distiller.
-	Fidelity      float64 `json:"fidelity"`
-	FidelityNotes []string `json:"fidelity_notes,omitempty"`
+	Fidelity float64 `json:"fidelity"`
+	// FidelityMeasured distinguishes a fidelity of zero from a check that could
+	// not run. They are opposite conclusions -- one says the artifact invented
+	// everything, the other that nothing could be verified -- and collapsing
+	// them into a single number condemned sieve for extracting content which
+	// was correctly absent from the served HTML.
+	FidelityMeasured bool     `json:"fidelity_measured"`
+	FidelityNotes    []string `json:"fidelity_notes,omitempty"`
+
+	// GraderAgreement is how often the grader gave the same verdict when asked
+	// twice about the same answer. It is the error bar on every accuracy figure
+	// above: a grader that disagrees with itself a fifth of the time cannot
+	// support a claim of a five-point difference, and without measuring it
+	// there is no way to know which claims are safe.
+	GraderAgreement float64 `json:"grader_agreement,omitempty"`
+	GraderRegraded  int     `json:"grader_regraded,omitempty"`
 
 	// Stability is reported only when a stability run was requested.
 	Stability *Stability `json:"stability,omitempty"`
@@ -165,14 +191,14 @@ type ConditionMetrics struct {
 	// Answered is how many questions actually produced an answer. It differs
 	// from Questions whenever a call failed, and the accuracy below is the mean
 	// over these rather than over all of them.
-	Answered     int     `json:"answered"`
-	MeanAccuracy float64 `json:"mean_accuracy"`
-	MeanInputToks float64 `json:"mean_input_tokens"`
-	TotalInputToks int64  `json:"total_input_tokens"`
-	MeanLatencyMS float64 `json:"mean_latency_ms"`
-	Refusals      int     `json:"refusals"`
-	Errors        int     `json:"errors"`
-	ByBand        map[Band]float64 `json:"accuracy_by_band"`
+	Answered       int              `json:"answered"`
+	MeanAccuracy   float64          `json:"mean_accuracy"`
+	MeanInputToks  float64          `json:"mean_input_tokens"`
+	TotalInputToks int64            `json:"total_input_tokens"`
+	MeanLatencyMS  float64          `json:"mean_latency_ms"`
+	Refusals       int              `json:"refusals"`
+	Errors         int              `json:"errors"`
+	ByBand         map[Band]float64 `json:"accuracy_by_band"`
 }
 
 // Stability is what two runs of the same URL produced.
@@ -189,9 +215,9 @@ type Stability struct {
 	// BlockAgreement is the share of blocks present in both runs with identical
 	// text. A page that is genuinely personalised will score low here, and
 	// correctly so.
-	BlockAgreement float64 `json:"block_agreement"`
-	BlocksA        int     `json:"blocks_a"`
-	BlocksB        int     `json:"blocks_b"`
+	BlockAgreement float64  `json:"block_agreement"`
+	BlocksA        int      `json:"blocks_a"`
+	BlocksB        int      `json:"blocks_b"`
 	OnlyInA        []string `json:"only_in_a,omitempty"`
 	OnlyInB        []string `json:"only_in_b,omitempty"`
 }
@@ -203,8 +229,8 @@ type Verdict struct {
 	// conditions, not the difference of the two means. See judge.
 	AccuracyGain float64 `json:"accuracy_gain"`
 	// ComparedQuestions is how many questions that pairing covered.
-	ComparedQuestions int `json:"compared_questions"`
-	MetTokenTarget   bool    `json:"met_token_target"`
+	ComparedQuestions int    `json:"compared_questions"`
+	MetTokenTarget    bool   `json:"met_token_target"`
 	MetAccuracyTarget bool   `json:"met_accuracy_target"`
 	MetCoverageTarget bool   `json:"met_coverage_target"`
 	MetFidelityTarget bool   `json:"met_fidelity_target"`
@@ -234,7 +260,19 @@ type Options struct {
 	// BaseURL points the run at an OpenAI-compatible provider. Empty means
 	// Anthropic, or whatever LLM_BASE_URL names.
 	BaseURL string
-	Logf    func(format string, args ...any)
+	// RawContextTokens caps how much of the raw page the control is given.
+	//
+	// Without a cap the control simply errors on any large page, so the
+	// benchmark could measure everything except the case the tool exists for:
+	// pear.no serves around four hundred and seventy thousand tokens and no
+	// model accepts it. Truncating models what an unaided agent actually gets
+	// -- the top of the document and no more -- and the report says how much
+	// was left behind, so nobody mistakes the handicap for a result.
+	RawContextTokens int
+	// GraderRepeats re-grades a sample of answers to measure how much the
+	// grader agrees with itself. Zero disables it.
+	GraderRepeats int
+	Logf          func(format string, args ...any)
 }
 
 // DefaultOptions returns usable settings.
@@ -380,7 +418,7 @@ func (r *Report) judge() {
 	v.MetTokenTarget = v.TokenReduction >= TargetTokenReduction
 	v.MetAccuracyTarget = v.AccuracyGain >= TargetAccuracyGain
 	v.MetCoverageTarget = r.Coverage >= TargetCoverage
-	v.MetFidelityTarget = r.Fidelity >= TargetFidelity
+	v.MetFidelityTarget = r.FidelityMeasured && r.Fidelity >= TargetFidelity
 	v.Passed = v.MetTokenTarget && v.MetAccuracyTarget && v.MetCoverageTarget && v.MetFidelityTarget
 
 	var missed []string
@@ -397,8 +435,13 @@ func (r *Report) judge() {
 			r.Coverage, TargetCoverage))
 	}
 	if !v.MetFidelityTarget {
-		missed = append(missed, fmt.Sprintf("fidelity %.3f is below the %.2f target — the artifact contains statements not verifiable in the source, which is the one failure that matters most",
-			r.Fidelity, TargetFidelity))
+		if !r.FidelityMeasured {
+			missed = append(missed, "fidelity was not measured on this page, so the "+
+				"criterion that catches invention is unmet rather than failed")
+		} else {
+			missed = append(missed, fmt.Sprintf("fidelity %.3f is below the %.2f target — the artifact contains statements not verifiable in the source, which is the one failure that matters most",
+				r.Fidelity, TargetFidelity))
+		}
 	}
 	if v.Passed {
 		v.Summary = fmt.Sprintf("passed: %.1f%% fewer tokens, %.1f points more accurate, coverage %.2f, fidelity %.3f",

@@ -29,6 +29,8 @@ func runBench(args []string, stdout, stderr io.Writer) int {
 		out       string
 		stability bool
 		budget    int64
+		rawCap    int
+		regrade   int
 	)
 	common.register(fs)
 	fs.StringVar(&questions, "questions", "", "path to a question set (YAML or JSON)")
@@ -38,6 +40,14 @@ func runBench(args []string, stdout, stderr io.Writer) int {
 	fs.BoolVar(&stability, "stability", false,
 		"distill twice and report tier and content stability instead of running questions")
 	fs.Int64Var(&budget, "budget", 2_000_000, "total token ceiling for the run")
+	fs.IntVar(&rawCap, "raw-context", 100_000,
+		"how much of the raw page the control is given, in tokens.\n"+
+			"Models what an unaided agent actually receives: a larger page is\n"+
+			"truncated and the report says by how much. 0 sends all of it, which\n"+
+			"simply fails on anything large.")
+	fs.IntVar(&regrade, "regrade", 0,
+		"re-grade this many answers to measure how far the grader agrees with\n"+
+			"itself. It is the error bar on every accuracy figure; 12 is useful.")
 
 	fs.Usage = func() {
 		fmt.Fprint(stderr, `Usage: sieve bench <artifact-dir> --questions <file> [flags]
@@ -101,6 +111,8 @@ Flags:
 
 	opts := bench.DefaultOptions()
 	opts.Budget = budget
+	opts.RawContextTokens = rawCap
+	opts.GraderRepeats = regrade
 	if model != "" {
 		opts.Model = model
 	}
@@ -242,6 +254,20 @@ func printReport(w io.Writer, r *bench.Report) {
 		fmt.Fprintf(w, "                %s\n", n)
 	}
 
+	if r.RawTruncated {
+		fmt.Fprintf(w, "\n  raw page      %d tokens, of which %d fitted (%.0f%% withheld)\n",
+			r.RawTokens, r.RawTokensSent,
+			100*(1-float64(r.RawTokensSent)/float64(r.RawTokens)))
+		fmt.Fprintf(w, "                the control got the top of the page and no more, which\n")
+		fmt.Fprintf(w, "                is what an unaided agent gets on a page this size\n")
+	}
+	if r.GraderRegraded > 0 {
+		fmt.Fprintf(w, "\n  grader agreed with itself on %.0f%% of %d re-graded answers\n",
+			r.GraderAgreement*100, r.GraderRegraded)
+		if r.GraderAgreement < 0.9 {
+			fmt.Fprintf(w, "                treat differences smaller than that spread as noise\n")
+		}
+	}
 	fmt.Fprintf(w, "\n  compared      %d question(s) answered under both conditions\n",
 		r.Verdict.ComparedQuestions)
 	fmt.Fprintf(w, "  token reduction %.1f%%   accuracy gain %+.1f points\n",

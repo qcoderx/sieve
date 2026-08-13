@@ -1,0 +1,198 @@
+# Question set for igloo.inc.
+#
+# This is the case the project exists for, and the one no benchmark had ever
+# been pointed at. igloo.inc serves an empty <body>: an unaided agent fetching
+# it receives a shell with a title and a meta description and nothing else.
+# Every word below is drawn as MSDF glyph geometry inside a three.js scene.
+#
+# The ground truth was read out of the site's own JavaScript bundle with curl,
+# not out of sieve's artifact. That matters more here than anywhere else --
+# grading a scene extraction against ground truth derived from that same scene
+# extraction would be a closed loop that could never fail.
+#
+#   curl https://www.igloo.inc/assets/App3D-*.js | grep -o 'Pudgy Penguins[^"]*'
+#
+# The expected outcome is not a marginal gain. The control cannot answer any
+# content question at all, because it has nothing to read; the artifact should
+# answer nearly all of them. If sieve does not win overwhelmingly here, the
+# scene extraction is not working.
+#
+#   sieve distill https://igloo.inc -load-timeout 40s -out ./artifacts
+#   sieve bench ./artifacts/igloo.inc --questions testdata/questions/igloo.yaml
+
+name: Igloo Inc. (WebGL, empty served HTML)
+url: https://igloo.inc
+
+questions:
+  # --- Factual retrieval ----------------------------------------------------
+  - id: q01
+    band: factual
+    ask: What is Igloo Inc's stated mission?
+    expect: To build the next generation of consumer brands at the intersection
+      of Community, AI, and crypto.
+    facts:
+      - next generation of consumer brands
+      - Community, AI and crypto
+
+  - id: q02
+    band: factual
+    ask: In what year was Pudgy Penguins founded?
+    expect: 2021.
+    facts:
+      - founded in 2021
+
+  - id: q03
+    band: factual
+    ask: When did Igloo Inc. acquire Pudgy Penguins?
+    expect: In 2022.
+    facts:
+      - acquired in 2022
+      - acquired by Igloo
+
+  - id: q04
+    band: factual
+    ask: What was the acquisition intended to achieve?
+    expect: To expand Pudgy Penguins' reach and capabilities, and reposition it
+      as a next-generation entertainment company and the face of Web3.
+    facts:
+      - expanding its reach and capabilities
+      - next-generation entertainment company
+      - face of Web3
+
+  - id: q05
+    band: factual
+    ask: What does the company say it believes about intellectual property and
+      communities?
+    expect: That intellectual property, digital collectibles and communities are
+      born and thrive on the blockchain.
+    facts:
+      - intellectual property
+      - digital collectibles
+      - thrive on the blockchain
+
+  - id: q06
+    band: factual
+    ask: What is Abstract?
+    expect: A blockchain for consumer crypto, pioneering culture, community and
+      creativity onchain.
+    facts:
+      - blockchain for consumer crypto
+      - culture, community and creativity onchain
+
+  - id: q07
+    band: factual
+    ask: Why does the company think a consumer crypto chain matters?
+    expect: It is described as the breakthrough opportunity to bring billions of
+      people onchain, and the dominant chain would be the single greatest
+      distribution channel.
+    facts:
+      - bring billions of people onchain
+      - single greatest distribution channel
+
+  - id: q08
+    band: factual
+    ask: What is OverpassIP, and what problem was it created to solve?
+    expect: A solution to a licensing challenge faced by Pudgy Penguins, a
+      breakthrough in NFT licensing.
+    facts:
+      - licensing challenge
+      - NFT licensing
+
+  - id: q09
+    band: factual
+    ask: What does OverpassIP let NFT holders do?
+    expect: Submit their digital assets for potential licensing opportunities.
+    facts:
+      - submit their digital assets
+      - licensing opportunities
+
+  - id: q10
+    band: factual
+    ask: What shift in business model does the company describe?
+    expect: From a brand-and-consumer approach to a brand-and-participant model.
+    facts:
+      - brand-and-participant model
+
+  - id: q11
+    band: factual
+    ask: Which company name appears in the copyright line?
+    expect: Igloo, Inc.
+    facts:
+      - Igloo, Inc
+
+  - id: q12
+    band: factual
+    ask: What does the page recommend for the experience?
+    expect: Headphones.
+    facts:
+      - headphones
+
+  # --- Structural -----------------------------------------------------------
+  - id: q13
+    band: structural
+    ask: What are the main sections of this page?
+    expect: Summary, Discover, Visit and Manifesto.
+    facts:
+      - Summary
+      - Discover
+      - Manifesto
+
+  - id: q14
+    band: structural
+    ask: Roughly how much readable content does this page have — a sentence, a
+      few paragraphs, or a long document?
+    expect: Several paragraphs across a handful of sections.
+    facts:
+      - several paragraphs
+
+  - id: q15
+    band: structural
+    ask: Is the page's text present in the served HTML, or produced some other
+      way?
+    expect: It is not in the served HTML; the page renders its text into a WebGL
+      scene.
+    facts:
+      - not in the served HTML
+      - rendered into a canvas or WebGL scene
+
+  # --- Actionable -----------------------------------------------------------
+  - id: q16
+    band: actionable
+    ask: Which social platforms does the site link to?
+    expect: LinkedIn, X (Twitter) and Medium.
+    facts:
+      - LinkedIn
+      - Medium
+      - X or Twitter
+
+  - id: q17
+    band: actionable
+    ask: If I wanted to read the company's own summary of its history, where
+      would I look?
+    expect: The Summary section.
+    facts:
+      - Summary
+
+  - id: q18
+    band: actionable
+    ask: Can a visitor submit an NFT collection for licensing, and through what?
+    expect: Yes, through OverpassIP.
+    facts:
+      - OverpassIP
+
+  - id: q19
+    band: actionable
+    ask: Does this page have a contact form or an email address on it?
+    expect: No enquiry form or email address is presented on the page.
+    facts:
+      - no form
+      - no email address
+
+  - id: q20
+    band: actionable
+    ask: What would an agent need in order to read this page's content at all?
+    expect: A browser that runs the page's JavaScript and a way to read text out
+      of the WebGL scene, since the served HTML contains none of it.
+    facts:
+      - a browser that runs JavaScript
+      - the text is in the scene rather than the document

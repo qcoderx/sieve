@@ -4,6 +4,7 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"regexp"
 	"strings"
 	"sync"
 	"time"
@@ -108,7 +109,29 @@ func (r *Runner) Run(ctx context.Context, in Input) (*Report, error) {
 	opt.Structured = true
 	opt.Gaps = true
 	artifactText := emit.Markdown(in.Artifact, opt)
+
+	// The control gets as much of the page as would actually fit.
+	//
+	// Handing it the whole document means it simply errors on anything large,
+	// so the benchmark could measure every case except the one sieve is for.
+	// An agent facing a four-hundred-thousand-token page does not read all of
+	// it either: it reads the top and runs out. Modelling that is the fair
+	// comparison, and the report carries both figures so the handicap is
+	// visible rather than baked into a score.
 	rawText := in.RawHTML
+	rep0RawTokens := tokens.EstimateHTML(rawText)
+	rawSent := rep0RawTokens
+	truncated := false
+	if cap := r.opts.RawContextTokens; cap > 0 && rep0RawTokens > cap {
+		// Estimated tokens to characters, at the same ratio the estimator uses.
+		keep := cap * len(rawText) / rep0RawTokens
+		if keep < len(rawText) {
+			rawText = rawText[:keep] +
+				"\n\n[... truncated: this page is larger than the context available ...]"
+		}
+		rawSent = tokens.EstimateHTML(rawText)
+		truncated = true
+	}
 
 	rep := &Report{
 		Target:      in.Set.URL,
@@ -117,6 +140,10 @@ func (r *Runner) Run(ctx context.Context, in Input) (*Report, error) {
 		GraderModel: r.opts.GraderModel,
 		ContentHash: in.Artifact.ContentHash,
 		Tier:        in.Artifact.Provenance.Tier,
+
+		RawTokens:     rep0RawTokens,
+		RawTokensSent: rawSent,
+		RawTruncated:  truncated,
 	}
 
 	r.opts.logf("raw page ~%d tokens, artifact ~%d tokens",
@@ -171,17 +198,74 @@ func (r *Runner) Run(ctx context.Context, in Input) (*Report, error) {
 
 	rep.Coverage = r.measureCoverage(in.Set, artifactText)
 	fid, notes, err := r.measureFidelity(ctx, in.Artifact, rawText)
-	if err != nil {
+	switch {
+	case err == errFidelityNoSource:
+		// Not a failure and not a zero: there was nothing to check against.
+		rep.Fidelity = 0
+		rep.FidelityMeasured = false
+		rep.FidelityNotes = notes
+	case err != nil:
 		r.opts.logf("fidelity check failed: %v", err)
 		rep.Fidelity = 0
+		rep.FidelityMeasured = false
 		rep.FidelityNotes = []string{"fidelity could not be measured: " + err.Error()}
-	} else {
+	default:
 		rep.Fidelity = fid
+		rep.FidelityMeasured = true
 		rep.FidelityNotes = notes
+	}
+
+	if n := r.opts.GraderRepeats; n > 0 {
+		rep.GraderAgreement, rep.GraderRegraded = r.measureGraderAgreement(ctx, in.Set, answers, n)
 	}
 
 	rep.judge()
 	return rep, nil
+}
+
+// measureGraderAgreement re-grades a sample and reports how often the grader
+// reached the same verdict as the first time.
+//
+// Every accuracy figure in the report is the grader's opinion, and an opinion
+// that changes between two identical questions is noise being reported as a
+// measurement. Knowing the width of that noise is what makes a five-point
+// difference either a finding or a coincidence -- and there was no way to tell
+// which, because nothing had ever asked.
+func (r *Runner) measureGraderAgreement(ctx context.Context, set *Set,
+	answers []Answer, sample int) (float64, int) {
+
+	var pick []int
+	for i, a := range answers {
+		if a.Error == "" && a.Text != "" {
+			pick = append(pick, i)
+		}
+	}
+	if len(pick) == 0 {
+		return 0, 0
+	}
+	// An even stride, so the sample is not all of one condition or all of the
+	// easy questions at the top of the set.
+	stride := 1
+	if len(pick) > sample {
+		stride = len(pick) / sample
+	}
+	agree, n := 0, 0
+	for i := 0; i < len(pick) && n < sample; i += stride {
+		idx := pick[i]
+		again := Answer{QuestionID: answers[idx].QuestionID, Text: answers[idx].Text}
+		q := findQuestion(set, again.QuestionID)
+		if err := r.grade(ctx, q, &again); err != nil {
+			continue
+		}
+		n++
+		if again.Accuracy == answers[idx].Accuracy {
+			agree++
+		}
+	}
+	if n == 0 {
+		return 0, 0
+	}
+	return round3(float64(agree) / float64(n)), n
 }
 
 func (r *Runner) ask(ctx context.Context, q Question, cond Condition, text string) Answer {
@@ -337,6 +421,27 @@ var stopWords = map[string]bool{
 	"when": true, "where": true, "page": true, "site": true, "about": true,
 }
 
+// minFidelitySource is how much readable text the served page must carry before
+// a fidelity check against it means anything.
+const minFidelitySource = 400
+
+// errFidelityNoSource marks the case where the source cannot verify anything,
+// so the caller can report it as unmeasured rather than as a failure.
+var errFidelityNoSource = fmt.Errorf("no verifiable source text")
+
+// visibleTextLen approximates how much readable text a served document holds,
+// which is not its byte count: an application shell is mostly script.
+func visibleTextLen(doc string) int {
+	stripped := scriptAndStyle.ReplaceAllString(doc, " ")
+	stripped = htmlTag.ReplaceAllString(stripped, " ")
+	return len(strings.Join(strings.Fields(stripped), " "))
+}
+
+var (
+	scriptAndStyle = regexp.MustCompile(`(?is)<(script|style)\b.*?</(script|style)>`)
+	htmlTag        = regexp.MustCompile(`(?s)<[^>]*>`)
+)
+
 // fidelitySystem checks for invention.
 const fidelitySystem = `You are checking whether statements were invented.
 
@@ -377,6 +482,27 @@ type fidelityVerdict struct {
 // them at the same rate as DOM text would let a single hallucinated headline
 // hide behind two hundred correctly extracted paragraphs.
 func (r *Runner) measureFidelity(ctx context.Context, g *graph.Graph, rawText string) (float64, []string, error) {
+	// A source with no text in it cannot verify anything.
+	//
+	// Fidelity asks whether the artifact's statements appear in the page it came
+	// from, and the page it is given is the served HTML. On a site that renders
+	// its content some other way that HTML is a shell: igloo.inc serves an empty
+	// <body>, so every correctly extracted sentence is "not found in source" and
+	// the check returns 0.083 for an artifact that invented nothing whatsoever.
+	//
+	// That is the gate criterion firing hardest at exactly the pages sieve
+	// exists for, and it is the check being unable to see rather than the
+	// artifact being wrong. Saying so is the only honest answer available: there
+	// is no second copy of the text to verify against, because if there were,
+	// sieve would not have needed a browser to find it.
+	if visible := visibleTextLen(rawText); visible < minFidelitySource {
+		return 0, []string{fmt.Sprintf(
+			"fidelity could not be measured: the served page carries only %d characters "+
+				"of readable text, so there is nothing to verify the artifact against. "+
+				"This is the page rendering its content some other way, not the artifact "+
+				"inventing it", visible)}, errFidelityNoSource
+	}
+
 	var sample []string
 	var recovered []string
 	for _, b := range g.Blocks {

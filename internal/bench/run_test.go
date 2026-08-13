@@ -84,6 +84,13 @@ func testSet(n int) *Set {
 	return s
 }
 
+// sourceWithText is a served page carrying enough readable text for a fidelity
+// check to mean something. Below that floor the check reports that it could not
+// run, which is a different answer from a score of zero.
+var sourceWithText = "<html><body><p>" +
+	strings.Repeat("The workshop was founded in 1974 and has occupied the same rooms since. ", 12) +
+	"</p></body></html>"
+
 func testGraph() *graph.Graph {
 	return &graph.Graph{
 		Title: "Test page",
@@ -227,7 +234,8 @@ func TestFidelityCountsFromIndices(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	rep, err := r.Run(context.Background(), Input{Set: testSet(1), Artifact: g, RawHTML: "raw"})
+	rep, err := r.Run(context.Background(), Input{
+		Set: testSet(1), Artifact: g, RawHTML: sourceWithText})
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -257,7 +265,7 @@ func TestFidelityIgnoresOutOfRangeIndices(t *testing.T) {
 	})
 	r, _ := NewRunner(Options{BaseURL: f.srv.URL, APIKey: "k", Model: "fake", Concurrency: 1})
 	rep, err := r.Run(context.Background(), Input{
-		Set: testSet(1), Artifact: testGraph(), RawHTML: "raw"})
+		Set: testSet(1), Artifact: testGraph(), RawHTML: sourceWithText})
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -359,5 +367,162 @@ func TestCoverageMatching(t *testing.T) {
 		if got := factPresent(page, c.fact); got != c.want {
 			t.Errorf("factPresent(%q) = %v, want %v — %s", c.fact, got, c.want, c.why)
 		}
+	}
+}
+
+// TestRawIsTruncatedToContext covers the case the benchmark previously could
+// not measure at all: a page too large to send.
+//
+// Without a cap the control errors on anything big, so every result came from
+// small pages -- precisely the ones where distillation matters least. An agent
+// handed a four-hundred-thousand-token page does not read it all either, so
+// truncating models reality rather than dodging it. What must not happen is
+// doing it quietly: the report has to carry both figures.
+func TestRawIsTruncatedToContext(t *testing.T) {
+	var rawSeen string
+	f := newFake(t, func(user string) (string, int) {
+		switch {
+		case strings.Contains(user, "STATEMENTS:"):
+			return `{"unsupported": [], "note": "x"}`, 200
+		case strings.Contains(user, "EXPECTED ANSWER"):
+			return `{"found": [], "missed": ["the answer"], "note": "x"}`, 200
+		}
+		if strings.Contains(user, "RAWMARK") {
+			rawSeen = user
+		}
+		return "answer", 200
+	})
+
+	huge := "RAWMARK " + strings.Repeat("filler text that goes on and on. ", 20000)
+	r, err := NewRunner(Options{
+		BaseURL: f.srv.URL, APIKey: "k", Model: "fake", Concurrency: 1,
+		RawContextTokens: 500,
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	rep, err := r.Run(context.Background(), Input{
+		Set: testSet(1), Artifact: testGraph(), RawHTML: huge})
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	if !rep.RawTruncated {
+		t.Error("a page far over the cap was not marked truncated")
+	}
+	if rep.RawTokens <= rep.RawTokensSent {
+		t.Errorf("raw tokens %d and sent %d: the report does not show what was withheld",
+			rep.RawTokens, rep.RawTokensSent)
+	}
+	if !strings.Contains(rawSeen, "truncated") {
+		t.Error("the control was not told its page had been cut short")
+	}
+	if len(rawSeen) >= len(huge) {
+		t.Error("the whole page was sent despite the cap")
+	}
+}
+
+// TestRawUntouchedWhenItFits: a page inside the cap must arrive whole, or the
+// common case would be quietly damaged by a guard meant for the rare one.
+func TestRawUntouchedWhenItFits(t *testing.T) {
+	f := newFake(t, func(user string) (string, int) {
+		if strings.Contains(user, "STATEMENTS:") || strings.Contains(user, "EXPECTED ANSWER") {
+			return `{"unsupported": [], "found": [], "missed": [], "note": "x"}`, 200
+		}
+		return "answer", 200
+	})
+	r, _ := NewRunner(Options{
+		BaseURL: f.srv.URL, APIKey: "k", Model: "fake", Concurrency: 1,
+		RawContextTokens: 100_000,
+	})
+	rep, err := r.Run(context.Background(), Input{
+		Set: testSet(1), Artifact: testGraph(), RawHTML: "a short page"})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if rep.RawTruncated {
+		t.Error("a short page was reported as truncated")
+	}
+}
+
+// TestGraderAgreementIsMeasured: every accuracy figure is the grader's
+// opinion, and an opinion that changes between two identical questions is
+// noise reported as a measurement. This asks how wide that noise is.
+func TestGraderAgreementIsMeasured(t *testing.T) {
+	var grades int
+	f := newFake(t, func(user string) (string, int) {
+		switch {
+		case strings.Contains(user, "STATEMENTS:"):
+			return `{"unsupported": [], "note": "x"}`, 200
+		case strings.Contains(user, "EXPECTED ANSWER"):
+			grades++
+			// Disagree with itself on every second grading.
+			if grades%2 == 0 {
+				return `{"found": ["the answer"], "missed": [], "note": "yes"}`, 200
+			}
+			return `{"found": [], "missed": ["the answer"], "note": "no"}`, 200
+		}
+		return "answer", 200
+	})
+	r, _ := NewRunner(Options{
+		BaseURL: f.srv.URL, APIKey: "k", Model: "fake", Concurrency: 1,
+		GraderRepeats: 4,
+	})
+	rep, err := r.Run(context.Background(), Input{
+		Set: testSet(4), Artifact: testGraph(), RawHTML: "raw"})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if rep.GraderRegraded == 0 {
+		t.Fatal("no answers were re-graded despite GraderRepeats being set")
+	}
+	// A grader that alternates cannot agree with itself all the time; the point
+	// is that the disagreement is now visible rather than assumed away.
+	if rep.GraderAgreement == 1 {
+		t.Errorf("agreement reported as perfect from a deliberately inconsistent grader")
+	}
+}
+
+// TestFidelityUnmeasurableWhenSourceIsEmpty covers the case that condemned
+// sieve for doing its job.
+//
+// Fidelity verifies the artifact's statements against the served HTML. On a
+// site that renders its content some other way that HTML is a shell: igloo.inc
+// serves an empty body, so every correctly extracted sentence came back "not
+// found in source" and the gate criterion read 0.083 for an artifact that had
+// invented nothing at all. A score of zero and a check that could not run are
+// opposite conclusions and must not share a number.
+func TestFidelityUnmeasurableWhenSourceIsEmpty(t *testing.T) {
+	f := newFake(t, func(user string) (string, int) {
+		if strings.Contains(user, "STATEMENTS:") {
+			t.Error("the fidelity grader was called even though the source has no text")
+			return `{"unsupported": [0], "note": "x"}`, 200
+		}
+		if strings.Contains(user, "EXPECTED ANSWER") {
+			return `{"found": ["the answer"], "missed": [], "note": "ok"}`, 200
+		}
+		return "the answer", 200
+	})
+
+	r, _ := NewRunner(Options{BaseURL: f.srv.URL, APIKey: "k", Model: "fake", Concurrency: 1})
+	rep, err := r.Run(context.Background(), Input{
+		Set: testSet(2), Artifact: testGraph(),
+		// An application shell: markup and script, no prose.
+		RawHTML: `<html><head><title>Igloo</title></head><body></body></html>`,
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	if rep.FidelityMeasured {
+		t.Error("fidelity was reported as measured against a page with no text in it")
+	}
+	joined := strings.Join(rep.FidelityNotes, " ")
+	if !strings.Contains(joined, "nothing to verify") {
+		t.Errorf("the reason was not given: %v", rep.FidelityNotes)
+	}
+	if !strings.Contains(rep.Verdict.Summary, "not measured") {
+		t.Errorf("the verdict blamed the artifact rather than the missing source: %q",
+			rep.Verdict.Summary)
 	}
 }
