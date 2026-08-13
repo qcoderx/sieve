@@ -172,3 +172,81 @@ func TestBaseURLNeedsAModel(t *testing.T) {
 		t.Error("a base URL with no model was accepted")
 	}
 }
+
+// TestReasoningWithoutAnswerIsAnError covers a failure that would otherwise be
+// scored as a wrong answer.
+//
+// A thinking model returns its answer in content and its working in a separate
+// field. When the token ceiling is reached mid-thought, content is empty and
+// only the working comes back. Handing that to a grader marks the question
+// wrong, when in truth the model never answered — the same mistake as counting
+// a failed call as a wrong answer, and just as flattering to whichever
+// condition happens to survive it.
+func TestReasoningWithoutAnswerIsAnError(t *testing.T) {
+	srv := serveOnce(t, 200, `{"choices":[{"message":{"content":"",
+		"reasoning":"We are asked for the capital. Let me think about France..."},
+		"finish_reason":"length"}],"usage":{"prompt_tokens":10,"completion_tokens":20}}`, nil)
+
+	c, _ := New(Options{BaseURL: srv.URL, APIKey: "k", Model: "thinker", MaxTokens: 20})
+	_, err := c.Ask(context.Background(), "", []ContentBlock{TextBlock("capital of France?")})
+	if err == nil {
+		t.Fatal("an empty answer from a thinking model was returned as if it were a reply")
+	}
+	if !strings.Contains(err.Error(), "output tokens") {
+		t.Errorf("err = %v, want it to name the cause and the remedy", err)
+	}
+}
+
+// TestReasoningAlongsideAnAnswerIsFine: when the model did reach a conclusion,
+// the working is ignored and the answer is used.
+func TestReasoningAlongsideAnAnswerIsFine(t *testing.T) {
+	srv := serveOnce(t, 200, `{"choices":[{"message":{"content":"Paris",
+		"reasoning":"France's capital is Paris."},"finish_reason":"stop"}],
+		"usage":{"prompt_tokens":10,"completion_tokens":5}}`, nil)
+
+	c, _ := New(Options{BaseURL: srv.URL, APIKey: "k", Model: "thinker"})
+	res, err := c.Ask(context.Background(), "", []ContentBlock{TextBlock("capital?")})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if res.Text != "Paris" {
+		t.Errorf("text = %q, want %q — the working must not displace the answer", res.Text, "Paris")
+	}
+}
+
+// TestProviderErrorShapes: the message a provider sends must survive, whichever
+// shape it uses.
+//
+// OpenAI and most imitators wrap it in an object; HuggingFace returns a bare
+// string. A client that understands only the object form reports "a body that
+// is not JSON" while the provider is plainly saying something useful — in the
+// case that prompted this, that the account had run out of credit, which is a
+// two-second fix misread as a broken integration.
+func TestProviderErrorShapes(t *testing.T) {
+	cases := []struct {
+		name   string
+		status int
+		body   string
+		want   string
+	}{
+		{"object form", 400,
+			`{"error":{"message":"model_not_found: nope","type":"invalid"}}`, "model_not_found"},
+		{"bare string form", 402,
+			`{"error":"You have depleted your monthly included credits."}`, "depleted"},
+		{"payment required is named", 402,
+			`{"error":"out of credit"}`, "payment"},
+	}
+	for _, c := range cases {
+		t.Run(c.name, func(t *testing.T) {
+			srv := serveOnce(t, c.status, c.body, nil)
+			cl, _ := New(Options{BaseURL: srv.URL, APIKey: "k", Model: "m"})
+			_, err := cl.Ask(context.Background(), "", []ContentBlock{TextBlock("x")})
+			if err == nil {
+				t.Fatal("no error returned")
+			}
+			if !strings.Contains(strings.ToLower(err.Error()), c.want) {
+				t.Errorf("err = %v, want it to contain %q", err, c.want)
+			}
+		})
+	}
+}

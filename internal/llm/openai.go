@@ -67,6 +67,12 @@ type oaResponse struct {
 		Message struct {
 			Content string `json:"content"`
 			Refusal string `json:"refusal"`
+			// Reasoning is where a thinking model puts its working. It is not
+			// the answer and is never used as one; it is read only to tell an
+			// empty reply that ran out of budget mid-thought apart from an
+			// empty reply that had nothing to say.
+			Reasoning        string `json:"reasoning"`
+			ReasoningContent string `json:"reasoning_content"`
 		} `json:"message"`
 		FinishReason string `json:"finish_reason"`
 	} `json:"choices"`
@@ -79,10 +85,31 @@ type oaResponse struct {
 			CachedTokens int64 `json:"cached_tokens"`
 		} `json:"prompt_tokens_details"`
 	} `json:"usage"`
-	Error *struct {
+	// Error is either an object with a message or a bare string, depending on
+	// the provider. HuggingFace returns the string form, and a client that
+	// expects only the object reports "a body that is not JSON" while the
+	// provider is plainly saying something useful -- in that case, that the
+	// account had run out of credit.
+	Error json.RawMessage `json:"error"`
+}
+
+// errorMessage reads whichever shape the provider used.
+func (o oaResponse) errorMessage() string {
+	if len(o.Error) == 0 {
+		return ""
+	}
+	var asObject struct {
 		Message string `json:"message"`
 		Type    string `json:"type"`
-	} `json:"error"`
+	}
+	if json.Unmarshal(o.Error, &asObject) == nil && asObject.Message != "" {
+		return asObject.Message
+	}
+	var asString string
+	if json.Unmarshal(o.Error, &asString) == nil && asString != "" {
+		return asString
+	}
+	return strings.TrimSpace(string(o.Error))
 }
 
 // maxRateLimitRetries bounds how many times a call waits out a rate limit.
@@ -220,6 +247,11 @@ func (o *openAIClient) askOnce(ctx context.Context, model string, maxTokens int6
 			o.base, resp.StatusCode, truncateForError(string(raw)))
 	}
 	switch {
+	case resp.StatusCode == http.StatusPaymentRequired:
+		// Worth its own case: an exhausted account looks like a broken
+		// integration until someone reads the body.
+		return nil, 0, fmt.Errorf("%s refused the request for payment reasons: %s",
+			o.base, messageOf(out, raw))
 	case resp.StatusCode == http.StatusUnauthorized:
 		return nil, 0, fmt.Errorf("%w (the provider at %s rejected the key)", ErrNoCredentials, o.base)
 	case resp.StatusCode == http.StatusTooManyRequests:
@@ -258,12 +290,33 @@ func (o *openAIClient) askOnce(ctx context.Context, model string, maxTokens int6
 	}
 
 	res.Text = strings.TrimSpace(ch.Message.Content)
+
+	// A thinking model that never reached its answer.
+	//
+	// Reasoning models return the answer in content and their working in a
+	// separate field. When the token ceiling is hit mid-thought, content comes
+	// back empty and the working is all there is -- and an empty answer handed
+	// to a grader is marked wrong, which is the same error as counting a failed
+	// call as a wrong answer: the model never answered, so there is nothing to
+	// mark. It is reported as a failure with the remedy in it instead.
+	//
+	// The working is deliberately not used as the answer. It is the model
+	// talking to itself, frequently contradicts its own conclusion, and passing
+	// it off as a reply would put words in its mouth.
+	if res.Text == "" && !res.Refused {
+		if thinking := ch.Message.Reasoning + ch.Message.ReasoningContent; thinking != "" {
+			return res, 0, fmt.Errorf(
+				"%s answered with reasoning but no content: it ran out of output tokens "+
+					"before reaching an answer. Raise max tokens, or use a model that "+
+					"does not think before replying", model)
+		}
+	}
 	return res, 0, nil
 }
 
 func messageOf(out oaResponse, raw []byte) string {
-	if out.Error != nil && out.Error.Message != "" {
-		return out.Error.Message
+	if m := out.errorMessage(); m != "" {
+		return m
 	}
 	return truncateForError(string(raw))
 }
