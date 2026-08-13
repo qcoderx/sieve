@@ -72,8 +72,14 @@ Flags:
 	}
 	fmt.Fprintf(stdout, "  capture    %d nodes, %d latent, %d checkpoints\n",
 		len(snap.Merged.Nodes), len(snap.Merged.Latent), snap.Merged.Checkpoints)
-	fmt.Fprintf(stdout, "  graph      %d blocks, %d sections, hash %s\n",
-		len(g.Blocks), len(g.Sections), g.ContentHash)
+	// The same figure distill prints, for the same graph.
+	//
+	// distill reports content blocks and replay reported every block including
+	// navigation and furniture, so the two commands gave different numbers for
+	// an identical artifact -- 39 against 47 on the same snapshot -- and the
+	// obvious reading of that is that replay had failed to reproduce the run.
+	fmt.Fprintf(stdout, "  graph      %d blocks (%d incl. furniture), %d sections, hash %s\n",
+		g.Stats.ContentNodes, len(g.Blocks), len(g.Sections), g.ContentHash)
 	fmt.Fprintf(stdout, "  audit      retention %.1f%%, order %s (%s), headings %s\n",
 		g.Audit.GraphRetention*100, g.Audit.OrderConfidence, g.Audit.OrderBasis,
 		g.Audit.HeadingConfidence)

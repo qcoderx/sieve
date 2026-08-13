@@ -2893,11 +2893,22 @@
       var allowance = remainingMs / Math.max(1, Math.min(wantCp, affordable));
       var settleBudget = Math.max(settleMinMs,
         Math.min(settleMaxMs, allowance - captureAvg));
-      // A page that has refused to settle three times running will refuse
-      // again. Paying full price for an answer it has already declined to give
-      // spends on stillness the budget that should be spent on covering the
-      // document.
-      if (settleMisses >= 3) settleBudget = settleMinMs;
+      // A page that has refused to settle twice running will refuse again.
+      // Paying full price for an answer it has already declined to give spends
+      // on stillness the budget that should be spent on covering the document.
+      //
+      // Two rather than three, because the threshold has to be reachable. On a
+      // page whose whole sweep affords three checkpoints, a rule that needs
+      // three consecutive misses can never fire before the budget is gone --
+      // which is exactly what happened on pear.no, where the guard existed and
+      // never once ran.
+      //
+      // Only once something has been legible, though. "Never settles" and
+      // "never reveals" look identical from here and need opposite responses,
+      // and hurrying a page that has shown nothing yet is how a sweep ends with
+      // an empty artifact: cutting this wait before anything had been seen took
+      // pear.no from 44 blocks to 6.
+      if (everSawVisible && settleMisses >= 2) settleBudget = settleMinMs;
 
       // Seeing nothing is a reason to slow down, not to hurry.
       //
@@ -2921,6 +2932,30 @@
       if (!everSawVisible && cp >= 2 && sampledChars > 0) {
         var patient = Math.min(revealFloorMs, Math.max(settleMaxMs, remainingMs / 4));
         if (patient > settleBudget) settleBudget = patient;
+      }
+
+      // No single stop may spend more than a quarter of what is left.
+      //
+      // This is the ceiling the other rules are missing. Each of them decides
+      // what this checkpoint deserves; none of them asks what the sweep can
+      // afford to give it. On pear.no one settle ran 3.9 seconds of a 5.6
+      // second sweep -- seventy per cent of the budget spent watching a page
+      // that animates permanently and was never going to hold still -- and the
+      // sweep reached three checkpoints of a document needing far more.
+      //
+      // A quarter guarantees at least four stops however badly the page
+      // behaves. Pages that settle honestly are unaffected: they answer in tens
+      // of milliseconds and never approach the ceiling.
+      //
+      // Conditional on having seen text, for the same reason as above and
+      // learned the same way. Applied unconditionally this rule fires on the
+      // first checkpoint of a page that fades its content in, collapses the
+      // wait before the fade completes, and the sweep observes nothing at all
+      // -- which is worse than the slow sweep it was meant to fix, because a
+      // slow sweep still returns what it saw.
+      if (everSawVisible) {
+        var affordableSettle = Math.max(settleMinMs, remainingMs * 0.25);
+        if (settleBudget > affordableSettle) settleBudget = affordableSettle;
       }
 
       var tScroll = nowMs();

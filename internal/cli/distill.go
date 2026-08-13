@@ -435,6 +435,7 @@ func writeSnapshot(path, target string, res *distill.Result, private bool) error
 		Libraries:    res.Libraries,
 		StaticHTML:   res.StaticHTML,
 		Notes:        res.Graph.Audit.Notes,
+		Tier:         res.Graph.Provenance.Tier,
 	}
 	return snapshot.Write(snapshotResolved(path, target), s, snapshot.WriteOptions{
 		Private:     private,

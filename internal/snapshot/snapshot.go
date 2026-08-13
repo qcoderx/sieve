@@ -64,12 +64,21 @@ type Snapshot struct {
 	// replayed too and so the escalation decision can be re-scored.
 	StaticHTML string `json:"static_html,omitempty"`
 
+	// Tier is the escalation tier the original run settled on.
+	//
+	// It is not derivable from anything else in the snapshot -- the capture
+	// looks the same whether it was reached by rendering or by sweeping -- and
+	// without it a replayed artifact reports an empty tier, which is the one
+	// field a reader consults to know how hard the page was to read. Optional,
+	// so snapshots written before this still load.
+	Tier string `json:"tier,omitempty"`
+
 	Notes []string `json:"notes,omitempty"`
 
 	// Redacted records that content was removed before writing. A snapshot from
 	// an authenticated session must never be attachable to a public bug report
 	// with the session's contents intact.
-	Redacted bool   `json:"redacted,omitempty"`
+	Redacted        bool   `json:"redacted,omitempty"`
 	RedactionReason string `json:"redaction_reason,omitempty"`
 }
 
@@ -192,6 +201,9 @@ func Replay(s *Snapshot, in graph.Input) (*graph.Graph, error) {
 	}
 	if in.Provenance.Libraries == nil {
 		in.Provenance.Libraries = s.Libraries
+	}
+	if in.Provenance.Tier == "" {
+		in.Provenance.Tier = s.Tier
 	}
 	return graph.Build(in)
 }

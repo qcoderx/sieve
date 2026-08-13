@@ -1,0 +1,97 @@
+<!doctype html>
+<meta charset="utf-8">
+<title>Restless</title>
+<!--
+  A page that never holds still, and reveals its content down the document.
+
+  The animation runs forever and touches layout, so every request for "tell me
+  when you have stopped moving" times out rather than being answered. That is
+  the whole point: sieve waits for stillness before each capture, and on this
+  page the wait can only ever end in a timeout. Given a fixed wait per stop, a
+  handful of stops consumes the entire sweep and the lower sections are never
+  reached.
+
+  Each section carries a distinct sentence so the test can say which parts of
+  the document the sweep actually arrived at, rather than counting characters.
+-->
+<style>
+  @keyframes drift { from { transform: translateX(0); } to { transform: translateX(14px); } }
+  body { margin: 0; font: 16px/1.5 system-ui, sans-serif; }
+  /* Permanent, layout-affecting, and applied to a always-visible element. */
+  .restless { animation: drift 90ms linear infinite alternate; height: 40px; background: #eee; }
+  .restless span { display: inline-block; animation: drift 70ms linear infinite alternate; }
+  section { min-height: 900px; padding: 24px; }
+  /* Revealed on scroll, the ordinary way: hidden until observed. */
+  .veil { opacity: 0; transition: opacity 120ms linear; }
+  .veil.shown { opacity: 1; }
+</style>
+
+<div class="restless" id="band"></div>
+
+<section><p class="veil shown">Section 1 states that the kilns were fired in 1923.</p></section>
+<section><p class="veil">Section 2 states that the glaze recipe uses feldspar.</p></section>
+<section><p class="veil">Section 3 states that the workshop moved to Bergen.</p></section>
+<section><p class="veil">Section 4 states that the thrown by hand.</p></section>
+<section><p class="veil">Section 5 states that the studio closes each August.</p></section>
+<section><p class="veil">Section 6 states that the orders take eleven weeks.</p></section>
+<section><p class="veil">Filler section 7, carrying ordinary prose so the document is long.</p></section>
+<section><p class="veil">Filler section 8, carrying ordinary prose so the document is long.</p></section>
+<section><p class="veil">Filler section 9, carrying ordinary prose so the document is long.</p></section>
+<section><p class="veil">Filler section 10, carrying ordinary prose so the document is long.</p></section>
+<section><p class="veil">Filler section 11, carrying ordinary prose so the document is long.</p></section>
+<section><p class="veil">Filler section 12, carrying ordinary prose so the document is long.</p></section>
+<section><p class="veil">Filler section 13, carrying ordinary prose so the document is long.</p></section>
+<section><p class="veil">Filler section 14, carrying ordinary prose so the document is long.</p></section>
+<section><p class="veil">Filler section 15, carrying ordinary prose so the document is long.</p></section>
+<section><p class="veil">Filler section 16, carrying ordinary prose so the document is long.</p></section>
+<section><p class="veil">Filler section 17, carrying ordinary prose so the document is long.</p></section>
+<section><p class="veil">Filler section 18, carrying ordinary prose so the document is long.</p></section>
+<section><p class="veil">Filler section 19, carrying ordinary prose so the document is long.</p></section>
+<section><p class="veil">Filler section 20, carrying ordinary prose so the document is long.</p></section>
+<section><p class="veil">Filler section 21, carrying ordinary prose so the document is long.</p></section>
+<section><p class="veil">Filler section 22, carrying ordinary prose so the document is long.</p></section>
+<section><p class="veil">Filler section 23, carrying ordinary prose so the document is long.</p></section>
+<section><p class="veil">Filler section 24, carrying ordinary prose so the document is long.</p></section>
+<section><p class="veil">Filler section 25, carrying ordinary prose so the document is long.</p></section>
+<section><p class="veil">Filler section 26, carrying ordinary prose so the document is long.</p></section>
+<section><p class="veil">Filler section 27, carrying ordinary prose so the document is long.</p></section>
+<section><p class="veil">Filler section 28, carrying ordinary prose so the document is long.</p></section>
+<section><p class="veil">Filler section 29, carrying ordinary prose so the document is long.</p></section>
+<section><p class="veil">Filler section 30, carrying ordinary prose so the document is long.</p></section>
+<section><p class="veil">Filler section 31, carrying ordinary prose so the document is long.</p></section>
+<section><p class="veil">Filler section 32, carrying ordinary prose so the document is long.</p></section>
+<section><p class="veil">Filler section 33, carrying ordinary prose so the document is long.</p></section>
+<section><p class="veil">Filler section 34, carrying ordinary prose so the document is long.</p></section>
+<section><p class="veil">Filler section 35, carrying ordinary prose so the document is long.</p></section>
+<section><p class="veil">Filler section 36, carrying ordinary prose so the document is long.</p></section>
+<section><p class="veil">Filler section 37, carrying ordinary prose so the document is long.</p></section>
+<section><p class="veil">Filler section 38, carrying ordinary prose so the document is long.</p></section>
+<section><p class="veil">Filler section 39, carrying ordinary prose so the document is long.</p></section>
+<section><p class="veil">Filler section 40, carrying ordinary prose so the document is long.</p></section>
+
+<script>
+  // A band of independently animating spans, rebuilt every frame.
+  //
+  // Stillness here is not merely slow to arrive, it is unreachable: there is a
+  // layout-affecting mutation on every single frame, for the life of the page.
+  // A settle that waits for N consecutive quiet frames can only ever time out.
+  var band = document.getElementById("band");
+  for (var i = 0; i < 40; i++) {
+    var sp = document.createElement("span");
+    sp.textContent = "·";
+    sp.style.animationDelay = (i * 7) + "ms";
+    band.appendChild(sp);
+  }
+  (function churn() {
+    band.style.paddingLeft = (Date.now() % 7) + "px";
+    requestAnimationFrame(churn);
+  })();
+
+  // Reveal each veiled paragraph as it scrolls into view.
+  var io = new IntersectionObserver(function (entries) {
+    entries.forEach(function (e) {
+      if (e.isIntersecting) e.target.classList.add("shown");
+    });
+  }, { threshold: 0.1 });
+  document.querySelectorAll(".veil").forEach(function (el) { io.observe(el); });
+</script>
