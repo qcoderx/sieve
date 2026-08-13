@@ -17,14 +17,18 @@ import (
 // returns instead: title, summary, the list of sections with their sizes, and
 // counts. A few hundred tokens, from which the agent chooses what to fetch.
 type Manifest struct {
-	SchemaVersion string    `json:"schema_version"`
-	URL           string    `json:"url"`
-	FinalURL      string    `json:"final_url,omitempty"`
-	Title         string    `json:"title"`
-	Summary       string    `json:"summary"`
-	Lang          string    `json:"lang,omitempty"`
-	ContentHash   string    `json:"content_hash"`
-	DistilledAt   time.Time `json:"distilled_at"`
+	SchemaVersion string `json:"schema_version"`
+	// Outcome comes second, immediately after the version and before the
+	// content, because it is the field that decides whether the rest of this
+	// manifest describes the page that was asked for.
+	Outcome     graph.Outcome `json:"outcome"`
+	URL         string        `json:"url"`
+	FinalURL    string        `json:"final_url,omitempty"`
+	Title       string        `json:"title"`
+	Summary     string        `json:"summary"`
+	Lang        string        `json:"lang,omitempty"`
+	ContentHash string        `json:"content_hash"`
+	DistilledAt time.Time     `json:"distilled_at"`
 
 	Sections []ManifestSection `json:"sections"`
 
@@ -85,6 +89,7 @@ const manifestGuidance = "This is a manifest, not the page content. " +
 func BuildManifest(g *graph.Graph) Manifest {
 	m := Manifest{
 		SchemaVersion: g.SchemaVersion,
+		Outcome:       g.Outcome,
 		URL:           g.URL,
 		FinalURL:      g.FinalURL,
 		Title:         g.Title,

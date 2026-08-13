@@ -432,6 +432,12 @@ type Provenance struct {
 	TierReason string `json:"tier_reason,omitempty"`
 	// TierScore is the escalation score itself.
 	TierScore float64 `json:"tier_score,omitempty"`
+	// TierFellBack reports that a higher tier was chosen and did not deliver,
+	// so the artifact rests on a cheaper one than the escalator asked for. It
+	// is the difference between "this page only needed a fetch" and "this page
+	// needed a browser and did not get a usable one", which read identically in
+	// the tier field alone.
+	TierFellBack bool `json:"tier_fell_back,omitempty"`
 	// TierPinned reports that the tier came from a per-domain memory rather
 	// than from a fresh judgement. Once a domain escalates it stays escalated,
 	// so a page near the threshold does not oscillate between runs.
@@ -478,6 +484,16 @@ type Graph struct {
 	// an unchanged site is genuinely a no-op.
 	ContentHash string `json:"content_hash"`
 	Generator   string `json:"generator"`
+
+	// Outcome is the first thing a caller should read: whether this artifact
+	// describes the page that was asked for, or something that stood in front
+	// of it. Placed above the content for the same reason.
+	Outcome Outcome `json:"outcome"`
+	// outcomeIn is what the outcome was decided from, kept so Recount can decide
+	// again when late blocks change the count it depends on. Unexported: it is
+	// an input to this graph, not part of the artifact.
+	outcomeIn    OutcomeInput
+	outcomeKnown bool
 
 	Title       string `json:"title"`
 	Description string `json:"description,omitempty"`

@@ -119,6 +119,7 @@ func Markdown(g *graph.Graph, opt MarkdownOptions) string {
 		b.WriteString(SafetyNotice)
 		b.WriteString("\n\n")
 	}
+	writeOutcome(&b, g)
 
 	if g.Title != "" {
 		b.WriteString("# ")
@@ -234,6 +235,13 @@ func writeFrontMatter(b *strings.Builder, g *graph.Graph) {
 	fmt.Fprintf(b, "distilled_at: %s\n", g.DistilledAt.Format("2006-01-02T15:04:05Z"))
 	fmt.Fprintf(b, "content_hash: %s\n", g.ContentHash)
 	fmt.Fprintf(b, "generator: %s\n", yamlString(g.Generator))
+	// Ahead of the tier, because a reader scanning the front matter needs to
+	// know whether this describes the page at all before anything about how it
+	// was read.
+	fmt.Fprintf(b, "outcome: %s\n", yamlString(string(g.Outcome.Status)))
+	if g.Outcome.HTTPStatus > 0 {
+		fmt.Fprintf(b, "http_status: %d\n", g.Outcome.HTTPStatus)
+	}
 	fmt.Fprintf(b, "tier: %s\n", yamlString(g.Provenance.Tier))
 	fmt.Fprintf(b, "order_confidence: %s\n", g.Audit.OrderConfidence)
 	fmt.Fprintf(b, "graph_retention: %.3f\n", g.Audit.GraphRetention)
@@ -711,4 +719,43 @@ func estimateSize(g *graph.Graph) int {
 		n += len(b.Text) + 16
 	}
 	return n
+}
+
+// writeOutcome states, above the content, that the content is not the page.
+//
+// The front matter already carries the status, but the front matter is the part
+// a reader skips. An artifact describing a bot challenge or a login wall looks
+// exactly like a thin page once you are past it -- a title, a heading, a
+// sentence or two -- and the whole failure this guards against is a reader
+// concluding the site is empty, or filling the silence in.
+//
+// Nothing is printed for a page that read normally. A banner on every artifact
+// is a banner nobody reads.
+func writeOutcome(b *strings.Builder, g *graph.Graph) {
+	if g.Outcome.Status == graph.StatusOK {
+		return
+	}
+	head := map[graph.Status]string{
+		graph.StatusBlocked:          "This is not the page. The site refused the request.",
+		graph.StatusChallenge:        "This is not the page. A challenge screen answered instead.",
+		graph.StatusAuthRequired:     "This is not the page. It is behind a login.",
+		graph.StatusSPAShell:         "This is not the page. The server sent an empty shell that never filled in.",
+		graph.StatusEmptyAfterRender: "This page rendered and carries no readable text.",
+		graph.StatusPartial:          "This is part of the page. Some of it could not be read.",
+	}[g.Outcome.Status]
+	if head == "" {
+		return
+	}
+
+	fmt.Fprintf(b, "> **%s** (`%s`)\n", head, g.Outcome.Status)
+	// The status code is not printed separately: it is already the first piece
+	// of evidence whenever it is the reason, and repeating it reads like two
+	// findings where there is one.
+	for _, e := range g.Outcome.Evidence {
+		fmt.Fprintf(b, ">\n> - %s\n", e)
+	}
+	if g.Outcome.BodyExcerpt != "" {
+		fmt.Fprintf(b, ">\n> What the server said: %s\n", escapeMD(g.Outcome.BodyExcerpt))
+	}
+	b.WriteString("\n")
 }

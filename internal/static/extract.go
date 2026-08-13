@@ -959,3 +959,24 @@ func firstNonEmpty(ss ...string) string {
 func normalizeSpace(s string) string {
 	return strings.Join(strings.Fields(s), " ")
 }
+
+// IsShell reports that the served document is an application shell: markup with
+// a mount point and no content in it.
+//
+// This is the condition behind the most deceptive failure in the category. A
+// React or Next.js page that has not hydrated answers with a valid 200 and
+// valid HTML carrying no text, so nothing in the response says the read failed,
+// and an agent handed it either reports the site as empty or invents something.
+// Naming the condition here keeps the threshold beside the signals it reads
+// rather than copied into every caller that wants to ask.
+//
+// A hydration payload is corroborating rather than sufficient: plenty of
+// server-rendered pages ship one alongside their content, so it only counts
+// when the text is missing too.
+func (s Signals) IsShell() bool {
+	const shellChars = 100 // MinStaticChars/4, the escalator's "this is a shell" line
+	if s.TextChars >= shellChars {
+		return false
+	}
+	return s.HydrationBlob || s.ScriptBytes > 0 || s.CanvasElements > 0
+}

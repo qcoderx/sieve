@@ -47,6 +47,11 @@ type Input struct {
 	Generator string
 	// Provenance carries the render-level facts through unchanged.
 	Provenance Provenance
+	// Outcome describes what happened when the page was read: whether it was
+	// refused, challenged, unhydrated, empty or fine. Every path that builds a
+	// graph fills it in, because the one thing a caller must never have to
+	// infer is whether reading worked.
+	Outcome OutcomeInput
 }
 
 // Build turns a capture into a content graph.
@@ -213,6 +218,17 @@ func Build(in Input) (*Graph, error) {
 	// cache; so would a rewritten asset URL or a whitespace change.
 	g.ContentHash = semanticHash(g)
 	g.Recount()
+
+	// Decided last, because it needs the block count that survived pruning.
+	//
+	// Deliberately not part of the content hash: the same page read twice, once
+	// normally and once through a rate limit, is not the same content, but the
+	// hash answers "is this the same page" for a cache and the outcome answers
+	// "did reading it work" for a caller. Folding one into the other would make
+	// every transient refusal look like a changed page.
+	// Retained so Recount can decide again after late blocks arrive; see below.
+	g.outcomeIn, g.outcomeKnown = in.Outcome, true
+	g.Outcome = DecideOutcome(in.Outcome, g.Stats.ContentNodes)
 	return g, nil
 }
 
@@ -240,6 +256,22 @@ func (g *Graph) Recount() {
 		}
 	}
 	g.Stats.ArtifactTokens = tokens.Estimate(payloadText(g))
+
+	// The outcome is derived from the block list too, so it belongs here.
+	//
+	// Deciding it once inside Build read the count before the late blocks
+	// existed, and igloo.inc -- whose entire site arrives from the scene walk
+	// after Build returns -- was labelled spa_shell with the evidence "rendering
+	// it produced no text" while carrying twenty-nine paragraphs of that page.
+	// That is the exact failure this status was added to prevent, produced by
+	// the status itself.
+	//
+	// Only when this graph was built in this process. A graph loaded back from
+	// disk has no OutcomeInput, and re-deciding from an empty one would quietly
+	// turn a recorded refusal into an ok.
+	if g.outcomeKnown {
+		g.Outcome = DecideOutcome(g.outcomeIn, g.Stats.ContentNodes)
+	}
 }
 
 // collapseAdjacentRepeats removes a sequence of runs that repeats the sequence
@@ -673,10 +705,46 @@ func makeGaps(m *capture.Merged, latent []LatentBlock) []Gap {
 	return out
 }
 
-func blockID(i int) string   { return fmt.Sprintf("b_%03d", i) }
-func actionID(i int) string  { return fmt.Sprintf("a_%03d", i) }
-func mediaID(i int) string   { return fmt.Sprintf("m_%03d", i) }
-func sectionID(i int) string { return fmt.Sprintf("s_%02d", i) }
+func blockID(i int) string  { return fmt.Sprintf("b_%03d", i) }
+func actionID(i int) string { return fmt.Sprintf("a_%03d", i) }
+func mediaID(i int) string  { return fmt.Sprintf("m_%03d", i) }
+
+// sectionID names a section after its heading rather than its position.
+//
+// A positional id is only stable while nothing above it moves, and something
+// above it moves whenever the page does. Two distillations of pear.no minutes
+// apart produced the same twenty-one sections with seventeen of the ids
+// pointing at different content: s_01 was "Ch. 1" in one and "Search engine
+// optimization" in the other. These ids are handed to agents over MCP and used
+// to fetch content by name, so an agent that reads a manifest, does something
+// else, and comes back for s_01 is silently given a different part of the page.
+//
+// Deriving the id from the heading text makes it survive anything that does not
+// change the heading -- content added above, a section removed, a sweep that
+// reaches further this time. Sections that share a heading are distinguished by
+// their order among the duplicates, which is the most stability available when
+// the page itself offers no other way to tell them apart.
+//
+// Truncated sha256 rather than a slug: headings run to arbitrary length and
+// arbitrary scripts, and an id is an identifier rather than a description. The
+// title travels beside it in the manifest for anything a human needs to read.
+func sectionID(title string, dup int) string {
+	norm := strings.ToLower(strings.Join(strings.Fields(title), " "))
+	if norm == "" {
+		// The lead section before any heading. There is at most one, and it has
+		// no text of its own to name it after.
+		if dup == 0 {
+			return "s_intro"
+		}
+		return fmt.Sprintf("s_intro-%d", dup+1)
+	}
+	sum := sha256.Sum256([]byte(norm))
+	id := "s_" + hex.EncodeToString(sum[:5])
+	if dup > 0 {
+		id += fmt.Sprintf("-%d", dup+1)
+	}
+	return id
+}
 
 // makeSections cuts the document at headings.
 //
@@ -687,9 +755,16 @@ func makeSections(blocks []Block) []Section {
 	var secs []Section
 	cur := -1
 
+	// How many sections have already claimed each heading, so repeats are told
+	// apart by their order among themselves rather than by absolute position.
+	seenTitle := map[string]int{}
+
 	open := func(title string, level int, first string) {
+		key := strings.ToLower(strings.Join(strings.Fields(title), " "))
+		id := sectionID(title, seenTitle[key])
+		seenTitle[key]++
 		secs = append(secs, Section{
-			ID: sectionID(len(secs)), Title: title, Level: level,
+			ID: id, Title: title, Level: level,
 			FirstBlock: first, LastBlock: first,
 		})
 		cur = len(secs) - 1

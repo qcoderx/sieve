@@ -546,6 +546,7 @@ func (d *Distiller) Distill(ctx context.Context, rawURL string) (*Result, error)
 		d.logf("browser unavailable (%v); falling back to tier 0", err)
 		prov.Tier = string(escalate.TierFetch)
 		prov.TierReason = fmt.Sprintf("escalation to %q was chosen but no browser was available: %v", decision.Tier, err)
+		prov.TierFellBack = true
 		g, gerr := d.buildGraph(rawURL, resp, staticRes.Merged, staticRes, prov,
 			[]string{"a browser was required for this page but none was available; this artifact was built from the served HTML alone"},
 			false, "")
@@ -588,7 +589,22 @@ func (d *Distiller) Distill(ctx context.Context, rawURL string) (*Result, error)
 			//
 			// A refusal still ends the run: that is a decision rather than a
 			// failure, and the browser must not be used to go around it.
-			if errors.Is(err, safety.ErrBlocked) || fetchFailure != "" {
+			// A status code is an answer, not a failure to answer.
+			//
+			// httpbin.org/status/401 sets fetchFailure -- the server sent no HTML
+			// with it -- and the browser then fails too, with
+			// ERR_INVALID_AUTH_CREDENTIALS. Both conditions being true returned
+			// the run as an error, so the caller learned nothing except that
+			// something went wrong, when what had actually happened was
+			// completely determined and worth saying: the page is behind a login.
+			// A 403 escaped this only because it trips the refusal detector
+			// earlier and never sets fetchFailure, which made the handling of two
+			// almost identical cases completely different.
+			//
+			// So a known error status produces an artifact describing it. A
+			// robots refusal still ends the run: that is a decision not to read
+			// the page, and the browser must not be used to go around it.
+			if errors.Is(err, safety.ErrBlocked) || (fetchFailure != "" && resp.Status < 400) {
 				return nil, err
 			}
 			d.logf("the browser could not load this page (%v); falling back to the served HTML", err)
@@ -596,6 +612,7 @@ func (d *Distiller) Distill(ctx context.Context, rawURL string) (*Result, error)
 			bprov.Tier = string(escalate.TierFetch)
 			bprov.TierReason = fmt.Sprintf("escalated to %q, but the browser could not load the page "+
 				"(%v), so the served HTML was used instead", decision.Tier, err)
+			bprov.TierFellBack = true
 			bg, berr := d.buildGraph(rawURL, resp, staticRes.Merged, staticRes, bprov,
 				append(notesFor(robotsNote),
 					"the browser was unable to load this page ("+err.Error()+"); this artifact was "+
@@ -759,6 +776,7 @@ func (d *Distiller) Distill(ctx context.Context, rawURL string) (*Result, error)
 		fprov.Tier = string(escalate.TierFetch)
 		fprov.TierReason = fmt.Sprintf("escalated to %q, but the render produced no content at all "+
 			"within its budget, so the served HTML was used instead", decision.Tier)
+		fprov.TierFellBack = true
 		if fg, ferr := d.buildGraph(rawURL, resp, staticRes.Merged, staticRes, fprov,
 			append(notes, "the browser was given this page and returned nothing readable inside its "+
 				"time budget; this artifact was built from the served HTML instead"),
@@ -779,6 +797,7 @@ func (d *Distiller) Distill(ctx context.Context, rawURL string) (*Result, error)
 		sprov.TierReason = fmt.Sprintf("escalated to %q, but the browser could not drive this page: "+
 			"the rendered capture yielded less readable text than the served HTML, so the tier-0 "+
 			"extraction was used instead", decision.Tier)
+		sprov.TierFellBack = true
 		sg, serr := d.buildGraph(rawURL, resp, staticRes.Merged, staticRes, sprov,
 			append(notes, "this page was rendered in a browser, but scrolling it revealed almost nothing: "+
 				"most of its text stayed at zero opacity. The artifact below was built from the served HTML "+
@@ -833,6 +852,29 @@ func (d *Distiller) buildGraph(rawURL string, resp *fetch.Response, merged *capt
 	staticRes *static.Result, prov graph.Provenance, notes []string, reachedBottom bool,
 	entryGate string) (*graph.Graph, error) {
 
+	// Every return path in Distill funnels through here, which is why the
+	// outcome is assembled here rather than at each of them. Deciding it at the
+	// call sites is how the fetch path came to report a 403 as an empty page:
+	// the render path marked HTTP errors and the tier-0 path returned before
+	// reaching that code, so the same condition was labelled in one place and
+	// silently dropped in the other.
+	out := graph.OutcomeInput{
+		HTTPStatus:     resp.Status,
+		Blocked:        prov.Blocked,
+		BlockedReason:  prov.BlockedReason,
+		EntryGate:      entryGate,
+		Rendered:       prov.Tier != string(escalate.TierFetch),
+		ShellHTML:      staticRes.Signals.IsShell(),
+		SweepTruncated: !reachedBottom,
+		TierFellBack:   prov.TierFellBack,
+		TierReason:     prov.TierReason,
+	}
+	// The body is only carried on an error, where it is the one place a proxy
+	// or policy filter explains itself.
+	if resp.Status >= 400 {
+		out.Body = string(resp.Body)
+	}
+
 	return graph.Build(graph.Input{
 		RequestedURL:  rawURL,
 		FinalURL:      resp.FinalURL,
@@ -845,6 +887,7 @@ func (d *Distiller) buildGraph(rawURL string, resp *fetch.Response, merged *capt
 		Now:           d.opts.Now,
 		Generator:     d.opts.Generator,
 		Provenance:    prov,
+		Outcome:       out,
 	})
 }
 
