@@ -151,9 +151,15 @@ func runDistill(args []string, stdout, stderr io.Writer) int {
 	//
 	// Tier 0 runs before the page is loaded, so its budget belongs in the total
 	// alongside the others rather than inside one of them.
-	ctx, cancel := withTimeout(
-		fetchAllowance(common.loadTimeout) + common.loadTimeout + common.timeout + teardownReserve)
+	budget := fetchAllowance(common.loadTimeout) + common.loadTimeout + common.timeout + teardownReserve
+	ctx, cancel := withTimeout(budget)
 	defer cancel()
+
+	// The deadline above bounds the work that consults it. The watchdog bounds
+	// the command.
+	dog, disarm := startWatchdog(stderr, budget, target)
+	defer disarm()
+	dog.set("fetch")
 
 	// One distiller, built once, closed once.
 	//
@@ -164,16 +170,23 @@ func runDistill(args []string, stdout, stderr io.Writer) int {
 	// only on the success path. Every error return -- an unreachable host, a
 	// refusal, a timeout -- leaked a Chromium. That is the hundred and sixty
 	// stray processes, and they were slow enough to look like extraction bugs.
-	if !quiet {
-		opts.OnProgress = func(p distill.Progress) {
+	// The watchdog is told the stage whether or not the user asked for progress:
+	// its whole value on a hang is naming where the process stopped.
+	opts.OnProgress = func(p distill.Progress) {
+		dog.set(p.Stage)
+		if !quiet {
 			fmt.Fprintf(stderr, "  [%6s] %-8s %s\n",
 				p.Elapsed.Round(time.Millisecond), p.Stage, p.Message)
 		}
 	}
 	d := distill.New(opts)
-	defer d.Close()
+	defer func() {
+		dog.set("closing the browser")
+		d.Close()
+	}()
 
 	res, err := d.Distill(ctx, target)
+	dog.set("writing the artifact")
 	if err != nil {
 		if isBlocked(err) {
 			fmt.Fprintf(stderr, "\nsieve: %v\n", err)

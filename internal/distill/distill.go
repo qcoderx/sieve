@@ -191,7 +191,19 @@ func (d *Distiller) Close() {
 	d.closed = true
 	d.mu.Unlock()
 
-	d.warming.Wait()
+	// A launch that never finishes must not hold the process open.
+	//
+	// Close runs after the run's context has expired, so nothing here is
+	// protected by it, and Wait on a WaitGroup has no deadline of its own. A
+	// half-started browser is still a process and the goroutine holding its
+	// handle is the only thing that can release it -- but waiting forever for
+	// that goroutine turns a leaked process into a hung command, which is
+	// worse. Wait for a bounded while, then proceed and let the operating
+	// system reap what is left.
+	if !waitTimeout(&d.warming, warmupDrainTimeout) {
+		d.logf("a speculative browser launch had not finished after %v; "+
+			"closing anyway and leaving it to be reaped", warmupDrainTimeout)
+	}
 
 	d.mu.Lock()
 	b := d.browser
@@ -562,7 +574,7 @@ func (d *Distiller) Distill(ctx context.Context, rawURL string) (*Result, error)
 	}
 
 	tr := time.Now()
-	res, serr, claimed := spec.claim(decision.Tier)
+	res, serr, claimed := spec.claim(ctx, decision.Tier)
 	if claimed {
 		d.logf("the speculative render answered; its navigation and page boot cost nothing")
 	} else {
@@ -963,7 +975,7 @@ func (d *Distiller) speculate(ctx context.Context, rawURL string, tier escalate.
 
 // claim takes the speculative render if it was started for the tier that was
 // actually chosen, and abandons it otherwise.
-func (s *speculation) claim(tier escalate.Tier) (*render.Result, error, bool) {
+func (s *speculation) claim(ctx context.Context, tier escalate.Tier) (*render.Result, error, bool) {
 	if s == nil {
 		return nil, nil, false
 	}
@@ -971,7 +983,25 @@ func (s *speculation) claim(tier escalate.Tier) (*render.Result, error, bool) {
 		s.cancel()
 		return nil, nil, false
 	}
-	<-s.done
+	// Bounded by the caller's context, not by hope.
+	//
+	// This was a bare receive on a channel closed by a goroutine running
+	// Sweep. Sweep takes a context and honours it everywhere it looks, but
+	// "everywhere it looks" is the whole assumption: a CDP call that never
+	// returns, or a browser that never finishes starting, leaves the goroutine
+	// alive, the channel open, and this line waiting for as long as the process
+	// is allowed to live. One pear.no run sat here for twenty minutes against a
+	// thirty-eight second deadline.
+	//
+	// Cancelling the speculation on the way out matters as much as returning:
+	// abandoning it without cancelling leaves a browser running for a render
+	// nobody will read.
+	select {
+	case <-s.done:
+	case <-ctx.Done():
+		s.cancel()
+		return nil, ctx.Err(), false
+	}
 	if s.err != nil {
 		// A speculative render that failed says nothing about whether an
 		// ordinary one would: it may simply have been cancelled. The caller
@@ -1315,4 +1345,22 @@ func appendRecoveries(g *graph.Graph, recs []canvas.Recovery) {
 	}
 	g.Recount()
 	g.Audit.CanvasesUnrecovered = unrecovered
+}
+
+// warmupDrainTimeout bounds how long Close waits for a speculative launch.
+const warmupDrainTimeout = 5 * time.Second
+
+// waitTimeout is sync.WaitGroup.Wait with a deadline. It reports whether the
+// group finished.
+func waitTimeout(wg *sync.WaitGroup, d time.Duration) bool {
+	done := make(chan struct{})
+	go func() { wg.Wait(); close(done) }()
+	t := time.NewTimer(d)
+	defer t.Stop()
+	select {
+	case <-done:
+		return true
+	case <-t.C:
+		return false
+	}
 }
