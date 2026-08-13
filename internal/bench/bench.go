@@ -161,8 +161,12 @@ type Report struct {
 
 // ConditionMetrics aggregates one side of the comparison.
 type ConditionMetrics struct {
-	Questions     int     `json:"questions"`
-	MeanAccuracy  float64 `json:"mean_accuracy"`
+	Questions int `json:"questions"`
+	// Answered is how many questions actually produced an answer. It differs
+	// from Questions whenever a call failed, and the accuracy below is the mean
+	// over these rather than over all of them.
+	Answered     int     `json:"answered"`
+	MeanAccuracy float64 `json:"mean_accuracy"`
 	MeanInputToks float64 `json:"mean_input_tokens"`
 	TotalInputToks int64  `json:"total_input_tokens"`
 	MeanLatencyMS float64 `json:"mean_latency_ms"`
@@ -194,8 +198,12 @@ type Stability struct {
 
 // Verdict states whether the run met the criteria for a release.
 type Verdict struct {
-	TokenReduction   float64 `json:"token_reduction"`
-	AccuracyGain     float64 `json:"accuracy_gain"`
+	TokenReduction float64 `json:"token_reduction"`
+	// AccuracyGain is the mean difference over questions answered under both
+	// conditions, not the difference of the two means. See judge.
+	AccuracyGain float64 `json:"accuracy_gain"`
+	// ComparedQuestions is how many questions that pairing covered.
+	ComparedQuestions int `json:"compared_questions"`
 	MetTokenTarget   bool    `json:"met_token_target"`
 	MetAccuracyTarget bool   `json:"met_accuracy_target"`
 	MetCoverageTarget bool   `json:"met_coverage_target"`
@@ -227,12 +235,18 @@ type Options struct {
 }
 
 // DefaultOptions returns usable settings.
+//
+// The model is left empty rather than pinned to the Anthropic default, because
+// naming it here would override whatever provider the user configured. It used
+// to be pinned, and the effect was that pointing sieve at another provider sent
+// that provider a model name it had never heard of: a request to Groq asking
+// for claude-opus-5, and a 404 that read like a broken build rather than a
+// misconfiguration. Resolution belongs in one place, and that place is the
+// client, which knows which provider it is talking to.
 func DefaultOptions() Options {
 	return Options{
-		Model: llm.DefaultModel,
-		// The grader is the same model by default. Using a weaker one would
+		// The grader defaults to the answering model. Using a weaker one would
 		// make the grade the weakest link in the measurement.
-		GraderModel: llm.DefaultModel,
 		Budget:      2_000_000,
 		Concurrency: 4,
 	}
@@ -256,23 +270,36 @@ func computeMetrics(answers []Answer, questions map[string]Question, cond Condit
 			continue
 		}
 		m.Questions++
-		accSum += a.Accuracy
-		latSum += float64(a.LatencyMS)
-		m.TotalInputToks += a.Usage.InputTokens + a.Usage.CacheReadTokens
 		if a.Refused {
 			m.Refusals++
 		}
 		if a.Error != "" {
 			m.Errors++
+			// A call that never completed is not a wrong answer.
+			//
+			// Counting it as one puts a zero in the numerator and a one in the
+			// denominator, so a condition that failed outright scores 0.000 --
+			// indistinguishable from a condition that answered every question
+			// incorrectly. That is the wrong way round for this benchmark in
+			// particular: the raw page is the control, it is the larger and
+			// more failure-prone request of the two, and its collapse would be
+			// reported as an accuracy gain for the artifact. A measurement that
+			// flatters the thing it measures whenever the control breaks is
+			// worse than no measurement.
+			continue
 		}
+		m.Answered++
+		accSum += a.Accuracy
+		latSum += float64(a.LatencyMS)
+		m.TotalInputToks += a.Usage.InputTokens + a.Usage.CacheReadTokens
 		q := questions[a.QuestionID]
 		bandSum[q.Band] += a.Accuracy
 		bandCount[q.Band]++
 	}
-	if m.Questions > 0 {
-		m.MeanAccuracy = round3(accSum / float64(m.Questions))
-		m.MeanLatencyMS = round1(latSum / float64(m.Questions))
-		m.MeanInputToks = round1(float64(m.TotalInputToks) / float64(m.Questions))
+	if m.Answered > 0 {
+		m.MeanAccuracy = round3(accSum / float64(m.Answered))
+		m.MeanLatencyMS = round1(latSum / float64(m.Answered))
+		m.MeanInputToks = round1(float64(m.TotalInputToks) / float64(m.Answered))
 	}
 	for b, sum := range bandSum {
 		m.ByBand[b] = round3(sum / float64(bandCount[b]))
@@ -285,10 +312,67 @@ func (r *Report) judge() {
 	v := Verdict{}
 	raw, art := r.Metrics.Raw, r.Metrics.Artifact
 
+	// A comparison needs both sides to have happened.
+	//
+	// If a condition answered nothing -- rate limited, context too large, the
+	// provider down -- there is no result to report, only a missing one. Left
+	// to the arithmetic below, a collapsed control reads as an accuracy of
+	// zero and hands the artifact a large apparent gain, which is the one
+	// direction this benchmark must never fail in. Say it could not be
+	// measured instead.
+	if raw.Answered == 0 || art.Answered == 0 {
+		side := "the raw page"
+		if art.Answered == 0 {
+			side = "the artifact"
+			if raw.Answered == 0 {
+				side = "neither condition"
+			}
+		}
+		v.Summary = fmt.Sprintf(
+			"could not be measured: %s produced no answers (%d error(s) of %d question(s)); "+
+				"no comparison is possible and none is reported",
+			side, raw.Errors+art.Errors, raw.Questions)
+		r.Verdict = v
+		return
+	}
+
 	if raw.MeanInputToks > 0 {
 		v.TokenReduction = round3(1 - art.MeanInputToks/raw.MeanInputToks)
 	}
-	v.AccuracyGain = round3(art.MeanAccuracy - raw.MeanAccuracy)
+
+	// The gain is measured over the questions both conditions answered.
+	//
+	// Comparing the two headline means directly is only valid when both sides
+	// answered the same questions, and they do not have to: a call can fail on
+	// one side and succeed on the other, and the raw side fails more often
+	// because its request is the larger one. On the fixture the raw condition
+	// answered ten of twenty and the artifact all twenty, so the two means
+	// described different question sets and their difference described nothing.
+	//
+	// Pairing them is the whole of the fix. Where every question succeeded on
+	// both sides this is identical to subtracting the means.
+	rawByID := map[string]float64{}
+	for _, a := range r.Answers {
+		if a.Condition == ConditionRaw && a.Error == "" {
+			rawByID[a.QuestionID] = a.Accuracy
+		}
+	}
+	var pairRaw, pairArt float64
+	for _, a := range r.Answers {
+		if a.Condition != ConditionArtifact || a.Error != "" {
+			continue
+		}
+		ra, ok := rawByID[a.QuestionID]
+		if !ok {
+			continue
+		}
+		v.ComparedQuestions++
+		pairRaw += ra
+		pairArt += a.Accuracy
+	}
+	if v.ComparedQuestions > 0 {
+		v.AccuracyGain = round3((pairArt - pairRaw) / float64(v.ComparedQuestions))
+	}
 
 	v.MetTokenTarget = v.TokenReduction >= TargetTokenReduction
 	v.MetAccuracyTarget = v.AccuracyGain >= TargetAccuracyGain
@@ -318,6 +402,16 @@ func (r *Report) judge() {
 			v.TokenReduction*100, v.AccuracyGain*100, r.Coverage, r.Fidelity)
 	} else {
 		v.Summary = "did not pass: " + strings.Join(missed, "; ")
+	}
+	// Partial data is still worth reporting, but never silently: a run where
+	// some calls failed is a weaker claim than one where none did, and the
+	// reader has to be told which they are holding.
+	if n := raw.Errors + art.Errors; n > 0 {
+		v.Summary += fmt.Sprintf(
+			" — measured over the questions that completed; %d call(s) failed "+
+				"(raw %d of %d, artifact %d of %d) and were excluded rather than "+
+				"counted as wrong answers",
+			n, raw.Errors, raw.Questions, art.Errors, art.Questions)
 	}
 	r.Verdict = v
 }

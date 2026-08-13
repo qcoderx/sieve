@@ -1,0 +1,197 @@
+# Question set for the Prometheus "Overview" documentation page.
+#
+# Ground truth was written from the served HTML, read independently of sieve.
+# That distinction is the whole point: a question set derived from sieve's own
+# artifact would grade the extraction against itself and could never fail, so
+# it would measure nothing. Every fact below can be checked by fetching the page
+# and reading it.
+#
+#   sieve distill https://prometheus.io/docs/introduction/overview/ -out ./artifacts
+#   sieve bench ./artifacts/prometheus.io-docs-introduction-overview \
+#     --questions testdata/questions/prometheus.yaml
+
+name: Prometheus — Overview
+url: https://prometheus.io/docs/introduction/overview/
+
+questions:
+  # --- Factual retrieval ----------------------------------------------------
+  - id: q01
+    band: factual
+    ask: What is Prometheus, in one sentence?
+    expect: An open-source systems monitoring and alerting toolkit.
+    facts:
+      - open-source
+      - systems monitoring
+      - alerting toolkit
+
+  - id: q02
+    band: factual
+    ask: Where was Prometheus originally built, and in what year did it start?
+    expect: Originally built at SoundCloud, with its inception in 2012.
+    facts:
+      - built at SoundCloud
+      - inception in 2012
+
+  - id: q03
+    band: factual
+    ask: Which foundation did Prometheus join, and when?
+    expect: The Cloud Native Computing Foundation, in 2016.
+    facts:
+      - Cloud Native Computing Foundation
+      - in 2016
+
+  - id: q04
+    band: factual
+    ask: Prometheus was the second hosted project of that foundation — which was the first?
+    expect: Kubernetes.
+    facts:
+      - Kubernetes
+
+  - id: q05
+    band: factual
+    ask: How does Prometheus store its metrics?
+    expect: As time series data, with the timestamp at which each metric was
+      recorded, alongside optional key-value pairs called labels.
+    facts:
+      - time series data
+      - stored with the timestamp
+      - key-value pairs called labels
+
+  - id: q06
+    band: factual
+    ask: What is the query language called?
+    expect: PromQL.
+    facts:
+      - PromQL
+
+  - id: q07
+    band: factual
+    ask: How does Prometheus collect time series — push or pull?
+    expect: Collection happens via a pull model over HTTP; pushing is supported
+      via an intermediary gateway.
+    facts:
+      - pull model
+      - over HTTP
+      - pushing supported via an intermediary gateway
+
+  - id: q08
+    band: factual
+    ask: How are scrape targets discovered?
+    expect: Via service discovery or static configuration.
+    facts:
+      - service discovery
+      - static configuration
+
+  - id: q09
+    band: factual
+    ask: Does Prometheus rely on distributed storage?
+    expect: No — there is no reliance on distributed storage; single server nodes
+      are autonomous.
+    facts:
+      - no reliance on distributed storage
+      - single server nodes are autonomous
+
+  - id: q10
+    band: factual
+    ask: Name the components of the Prometheus ecosystem.
+    expect: The main Prometheus server, client libraries, a push gateway,
+      special-purpose exporters, an alertmanager, and various support tools.
+    facts:
+      - the main Prometheus server
+      - client libraries
+      - a push gateway
+      - exporters
+      - an alertmanager
+
+  - id: q11
+    band: factual
+    ask: What is the push gateway for?
+    expect: Supporting short-lived jobs.
+    facts:
+      - short-lived jobs
+
+  - id: q12
+    band: factual
+    ask: What language are most Prometheus components written in, and why does
+      that matter?
+    expect: Go, which makes them easy to build and deploy as static binaries.
+    facts:
+      - written in Go
+      - static binaries
+
+  - id: q13
+    band: factual
+    ask: Give two examples of special-purpose exporters named on the page.
+    expect: HAProxy, StatsD and Graphite are named.
+    facts:
+      - HAProxy
+      - StatsD
+      - Graphite
+
+  - id: q14
+    band: factual
+    ask: What does the page say a metric is?
+    expect: Numerical measurements; a time series is the recording of changes
+      over time.
+    facts:
+      - numerical measurements
+      - recording of changes over time
+
+  # --- Structural -----------------------------------------------------------
+  - id: q15
+    band: structural
+    ask: What are the main sections of this page?
+    expect: What is Prometheus, Features, What are metrics, Components,
+      Architecture, and When does it fit (and when does it not fit).
+    facts:
+      - What is Prometheus
+      - Features
+      - Components
+      - Architecture
+
+  - id: q16
+    band: structural
+    ask: Is the list of Prometheus's main features presented as a list, and
+      roughly how many items does it have?
+    expect: Yes, a bulleted list of about seven features.
+    facts:
+      - a list
+      - about seven items
+
+  - id: q17
+    band: structural
+    ask: Does the page contain a diagram, and what does it show?
+    expect: Yes — a diagram illustrating the architecture of Prometheus and some
+      of its ecosystem components.
+    facts:
+      - a diagram
+      - illustrates the architecture
+
+  # --- Actionable -----------------------------------------------------------
+  - id: q18
+    band: actionable
+    ask: What kind of workload does Prometheus fit, and what is it explicitly
+      not suited to?
+    expect: It fits recording any purely numeric time series, both
+      machine-centric monitoring and dynamic service-oriented architectures. It
+      is not suited to cases needing one hundred per cent accuracy, such as
+      per-request billing.
+    facts:
+      - purely numeric time series
+      - machine-centric monitoring
+      - not suited where 100% accuracy is required
+
+  - id: q19
+    band: actionable
+    ask: If I want to get started, where on this page would I go next?
+    expect: The First steps or Getting started page in the documentation
+      navigation.
+    facts:
+      - first steps or getting started
+
+  - id: q20
+    band: actionable
+    ask: Where would I look for a comparison against other monitoring systems?
+    expect: The "Comparison to alternatives" page.
+    facts:
+      - comparison to alternatives

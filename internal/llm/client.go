@@ -1,11 +1,23 @@
-// Package llm wraps the Anthropic API for the two places sieve needs a model:
+// Package llm wraps a chat model for the two places sieve needs one:
 // captioning canvas regions that yielded nothing to the scene-graph parse, and
 // running the benchmark's question sets.
 //
-// It is deliberately thin. The value it adds over calling the SDK directly is
-// in the parts that are easy to get wrong and that both callers need: refusal
-// handling, a per-job spend ceiling, and usage accounting exact enough to put
-// in a benchmark table.
+// It is deliberately thin. The value it adds over calling a provider's SDK
+// directly is in the parts that are easy to get wrong and that both callers
+// need: refusal handling, a per-job spend ceiling, and usage accounting exact
+// enough to put in a benchmark table.
+//
+// # Two providers, one shape
+//
+// Anthropic is the default. Setting a base URL switches to the OpenAI chat
+// completions shape, which is what almost every other provider speaks --
+// Groq, OpenRouter, Together, vLLM, Ollama and the rest -- so a user can point
+// sieve at whichever model they already pay for, or at a local one.
+//
+// That matters beyond convenience. The benchmark sends a page's full HTML with
+// every question, which on the default model costs real money per site; being
+// able to run it against a free or self-hosted model is the difference between
+// a benchmark anyone can reproduce and one only its author ever runs.
 package llm
 
 import (
@@ -27,9 +39,12 @@ const DefaultModel = "claude-opus-5"
 // ErrNoCredentials is returned when no API key is configured. It explains what
 // to do rather than surfacing a 401 from three layers down.
 var ErrNoCredentials = errors.New(
-	"no Anthropic API key found\n" +
-		"  Set ANTHROPIC_API_KEY, or run `ant auth login` to store a profile.\n" +
-		"  Only the vision and benchmark paths need it; distillation does not.")
+	"no model credentials found\n" +
+		"  Anthropic: set ANTHROPIC_API_KEY, or run `ant auth login`.\n" +
+		"  Any other provider: set LLM_BASE_URL, LLM_API_KEY and LLM_MODEL.\n" +
+		"    Most providers expose an OpenAI-compatible endpoint, e.g.\n" +
+		"    LLM_BASE_URL=https://api.groq.com/openai/v1\n" +
+		"  Only the vision and benchmark paths need this; distillation does not.")
 
 // ErrBudgetExhausted is returned when a job's token ceiling is reached. Vision
 // is the most expensive step in the pipeline by an order of magnitude, so the
@@ -65,6 +80,11 @@ func (u Usage) Total() int64 {
 type Options struct {
 	APIKey string
 	Model  string
+	// BaseURL selects an OpenAI-compatible provider. Empty means Anthropic.
+	//
+	// Resolved from LLM_BASE_URL when unset, so a user can switch provider
+	// without every caller growing a flag.
+	BaseURL string
 	// MaxTokens bounds a single response.
 	MaxTokens int64
 	// Effort trades thoroughness against cost: low, medium, high, xhigh, max.
@@ -76,9 +96,11 @@ type Options struct {
 	Timeout time.Duration
 }
 
-// Client is a budgeted wrapper around the Messages API.
+// Client is a budgeted wrapper around one provider's chat endpoint.
 type Client struct {
-	api   anthropic.Client
+	api anthropic.Client
+	// oai is set instead of api when a base URL selected the OpenAI shape.
+	oai   *openAIClient
 	opts  Options
 	mu    sync.Mutex
 	usage Usage
@@ -88,14 +110,35 @@ type Client struct {
 // ANTHROPIC_API_KEY; when neither is set the SDK's own credential chain is left
 // to find a stored profile, and only a call will reveal whether it succeeded.
 func New(opts Options) (*Client, error) {
-	if opts.Model == "" {
-		opts.Model = DefaultModel
+	if opts.BaseURL == "" {
+		opts.BaseURL = strings.TrimSpace(os.Getenv("LLM_BASE_URL"))
 	}
 	if opts.MaxTokens <= 0 {
 		opts.MaxTokens = 2048
 	}
 	if opts.Timeout <= 0 {
 		opts.Timeout = 2 * time.Minute
+	}
+
+	// An OpenAI-compatible provider, when one was named.
+	if opts.BaseURL != "" {
+		key := opts.APIKey
+		if key == "" {
+			key = firstEnv("LLM_API_KEY", "OPENAI_API_KEY")
+		}
+		if opts.Model == "" {
+			opts.Model = strings.TrimSpace(os.Getenv("LLM_MODEL"))
+		}
+		if opts.Model == "" {
+			return nil, fmt.Errorf("a base URL was given (%s) but no model name; "+
+				"set LLM_MODEL or pass -model. There is no default because every "+
+				"provider names its models differently", opts.BaseURL)
+		}
+		return &Client{oai: newOpenAI(opts.BaseURL, key, opts.Timeout), opts: opts}, nil
+	}
+
+	if opts.Model == "" {
+		opts.Model = DefaultModel
 	}
 
 	var sdkOpts []option.RequestOption
@@ -111,13 +154,23 @@ func New(opts Options) (*Client, error) {
 	return &Client{api: anthropic.NewClient(sdkOpts...), opts: opts}, nil
 }
 
+// firstEnv returns the first of these environment variables that is set.
+func firstEnv(names ...string) string {
+	for _, n := range names {
+		if v := strings.TrimSpace(os.Getenv(n)); v != "" {
+			return v
+		}
+	}
+	return ""
+}
+
 // HasCredentials reports whether anything is configured to authenticate with.
 // It is a pre-flight check so a long distillation does not run to completion
 // and then fail on its last step.
 func HasCredentials(explicit string) bool {
 	return explicit != "" ||
-		os.Getenv("ANTHROPIC_API_KEY") != "" ||
-		os.Getenv("ANTHROPIC_AUTH_TOKEN") != ""
+		firstEnv("ANTHROPIC_API_KEY", "ANTHROPIC_AUTH_TOKEN",
+			"LLM_API_KEY", "OPENAI_API_KEY", "LLM_BASE_URL") != ""
 }
 
 // Usage reports the running total.
@@ -155,10 +208,19 @@ func (c *Client) Ask(ctx context.Context, system string, blocks []ContentBlock) 
 		return nil, err
 	}
 
+	if c.oai != nil {
+		out, err := c.oai.ask(ctx, c.opts.Model, c.opts.MaxTokens, system, blocks)
+		if err != nil {
+			return nil, err
+		}
+		c.record(out.Usage)
+		return out, nil
+	}
+
 	params := anthropic.MessageNewParams{
 		Model:     anthropic.Model(c.opts.Model),
 		MaxTokens: c.opts.MaxTokens,
-		Messages:  []anthropic.MessageParam{anthropic.NewUserMessage(blocks...)},
+		Messages:  []anthropic.MessageParam{anthropic.NewUserMessage(toAnthropic(blocks)...)},
 	}
 	if system != "" {
 		params.System = []anthropic.TextBlockParam{{Text: system}}
@@ -241,16 +303,42 @@ func translateErr(err error) error {
 	return err
 }
 
-// ContentBlock is a piece of a user turn. Re-exported so callers can build
-// mixed text-and-image requests without importing the SDK themselves.
-type ContentBlock = anthropic.ContentBlockParamUnion
+// ContentBlock is a piece of a user turn: either text or an image.
+//
+// It is deliberately this package's own type rather than a provider's. Callers
+// build a request once and it goes to whichever provider is configured; making
+// it an alias for one SDK's union would have put that SDK in the signature of
+// every caller and made a second provider impossible to add without changing
+// all of them.
+type ContentBlock struct {
+	Text string
+	// MediaType and B64 are set instead of Text for an image.
+	MediaType string
+	B64       string
+}
+
+// IsImage reports whether this block carries an image.
+func (b ContentBlock) IsImage() bool { return b.B64 != "" }
 
 // TextBlock is a convenience for building a user turn.
 func TextBlock(s string) ContentBlock {
-	return anthropic.NewTextBlock(s)
+	return ContentBlock{Text: s}
 }
 
 // ImageBlock builds an image content block from base64-encoded bytes.
 func ImageBlock(mediaType string, b64 string) ContentBlock {
-	return anthropic.NewImageBlockBase64(mediaType, b64)
+	return ContentBlock{MediaType: mediaType, B64: b64}
+}
+
+// toAnthropic converts neutral blocks into the Anthropic SDK's union type.
+func toAnthropic(blocks []ContentBlock) []anthropic.ContentBlockParamUnion {
+	out := make([]anthropic.ContentBlockParamUnion, 0, len(blocks))
+	for _, b := range blocks {
+		if b.IsImage() {
+			out = append(out, anthropic.NewImageBlockBase64(b.MediaType, b.B64))
+			continue
+		}
+		out = append(out, anthropic.NewTextBlock(b.Text))
+	}
+	return out
 }

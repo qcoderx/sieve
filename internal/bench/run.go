@@ -39,9 +39,11 @@ type Runner struct {
 
 // NewRunner builds a runner.
 func NewRunner(opts Options) (*Runner, error) {
-	if opts.Model == "" {
-		opts.Model = llm.DefaultModel
-	}
+	// The model name is left for the client to resolve, because only it knows
+	// which provider is configured and therefore which default could possibly
+	// be right. Filling in the Anthropic default here sent that name to
+	// whatever endpoint the user had pointed at -- a request to Groq for
+	// claude-opus-5, answered with a 404 that reads like a broken build.
 	if opts.GraderModel == "" {
 		opts.GraderModel = opts.Model
 	}
@@ -66,6 +68,12 @@ func NewRunner(opts Options) (*Runner, error) {
 	if err != nil {
 		return nil, err
 	}
+	// Report the model that was actually used, not the one that was asked for.
+	// Either may have been resolved from the environment, and a report naming
+	// something other than what answered the questions is worse than one
+	// naming nothing.
+	opts.Model = answer.Model()
+	opts.GraderModel = grader.Model()
 	return &Runner{opts: opts, answer: answer, grader: grader}, nil
 }
 
@@ -415,3 +423,7 @@ func findQuestion(set *Set, id string) Question {
 	}
 	return Question{ID: id}
 }
+
+// Model reports the model the runner resolved to, so a caller can name it
+// before the run rather than after.
+func (r *Runner) Model() string { return r.opts.Model }

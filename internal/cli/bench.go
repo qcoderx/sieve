@@ -116,7 +116,22 @@ Flags:
 		return fail(stderr, err)
 	}
 
-	ctx, cancel := withTimeout(common.timeout * 4)
+	// The benchmark's own deadline, not the page-reading one.
+	//
+	// This used to be four times -timeout, which is the budget for reading a
+	// single page: forty seconds by default, to cover forty model calls that
+	// each take a second or more and may be asked by the provider to wait out
+	// a rate limit. The run died of its own deadline and reported the survivors
+	// as if they were the whole measurement.
+	//
+	// A minute per question, floored at ten, is generous enough that only a
+	// genuinely stuck run hits it, and bounded enough that a stuck run still
+	// ends.
+	runBudget := time.Duration(len(set.Questions)) * time.Minute
+	if runBudget < 10*time.Minute {
+		runBudget = 10 * time.Minute
+	}
+	ctx, cancel := withTimeout(runBudget)
 	defer cancel()
 
 	fmt.Fprintf(stderr, "answering %d questions under both conditions with %s…\n",
@@ -190,6 +205,12 @@ func printReport(w io.Writer, r *bench.Report) {
 	fmt.Fprintf(w, "  model %s, grader %s, tier %s\n\n", r.Model, r.GraderModel, r.Tier)
 
 	fmt.Fprintf(w, "  %-14s %12s %12s\n", "", "raw page", "artifact")
+	// Answered comes before accuracy, because an accuracy computed over three
+	// of twenty questions is a different claim from one computed over twenty,
+	// and the reader should see which before reading the number.
+	fmt.Fprintf(w, "  %-14s %12s %12s\n", "answered",
+		fmt.Sprintf("%d/%d", r.Metrics.Raw.Answered, r.Metrics.Raw.Questions),
+		fmt.Sprintf("%d/%d", r.Metrics.Artifact.Answered, r.Metrics.Artifact.Questions))
 	fmt.Fprintf(w, "  %-14s %12.3f %12.3f\n", "accuracy",
 		r.Metrics.Raw.MeanAccuracy, r.Metrics.Artifact.MeanAccuracy)
 	fmt.Fprintf(w, "  %-14s %12.0f %12.0f\n", "input tokens",
@@ -221,7 +242,9 @@ func printReport(w io.Writer, r *bench.Report) {
 		fmt.Fprintf(w, "                %s\n", n)
 	}
 
-	fmt.Fprintf(w, "\n  token reduction %.1f%%   accuracy gain %+.1f points\n",
+	fmt.Fprintf(w, "\n  compared      %d question(s) answered under both conditions\n",
+		r.Verdict.ComparedQuestions)
+	fmt.Fprintf(w, "  token reduction %.1f%%   accuracy gain %+.1f points\n",
 		r.Verdict.TokenReduction*100, r.Verdict.AccuracyGain*100)
 	fmt.Fprintf(w, "\n  %s\n\n", r.Verdict.Summary)
 }
