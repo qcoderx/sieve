@@ -1,6 +1,12 @@
 package mcpserver
 
-import "encoding/json"
+import (
+	"context"
+	"encoding/json"
+	"time"
+
+	"github.com/modelcontextprotocol/go-sdk/mcp"
+)
 
 // The manifest schema is written by hand instead of being reflected.
 //
@@ -50,4 +56,45 @@ const manifestShape = "job_id, state, and on completion a manifest: outcome (rea
 
 func str(desc string) map[string]any {
 	return map[string]any{"type": "string", "description": desc}
+}
+
+// SurfaceTokens estimates what the tool definitions cost a session.
+//
+// Exported so the token report can print it beside the per-page figures: the
+// definition cost is paid once and the page cost is paid every time, and a
+// comparison that leaves one of them out is answerable with the other.
+func SurfaceTokens() int {
+	// Measured the way a client sees it, over a real session.
+	//
+	// The registered structs are not the whole story: AddTool infers each input
+	// schema and attaches it after registration, so marshalling what was handed
+	// in reports around a quarter less than a client is actually sent. Two
+	// numbers for one quantity is the thing this project keeps having to fix,
+	// so this pays for an in-memory round trip and reports what arrives.
+	s := New(Options{})
+	srv := s.MCPServer()
+
+	clientT, serverT := mcp.NewInMemoryTransports()
+	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
+	defer cancel()
+
+	done := make(chan struct{})
+	go func() { defer close(done); _ = srv.Run(ctx, serverT) }()
+
+	sess, err := mcp.NewClient(&mcp.Implementation{Name: "measure", Version: "1"}, nil).
+		Connect(ctx, clientT, nil)
+	if err != nil {
+		return 0
+	}
+	defer func() { _ = sess.Close(); <-done }()
+
+	list, err := sess.ListTools(ctx, nil)
+	if err != nil {
+		return 0
+	}
+	blob, err := json.Marshal(list.Tools)
+	if err != nil {
+		return 0
+	}
+	return (len(blob) + len(Instructions)) / 4
 }

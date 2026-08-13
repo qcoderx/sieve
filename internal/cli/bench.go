@@ -34,6 +34,7 @@ func runBench(args []string, stdout, stderr io.Writer) int {
 		regrade   int
 
 		coverageOnly bool
+		tokensOnly   bool
 	)
 	common.register(fs)
 	fs.StringVar(&questions, "questions", "", "path to a question set (YAML or JSON)")
@@ -51,6 +52,11 @@ func runBench(args []string, stdout, stderr io.Writer) int {
 	fs.IntVar(&regrade, "regrade", 0,
 		"re-grade this many answers to measure how far the grader agrees with\n"+
 			"itself. It is the error bar on every accuracy figure; 12 is useful.")
+	fs.BoolVar(&tokensOnly, "tokens", false,
+		"distill a URL and report what an agent receives for one page read,\n"+
+			"against an unaided fetch of the same page. No model is called and no\n"+
+			"credentials are needed, so anyone can reproduce it in the time it\n"+
+			"takes to read the claim.")
 	fs.BoolVar(&coverageOnly, "coverage-only", false,
 		"check which ground-truth facts are present in the artifact and stop.\n"+
 			"No model is called and no credentials are needed. This is how to\n"+
@@ -91,6 +97,9 @@ Flags:
 
 	if stability {
 		return runStability(target, common, out, stdout, stderr)
+	}
+	if tokensOnly {
+		return runTokens(target, common, out, stdout, stderr)
 	}
 
 	if questions == "" {
