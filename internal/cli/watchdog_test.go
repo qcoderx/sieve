@@ -5,6 +5,8 @@ import (
 	"strings"
 	"testing"
 	"time"
+
+	"github.com/qcoderx/sieve/internal/render"
 )
 
 // TestWatchdogDisarmsOnANormalRun: the common case is that it never fires, and
@@ -71,5 +73,43 @@ func TestWatchdogReportsWhereItStopped(t *testing.T) {
 	}
 	if !strings.Contains(out, "bug in sieve") {
 		t.Error("the report does not say whose fault this is; a user will blame the page")
+	}
+}
+
+// TestHangExitCodeIsNotTakenGuards a mistake this file already made.
+//
+// The watchdog first used exit code 3, which the distill command already
+// returns for a refusal by safety policy. In the corpus pass that caught it,
+// metmuseum.org declining with a robots.txt 429 and mercury.com hanging for
+// half an hour were reported to the caller with the identical code -- and those
+// two need opposite responses: one is the site's decision and must be honoured,
+// the other is a bug in sieve.
+func TestHangExitCodeIsNotTaken(t *testing.T) {
+	// The codes runDistill returns, by inspection of its returns.
+	const (
+		codeFailedRun       = 1
+		codeUsage           = 2
+		codeBlockedByPolicy = 3
+		codeUnreachableHost = 4
+	)
+	for _, taken := range []int{0, codeFailedRun, codeUsage, codeBlockedByPolicy, codeUnreachableHost} {
+		if exitHung == taken {
+			t.Errorf("the hang exit code %d already means something else; a caller "+
+				"cannot tell a hang from it", exitHung)
+		}
+	}
+}
+
+// TestKillBrowsersIsSafeWithNothingToKill: the watchdog calls this on a process
+// that may never have started a browser at all, and it must not be the thing
+// that fails while reporting a failure.
+func TestKillBrowsersIsSafeWithNothingToKill(t *testing.T) {
+	if n := render.KillBrowsers(); n != 0 {
+		t.Errorf("killed %d browsers in a process that launched none", n)
+	}
+	// Twice, because the watchdog is not the only caller and re-entry must be
+	// harmless.
+	if n := render.KillBrowsers(); n != 0 {
+		t.Errorf("second call killed %d", n)
 	}
 }

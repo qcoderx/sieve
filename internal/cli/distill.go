@@ -205,11 +205,13 @@ func runDistill(args []string, stdout, stderr io.Writer) int {
 	saveMemory(common.memoryPath, d.Memory())
 	saveRobots(rpath, opts.Robots)
 
+	dog.set("building the artifact")
 	art, err := emit.Build(res.Graph)
 	if err != nil {
 		return fail(stderr, err)
 	}
 	dir := artifactDir(out, target)
+	dog.set("writing the artifact to disk")
 	if err := art.Write(dir); err != nil {
 		return fail(stderr, err)
 	}
@@ -227,7 +229,9 @@ func runDistill(args []string, stdout, stderr io.Writer) int {
 	// rather than leaving it to the deferred Close after the summary is printed,
 	// takes that second off the wall clock the user is measuring.
 	tClose := time.Now()
+	dog.set("closing the browser")
 	d.Close()
+	dog.set("writing the summary")
 	if common.verbose {
 		fmt.Fprintf(stderr, "  browser released in %v\n", time.Since(tClose).Round(time.Millisecond))
 	}

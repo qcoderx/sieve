@@ -14,6 +14,7 @@ import (
 	"sort"
 	"strings"
 	"sync"
+	"time"
 
 	"github.com/chromedp/cdproto/browser"
 	"github.com/chromedp/chromedp"
@@ -147,6 +148,14 @@ func Launch(ctx context.Context, opts Options) (*Browser, error) {
 		fs.set("disable-dev-shm-usage", true)
 	}
 
+	// Track the browser process so it can be killed without its context.
+	//
+	// Every ordinary shutdown cancels the allocator and chromedp does the rest.
+	// The watchdog is the path where that cannot happen -- os.Exit runs no
+	// defers -- and a Chromium tree left behind keeps the caller's command open
+	// long after this process is gone.
+	fs.opts = append(fs.opts, chromedp.ModifyCmdFunc(trackBrowser))
+
 	allocCtx, allocCancel := chromedp.NewExecAllocator(ctx, fs.opts...)
 
 	ctxOpts := []chromedp.ContextOption{}
@@ -268,7 +277,25 @@ func (b *Browser) SetOptions(o Options) {
 	b.opts = o
 }
 
+// closeGrace is how long a browser is given to shut down politely.
+//
+// Chromium normally exits in well under a second. This is generous enough that
+// a merely busy machine is never cut short, and short enough that a caller is
+// not left waiting on a browser that has stopped answering.
+const closeGrace = 8 * time.Second
+
 // Close shuts the browser down. It is safe to call more than once.
+//
+// Cancelling the allocator asks chromedp to stop the browser and then waits for
+// the process to actually exit. That wait has no bound, and a Chromium that has
+// stopped responding never provides one: one corpus run reached this line after
+// a perfectly good extraction and did not return to its caller for another
+// fourteen minutes, with the artifact already written to disk.
+//
+// So the polite shutdown gets a deadline, and past it the process tree is
+// killed outright. Nothing is lost by doing so -- everything this browser was
+// for has already been read out of it -- and the alternative is a command that
+// never ends.
 func (b *Browser) Close() {
 	b.mu.Lock()
 	defer b.mu.Unlock()
@@ -276,8 +303,23 @@ func (b *Browser) Close() {
 		return
 	}
 	b.closed = true
-	b.baseCancel()
-	b.allocCancel()
+
+	done := make(chan struct{})
+	go func() {
+		defer close(done)
+		b.baseCancel()
+		b.allocCancel()
+	}()
+
+	t := time.NewTimer(closeGrace)
+	defer t.Stop()
+	select {
+	case <-done:
+	case <-t.C:
+		n := KillBrowsers()
+		b.opts.logf("the browser did not shut down within %v; killed %d process tree(s)",
+			closeGrace, n)
+	}
 }
 
 // hostResolverRules turns a host blocklist into Chromium's resolver rule

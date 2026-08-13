@@ -7,6 +7,8 @@ import (
 	"runtime"
 	"sync/atomic"
 	"time"
+
+	"github.com/qcoderx/sieve/internal/render"
 )
 
 // The watchdog is the promise that sieve always ends.
@@ -40,6 +42,11 @@ type watchdog struct {
 // second deadline and must never fire on a run that is merely finishing up.
 // It fires on one that has stopped.
 const watchdogGrace = 45 * time.Second
+
+// exitHung is the code a caller can test for. It is deliberately distinct from
+// a failed run (1), a usage error (2), a refusal by policy (3) and an
+// unreachable host (4): "sieve hung" needs a different response from all four.
+const exitHung = 5
 
 // exitFunc is os.Exit, replaced in tests so firing can be observed without
 // ending the test binary.
@@ -98,7 +105,18 @@ func (d *watchdog) fire(w io.Writer, limit time.Duration, what string) {
 		fmt.Fprintf(w, "  Re-run with SIEVE_WATCHDOG_STACKS=1 to include goroutine stacks.\n\n")
 	}
 
-	// Exit code 3: distinct from a failed run (1) and a usage error (2), so a
-	// caller can tell "the page could not be read" from "sieve hung".
-	exitFunc(3)
+	// Take the browser with us.
+	//
+	// os.Exit runs no deferred cleanup, so the Chromium tree this process
+	// launched outlives it -- and a caller waiting on our process group is
+	// still waiting. A sweep recorded a run that gave up at 83 seconds and did
+	// not return to its caller for 2,167, because exiting alone is not exiting.
+	if n := render.KillBrowsers(); n > 0 {
+		fmt.Fprintf(w, "  Killed %d browser process tree(s) on the way out.\n\n", n)
+	}
+
+	// Exit code 5, because 3 and 4 are taken -- 3 is a refusal by safety policy
+	// and 4 is an unreachable host. Using 3 here made a robots.txt refusal
+	// indistinguishable from a hang in the first corpus pass that tried it.
+	exitFunc(exitHung)
 }
