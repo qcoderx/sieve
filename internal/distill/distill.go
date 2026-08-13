@@ -768,6 +768,17 @@ func (d *Distiller) Distill(ctx context.Context, rawURL string) (*Result, error)
 	// extraction is always available and always costs nothing at this point, so
 	// it is the floor: escalating can leave the artifact unchanged, but it can
 	// never leave it worse than not having escalated.
+	// Which capture the artifact was actually built from.
+	//
+	// The snapshot records this so that replaying it reproduces the artifact
+	// rather than the one that was rejected. Both fallbacks below rebuild the
+	// graph from the served HTML after the browser came back thin, and storing
+	// the render capture regardless meant replay faithfully rebuilt the thin
+	// version the live run had just thrown away: raycast.com replayed to zero
+	// blocks against two hundred and thirty live, and obys.agency to a hundred
+	// and twenty-two against two hundred and twenty-two.
+	built := res.Merged
+
 	if fetchFailure == "" && g.Stats.ContentNodes == 0 {
 		fprov := prov
 		fprov.Tier = string(escalate.TierFetch)
@@ -781,6 +792,7 @@ func (d *Distiller) Distill(ctx context.Context, rawURL string) (*Result, error)
 			d.logf("the render came back empty; falling back to the served HTML (%d block(s))",
 				fg.Stats.ContentNodes)
 			g = fg
+			built = staticRes.Merged
 			decision.Tier = escalate.TierFetch
 			decision.Reason = fprov.TierReason
 		}
@@ -803,6 +815,7 @@ func (d *Distiller) Distill(ctx context.Context, rawURL string) (*Result, error)
 			return nil, serr
 		}
 		g = sg
+		built = staticRes.Merged
 		decision.Tier = escalate.TierFetch
 		decision.Reason = sprov.TierReason
 	}
@@ -811,7 +824,7 @@ func (d *Distiller) Distill(ctx context.Context, rawURL string) (*Result, error)
 	d.progress(Progress{Stage: "done", Tier: decision.Tier, Elapsed: time.Since(start), Partial: g})
 	return &Result{
 		Graph: g, Freshness: freshness, Decision: decision, Timing: timing,
-		Capture: res.Merged, StaticHTML: staticRes.RawHTML,
+		Capture: built, StaticHTML: staticRes.RawHTML,
 		Scene: res.Scene, Libraries: res.Libraries, Status: res.Status,
 	}, nil
 }
