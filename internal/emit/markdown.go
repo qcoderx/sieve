@@ -128,6 +128,7 @@ func Markdown(g *graph.Graph, opt MarkdownOptions) string {
 	}
 	if opt.Navigation {
 		writeNavigation(&b, g)
+		writeFurniture(&b, g)
 	}
 	if opt.Structured && !opt.Strict {
 		writeFAQ(&b, g)
@@ -432,6 +433,46 @@ func writeActions(b *strings.Builder, g *graph.Graph) {
 		}
 		b.WriteByte('\n')
 	}
+}
+
+// writeFurniture emits the prose that lives in a page's chrome.
+//
+// Separating content from furniture is right, and dropping the furniture
+// entirely is not. A postal address, an opening time, a registration number
+// and a contact line all sit in the footer of a great many sites, and they are
+// among the things a visitor most often wants. The immersive fixture puts
+// "Rua da Cozinha 4, Lisboa" there, and an agent reading the rendering could
+// not answer where the workshop is -- not because the extraction missed it,
+// but because the rendering withheld it.
+//
+// It goes under its own heading rather than into the body, so the distinction
+// the region model draws is preserved: a reader can see this is the page's
+// margins rather than its argument, and weigh it accordingly.
+func writeFurniture(b *strings.Builder, g *graph.Graph) {
+	var lines []string
+	seen := map[string]bool{}
+	for _, blk := range g.Blocks {
+		if !blk.Region.IsChrome() || blk.Type == graph.TypeImage {
+			continue
+		}
+		t := strings.TrimSpace(blk.Text)
+		// A word or two is a menu label, and the navigation list above already
+		// carries those with their destinations. What is wanted here is the
+		// material that reads as a statement.
+		if len(t) < 12 || seen[strings.ToLower(t)] {
+			continue
+		}
+		seen[strings.ToLower(t)] = true
+		lines = append(lines, t)
+	}
+	if len(lines) == 0 {
+		return
+	}
+	b.WriteString("## Header and footer\n\n")
+	for _, l := range lines {
+		fmt.Fprintf(b, "- %s\n", escapeMD(l))
+	}
+	b.WriteByte('\n')
 }
 
 func writeNavigation(b *strings.Builder, g *graph.Graph) {

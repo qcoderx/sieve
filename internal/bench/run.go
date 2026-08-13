@@ -91,7 +91,23 @@ func (r *Runner) Run(ctx context.Context, in Input) (*Report, error) {
 	if in.Artifact == nil {
 		return nil, fmt.Errorf("bench: no artifact")
 	}
-	artifactText := emit.Markdown(in.Artifact, emit.CompactMarkdownOptions())
+	// The artifact condition gets the whole artifact, because that is what an
+	// agent receives.
+	//
+	// It used to get the compact rendering, which omits actions, forms and
+	// navigation -- so the model was asked "what does the enquiry form
+	// require?" against a document with the form deleted from it, and coverage
+	// was measured against text that could not contain the answer. The control
+	// meanwhile received the complete HTML, form markup and all. That is not a
+	// comparison between a page and its distillation; it is a comparison
+	// between a page and a redaction of its distillation, and sieve lost it on
+	// exactly the questions structure is supposed to win.
+	opt := emit.CompactMarkdownOptions()
+	opt.Actions = true
+	opt.Navigation = true
+	opt.Structured = true
+	opt.Gaps = true
+	artifactText := emit.Markdown(in.Artifact, opt)
 	rawText := in.RawHTML
 
 	rep := &Report{
@@ -287,7 +303,7 @@ func factPresent(haystackLower, fact string) bool {
 	}
 	hits := 0
 	for _, w := range significant {
-		if strings.Contains(haystackLower, w) {
+		if strings.Contains(haystackLower, w) || strings.Contains(haystackLower, stem(w)) {
 			hits++
 		}
 	}
@@ -295,6 +311,23 @@ func factPresent(haystackLower, fact string) bool {
 	// of them would fail on legitimate rewording; requiring one would pass on
 	// coincidence.
 	return float64(hits)/float64(len(significant)) >= 0.7
+}
+
+// stem strips a common inflection so a fact written as "it posts to /enquiry"
+// matches a page that says "Submits POST to /enquiry".
+//
+// This is deliberately the crudest thing that works, and deliberately only
+// applied as a second chance after an exact match fails. Coverage is a claim
+// about whether the artifact contains a fact, and every loosening of the test
+// makes that claim weaker; the only loosening that costs nothing is one that
+// treats a word and its plural as the same word, which they are.
+func stem(w string) string {
+	for _, suf := range []string{"ing", "es", "ed", "s"} {
+		if len(w) > len(suf)+3 && strings.HasSuffix(w, suf) {
+			return strings.TrimSuffix(w, suf)
+		}
+	}
+	return w
 }
 
 var stopWords = map[string]bool{
