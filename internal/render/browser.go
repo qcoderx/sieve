@@ -22,7 +22,9 @@ import (
 
 // Version identifies the build. It is stamped into every trace so an artifact
 // can be tied back to the code that produced it.
-var Version = "0.1.0-dev"
+//
+// A var rather than a const so a release build can stamp a commit onto it.
+var Version = "0.1.0"
 
 // Browser owns one Chromium process. Reuse it across pages: process startup is
 // 200-600ms, which dominates the cost of a small page.

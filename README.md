@@ -156,6 +156,20 @@ sieve replay ./traces/example.com.sieve
 sieve serve ./artifacts
 ```
 
+### What comes out
+
+An artifact directory: `manifest.json` (what the page contains and whether it
+could be read), `content.json` (the full graph), `index.md` (what an agent
+reads) and `index.html`.
+
+Read `outcome.status` before anything else. Only `ok` means the page was read;
+`blocked`, `challenge`, `auth_required`, `spa_shell`, `empty_after_render` and
+`partial` each mean the artifact describes something other than the page you
+asked for, and each carries the evidence for that verdict.
+
+**[docs/ARTIFACT.md](docs/ARTIFACT.md) is the format contract.** Schema 1.x adds
+fields and never removes or repurposes them, so it is safe to build against.
+
 ### As an MCP server
 
 This is the primary interface. The CLI is for humans and CI.
