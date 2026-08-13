@@ -1,0 +1,39 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>Div listener — gate fixture</title>
+<style>
+  html, body { margin: 0; background: #17130f; color: #f0e9df;
+               font: 16px/1.6 system-ui, sans-serif; }
+  #gate { position: fixed; inset: 0; display: flex; align-items: center;
+          justify-content: center; background: #17130f; z-index: 9; }
+  .door { cursor: pointer; border: 1px solid #f0e9df; padding: 1rem 2.5rem;
+          letter-spacing: .3em; font-size: 13px; }
+  main { display: none; padding: 3rem; max-width: 40rem; }
+</style>
+</head>
+<body>
+  <!-- No button, no role, no href, no onclick attribute: a bare div with a
+       listener attached in script, which is what a framework produces and what
+       a selector looking for semantics never finds. -->
+  <div id="gate"><div class="door" id="go">ENTER THE EXPERIENCE</div></div>
+  <main id="content">
+    <h1>Anvil Sound</h1>
+    <p>THE STUDIO IS OPEN. A room built for tracking drums, in a former grain
+       store with a ceiling high enough to be worth the heating bill.</p>
+    <p>Two live rooms, a stone chamber, and a console that has been in
+       continuous service since 1978 and is maintained by the person who
+       originally commissioned it.</p>
+    <h2>Rates</h2>
+    <p>Day rates include an engineer. We do not charge separately for setup,
+       because setup is most of what makes a record sound like anything.</p>
+  </main>
+<script>
+  document.getElementById("go").addEventListener("click", function () {
+    document.getElementById("gate").style.display = "none";
+    document.getElementById("content").style.display = "block";
+  });
+</script>
+</body>
+</html>

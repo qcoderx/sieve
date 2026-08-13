@@ -1,0 +1,14 @@
+﻿# Build artifacts
+/sieve
+/sieve.exe
+/dist/
+
+# Local output
+/artifacts/
+/scratch-artifacts/
+/traces/
+*.sieve
+
+# Go
+*.test
+*.out

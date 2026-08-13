@@ -1,0 +1,253 @@
+{
+  "url": "http://127.0.0.1:61890/immersive/",
+  "title": "Aurelia Atelier — Hand-finished furniture",
+  "sections": [
+    "L3 Lisbon, since 1974",
+    "L1 Furniture that outlives its owner",
+    "L2 The studio",
+    "L2 Materials",
+    "L2 Press",
+    "L2 Make an enquiry"
+  ],
+  "blocks": [
+    {
+      "key": "main/heading/7ddc67025cec",
+      "type": "heading",
+      "level": 3,
+      "region": "main",
+      "source": "dom",
+      "confidence": "medium",
+      "text": "Lisbon, since 1974"
+    },
+    {
+      "key": "main/heading/312301fadfb0",
+      "type": "heading",
+      "level": 1,
+      "region": "main",
+      "source": "dom",
+      "confidence": "high",
+      "text": "Furniture that outlives its owner"
+    },
+    {
+      "key": "main/paragraph/7aa5e800b9ab",
+      "type": "paragraph",
+      "region": "main",
+      "source": "dom",
+      "confidence": "high",
+      "text": "We make chairs, tables and cabinets by hand, in oak, walnut and Portuguese cork."
+    },
+    {
+      "key": "main/heading/646c722c7e76",
+      "type": "heading",
+      "level": 2,
+      "region": "main",
+      "source": "dom",
+      "confidence": "high",
+      "text": "The studio"
+    },
+    {
+      "key": "main/paragraph/df3645eb1946",
+      "type": "paragraph",
+      "region": "main",
+      "source": "dom",
+      "confidence": "high",
+      "text": "Aurelia Atelier was founded in 1974 by Ines Aurelia in a converted bakery in Alcantara. The workshop has occupied the same three rooms ever since."
+    },
+    {
+      "key": "main/paragraph/ef8046119aeb",
+      "type": "paragraph",
+      "region": "main",
+      "source": "dom",
+      "confidence": "high",
+      "text": "Eleven people work here. Six are cabinetmakers, two are finishers, and three keep everything else moving."
+    },
+    {
+      "key": "main/paragraph/b18164797d11",
+      "type": "paragraph",
+      "region": "main",
+      "source": "dom",
+      "confidence": "high",
+      "text": "Every piece is made to order. A dining table takes nine weeks; a cabinet with hand-cut dovetails takes fourteen."
+    },
+    {
+      "key": "main/paragraph/b7b600004efa",
+      "type": "paragraph",
+      "region": "main",
+      "source": "dom",
+      "confidence": "high",
+      "text": "We do not use veneer over particle board, and we do not stain wood to imitate a species it is not."
+    },
+    {
+      "key": "main/heading/fd10a146e962",
+      "type": "heading",
+      "level": 2,
+      "region": "main",
+      "source": "dom",
+      "confidence": "high",
+      "text": "Materials"
+    },
+    {
+      "key": "main/list_item/5e167f9224de",
+      "type": "list_item",
+      "region": "main",
+      "source": "dom",
+      "confidence": "high",
+      "text": "European oak, quarter-sawn, air-dried for four years"
+    },
+    {
+      "key": "main/list_item/0df03f3ec8f5",
+      "type": "list_item",
+      "region": "main",
+      "source": "dom",
+      "confidence": "high",
+      "text": "American black walnut"
+    },
+    {
+      "key": "main/list_item/86aa458f015f",
+      "type": "list_item",
+      "region": "main",
+      "source": "dom",
+      "confidence": "high",
+      "text": "Portuguese cork, from Alentejo"
+    },
+    {
+      "key": "main/list_item/17cb589cbab6",
+      "type": "list_item",
+      "region": "main",
+      "source": "dom",
+      "confidence": "high",
+      "text": "Hard wax oil finish, no polyurethane"
+    },
+    {
+      "key": "main/label/6d29a9a06f2a",
+      "type": "label",
+      "region": "main",
+      "source": "dom",
+      "confidence": "high",
+      "text": "Quarter-sawn oak, showing medullary ray fleck."
+    },
+    {
+      "key": "main/image/1f5a9da6f127",
+      "type": "image",
+      "region": "main",
+      "source": "dom",
+      "confidence": "high",
+      "text": "Close-up of quarter-sawn oak grain"
+    },
+    {
+      "key": "main/heading/9ed1273e9b5a",
+      "type": "heading",
+      "level": 2,
+      "region": "main",
+      "source": "dom",
+      "confidence": "high",
+      "text": "Press"
+    },
+    {
+      "key": "main/quote/6e654e2f7799",
+      "type": "quote",
+      "region": "main",
+      "source": "dom",
+      "confidence": "high",
+      "text": "The most quietly confident furniture coming out of Portugal."
+    },
+    {
+      "key": "main/label/440be098cdd1",
+      "type": "label",
+      "region": "main",
+      "source": "dom",
+      "confidence": "high",
+      "text": "Monocle, 2023"
+    },
+    {
+      "key": "main/heading/d6021798887b",
+      "type": "heading",
+      "level": 2,
+      "region": "main",
+      "source": "dom",
+      "confidence": "high",
+      "text": "Make an enquiry"
+    },
+    {
+      "key": "form/label/f2488fd4ef4a",
+      "type": "label",
+      "region": "form",
+      "source": "dom",
+      "confidence": "high",
+      "text": "Email address"
+    },
+    {
+      "key": "form/label/8d8a162d576b",
+      "type": "label",
+      "region": "form",
+      "source": "dom",
+      "confidence": "high",
+      "text": "Piece"
+    },
+    {
+      "key": "form/label/8a7525b1492f",
+      "type": "label",
+      "region": "form",
+      "source": "dom",
+      "confidence": "high",
+      "text": "Notes"
+    },
+    {
+      "key": "form/paragraph/5e0e9cf99220",
+      "type": "paragraph",
+      "region": "form",
+      "source": "dom",
+      "confidence": "high",
+      "text": "Send enquiry"
+    },
+    {
+      "key": "footer/paragraph/d67a16754ffa",
+      "type": "paragraph",
+      "region": "footer",
+      "source": "dom",
+      "confidence": "high",
+      "text": "Aurelia Atelier, Rua da Cozinha 4, Lisboa. hello@example.com"
+    }
+  ],
+  "latent": [
+    {
+      "key": "latent:::104ab9213e28",
+      "type": "paragraph",
+      "region": "",
+      "source": "",
+      "confidence": "",
+      "text": "Work"
+    },
+    {
+      "key": "latent:::0aa91af2ec4c",
+      "type": "paragraph",
+      "region": "",
+      "source": "",
+      "confidence": "",
+      "text": "Studio"
+    },
+    {
+      "key": "latent:::fd10a146e962",
+      "type": "paragraph",
+      "region": "",
+      "source": "",
+      "confidence": "",
+      "text": "Materials"
+    }
+  ],
+  "actions": [
+    "button Send enquiry",
+    "form Email address Piece Dining table Cabinet Chair Notes Send enquiry [email:email* piece:select notes:textarea] → POST",
+    "link Contact",
+    "link Materials",
+    "link Studio",
+    "link Work",
+    "link hello@example.com"
+  ],
+  "audit": {
+    "order_basis": "geometry",
+    "order_confidence": "high",
+    "heading_confidence": "high",
+    "latent_count": 3
+  }
+}

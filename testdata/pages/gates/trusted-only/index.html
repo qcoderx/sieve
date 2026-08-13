@@ -1,0 +1,38 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>Trusted only — gate fixture</title>
+<style>
+  html, body { margin: 0; background: #0a0a0a; color: #ededed;
+               font: 16px/1.6 system-ui, sans-serif; }
+  #gate { position: fixed; inset: 0; display: flex; align-items: center;
+          justify-content: center; background: #0a0a0a; z-index: 9; }
+  #gate button { background: none; border: 1px solid #ededed; color: #ededed;
+                 padding: 1rem 2rem; letter-spacing: .2em; font-size: 13px; }
+  main { display: none; padding: 3rem; max-width: 40rem; }
+</style>
+</head>
+<body>
+  <!-- Opens only for a real input event. element.click() sets isTrusted false
+       and is ignored, which is why the press is dispatched from outside the
+       page as an actual mouse event rather than called on the node. -->
+  <div id="gate"><button type="button" id="go">Begin</button></div>
+  <main id="content">
+    <h1>Corvid Press</h1>
+    <p>THE STUDIO IS OPEN. A letterpress shop running four Heidelberg platens
+       and a Vandercook proofing press.</p>
+    <p>We set metal type for editions under a thousand and photopolymer for
+       everything larger. Paper is milled to order in Somerset.</p>
+    <h2>Editions</h2>
+    <p>Sixteen titles in print, all sewn and cased by hand in the same building.</p>
+  </main>
+<script>
+  document.getElementById("go").addEventListener("click", function (e) {
+    if (!e.isTrusted) return;
+    document.getElementById("gate").style.display = "none";
+    document.getElementById("content").style.display = "block";
+  });
+</script>
+</body>
+</html>

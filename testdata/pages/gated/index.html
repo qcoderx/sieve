@@ -1,0 +1,29 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>Gated — fixture</title>
+<style>
+  html, body { margin: 0; height: 100%; overflow: hidden; background: #0b0a09; color: #f2efe9; }
+  #gate {
+    position: fixed; inset: 0; display: flex; align-items: center; justify-content: center;
+    background: #0b0a09; z-index: 10;
+  }
+  #gate button {
+    background: none; border: 1px solid #f2efe9; color: #f2efe9;
+    padding: 1rem 2rem; font: 500 14px/1 system-ui, sans-serif; letter-spacing: .2em;
+  }
+  main { padding: 4rem; }
+</style>
+</head>
+<body>
+  <!-- The interstitial. Full viewport, almost no text, one control that invites
+       the visitor in. Everything real is behind it and never renders until the
+       button is pressed, which sieve does not do. -->
+  <div id="gate"><button type="button">CLICK TO ENTER</button></div>
+  <main>
+    <h1>The studio</h1>
+    <p>This copy is behind the gate and a scroll sweep will never reach it.</p>
+  </main>
+</body>
+</html>

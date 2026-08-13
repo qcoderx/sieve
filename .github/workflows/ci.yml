@@ -1,0 +1,102 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+permissions:
+  contents: read
+
+jobs:
+  # The browser-free packages carry the tests that must pass everywhere, and
+  # they run in seconds. Splitting them out means a contributor gets a fast,
+  # unambiguous signal on the logic that does not need Chromium.
+  unit:
+    name: unit (no browser)
+    runs-on: ${{ matrix.os }}
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest, macos-latest, windows-latest]
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-go@v5
+        with:
+          go-version: stable
+          cache: true
+
+      - name: Build
+        run: go build ./...
+
+      - name: Vet
+        run: go vet ./...
+
+      - name: Test
+        env:
+          SIEVE_SKIP_BROWSER: "1"
+        run: >
+          go test -race ./internal/escalate/... ./internal/corroborate/...
+          ./internal/textnorm/... ./internal/safety/... ./internal/tokens/...
+          ./internal/emit/... ./internal/static/...
+
+  # Extraction is only meaningful against a real browser, so the golden corpus
+  # and the adversarial fixtures run here.
+  extraction:
+    name: extraction (Chromium)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-go@v5
+        with:
+          go-version: stable
+          cache: true
+
+      - name: Install Chromium
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y --no-install-recommends chromium-browser || \
+            sudo snap install chromium
+          which chromium || which chromium-browser
+
+      # Frame production is the least obvious precondition in the whole
+      # renderer: a tab that is not composited starves requestAnimationFrame
+      # and therefore IntersectionObserver, which silently turns a rich page
+      # into an empty artifact. If it is broken on this runner, every
+      # extraction result below is meaningless, so it is checked first and
+      # reported as its own step.
+      - name: Probe frame production
+        run: go run ./cmd/sieve doctor
+
+      - name: Golden corpus
+        run: go test -count=1 ./internal/graph/...
+
+      - name: Render layer
+        run: go test -count=1 ./internal/render/...
+
+      # The latent invariant is the project's central security claim: hidden
+      # content must never reach a default payload. It is asserted on every
+      # output format, and it is run as its own step so a failure is
+      # unmissable rather than buried in a package summary.
+      - name: Latent tier must not leak
+        run: go test -count=1 -run 'TestLatent|TestAdversarial' ./internal/emit/... ./internal/graph/...
+
+  # Golden files are only useful if a drift is visible. A run that quietly
+  # rewrote them would defeat the point, so a dirty tree after the tests is a
+  # failure.
+  goldens-are-committed:
+    name: goldens are committed
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-go@v5
+        with:
+          go-version: stable
+          cache: true
+      - name: Check the tree is clean
+        run: |
+          go build ./...
+          git diff --exit-code || {
+            echo "::error::The working tree changed during the build."
+            exit 1
+          }

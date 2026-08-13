@@ -1,0 +1,43 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>Split letters — gate fixture</title>
+<style>
+  html, body { margin: 0; background: #101010; color: #eee; font: 16px/1.6 system-ui, sans-serif; }
+  #gate { position: fixed; inset: 0; display: flex; align-items: center;
+          justify-content: center; background: #101010; z-index: 9; }
+  #gate button { background: none; border: 1px solid #eee; color: #eee;
+                 padding: 1.2rem 2.4rem; letter-spacing: .3em; font-size: 14px; }
+  main { display: none; padding: 3rem; max-width: 40rem; }
+</style>
+</head>
+<body>
+  <!-- The label is split into one span per letter, which is how every site
+       that animates its entry text is built (GSAP SplitText and its imitators
+       do exactly this). The element still reads "ENTER" to a person and to
+       innerText; it simply has more children than a naive search allows. -->
+  <div id="gate">
+    <button type="button" id="go"><span>E</span><span>N</span><span>T</span><span>E</span><span>R</span></button>
+  </div>
+  <main id="content">
+    <h1>Ryegate Studio</h1>
+    <p>THE STUDIO IS OPEN. We build long-lived systems for people who have to
+       live with them afterwards, which is a different discipline from building
+       something that demonstrates well once.</p>
+    <p>Our work is mostly infrastructure: schedulers, ingest pipelines, and the
+       unglamorous machinery that decides whether a product is trustworthy at
+       three in the morning. We have been doing it since 2011.</p>
+    <h2>Practice</h2>
+    <p>We take a small number of engagements each year and staff them properly.
+       No one is assigned to four things at once, because that is how details
+       get dropped and details are the entire job.</p>
+  </main>
+<script>
+  document.getElementById("go").addEventListener("click", function () {
+    document.getElementById("gate").style.display = "none";
+    document.getElementById("content").style.display = "block";
+  });
+</script>
+</body>
+</html>
