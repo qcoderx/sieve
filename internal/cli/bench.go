@@ -7,6 +7,7 @@ import (
 	"io"
 	"os"
 	"sort"
+	"strings"
 	"time"
 
 	"github.com/qcoderx/sieve/internal/bench"
@@ -220,6 +221,11 @@ func printReport(w io.Writer, r *bench.Report) {
 	// Answered comes before accuracy, because an accuracy computed over three
 	// of twenty questions is a different claim from one computed over twenty,
 	// and the reader should see which before reading the number.
+	if r.Metrics.Raw.Ungraded > 0 || r.Metrics.Artifact.Ungraded > 0 {
+		fmt.Fprintf(w, "  %-14s %12s %12s   (accuracy is the mean over these)\n", "graded",
+			fmt.Sprintf("%d/%d", r.Metrics.Raw.Scored, r.Metrics.Raw.Answered),
+			fmt.Sprintf("%d/%d", r.Metrics.Artifact.Scored, r.Metrics.Artifact.Answered))
+	}
 	fmt.Fprintf(w, "  %-14s %12s %12s\n", "answered",
 		fmt.Sprintf("%d/%d", r.Metrics.Raw.Answered, r.Metrics.Raw.Questions),
 		fmt.Sprintf("%d/%d", r.Metrics.Artifact.Answered, r.Metrics.Artifact.Questions))
@@ -272,7 +278,38 @@ func printReport(w io.Writer, r *bench.Report) {
 		r.Verdict.ComparedQuestions)
 	fmt.Fprintf(w, "  token reduction %.1f%%   accuracy gain %+.1f points\n",
 		r.Verdict.TokenReduction*100, r.Verdict.AccuracyGain*100)
-	fmt.Fprintf(w, "\n  %s\n\n", r.Verdict.Summary)
+	// The reasons calls failed, before the verdict rather than after it.
+	//
+	// A run that reports forty errors and no cause leaves the reader to open
+	// the JSON, which they can only do if they thought to pass -report. The
+	// provider's own message is nearly always the whole answer -- a model name
+	// that does not exist, a key without access, a rate limit -- so it belongs
+	// on screen where the failure is announced.
+	if len(r.CallFailures) > 0 {
+		fmt.Fprintf(w, "\n  calls failed:\n")
+		for i, f := range r.CallFailures {
+			if i == 3 {
+				fmt.Fprintf(w, "    ... and %d further distinct reason(s), all in the report\n",
+					len(r.CallFailures)-3)
+				break
+			}
+			fmt.Fprintf(w, "    %3d x  %s\n", f.Count, oneLine(f.Reason, 150))
+		}
+	}
+	fmt.Fprintf(w, "\n  %s\n", r.Verdict.Summary)
+	for _, n := range r.Verdict.Notes {
+		fmt.Fprintf(w, "  note: %s\n", n)
+	}
+	fmt.Fprintln(w)
+}
+
+// oneLine flattens a provider message so it cannot break the report's layout.
+func oneLine(s string, max int) string {
+	s = strings.Join(strings.Fields(s), " ")
+	if len(s) > max {
+		s = s[:max-3] + "..."
+	}
+	return s
 }
 
 func printStability(w io.Writer, target string, s bench.Stability) {

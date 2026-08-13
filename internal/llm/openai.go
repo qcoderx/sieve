@@ -112,7 +112,9 @@ func (o oaResponse) errorMessage() string {
 	return strings.TrimSpace(string(o.Error))
 }
 
-// maxRateLimitRetries bounds how many times a call waits out a rate limit.
+// maxRateLimitWait bounds how long one call will wait out a rate limit in
+// total, and maxRateLimitRetries is a backstop against a provider that asks for
+// a trivial wait forever.
 //
 // Free and low tiers meter by tokens per minute, and the benchmark is exactly
 // the workload that trips them: forty calls carrying a page each. Without this
@@ -120,7 +122,19 @@ func (o oaResponse) errorMessage() string {
 // comparison drawn from the handful that got through, which is not a
 // measurement of anything. The provider says how long to wait; waiting is the
 // whole fix.
-const maxRateLimitRetries = 4
+//
+// The bound is cumulative time rather than a count of attempts, because a
+// tokens-per-minute limit is not cleared by trying again -- it is cleared by
+// the minute elapsing. Four attempts at the three seconds Groq asks for is
+// twelve seconds of patience against a window that can need sixty, so the
+// count ran out while the limit was still in force and eleven of forty
+// questions were dropped from a run that was otherwise fine. Ninety seconds
+// covers a full window with room to spare, and still ends a run against a
+// provider that is genuinely too small for the workload.
+const (
+	maxRateLimitWait    = 90 * time.Second
+	maxRateLimitRetries = 30
+)
 
 // retryAfter reads the delay a provider asked for, from the standard header or
 // from the "try again in 19.2375s" that several of them put in the message.
@@ -143,24 +157,24 @@ var tryAgainRe = regexp.MustCompile(`try again in ([0-9.]+)\s*s`)
 func (o *openAIClient) ask(ctx context.Context, model string, maxTokens int64,
 	system string, blocks []ContentBlock) (*Result, error) {
 
-	var last error
+	var waited time.Duration
 	for attempt := 0; ; attempt++ {
 		res, wait, err := o.askOnce(ctx, model, maxTokens, system, blocks)
-		if wait <= 0 || attempt >= maxRateLimitRetries {
+		if wait <= 0 || attempt >= maxRateLimitRetries || waited+wait > maxRateLimitWait {
 			if err != nil && wait > 0 {
-				return nil, fmt.Errorf("%w (gave up after %d rate-limit waits)",
-					err, maxRateLimitRetries)
+				return nil, fmt.Errorf("%w (gave up after waiting %s across %d rate limits)",
+					err, waited.Round(time.Second), attempt)
 			}
 			return res, err
 		}
-		last = err
-		// A cap, because a provider asking for several minutes is telling us
-		// this workload does not fit its tier, and a benchmark that hangs is
-		// less useful than one that says so.
+		// A cap on any single wait, because a provider asking for several
+		// minutes at once is telling us this workload does not fit its tier,
+		// and a benchmark that hangs is less useful than one that says so.
 		if wait > 30*time.Second {
 			return nil, fmt.Errorf("%w (asked to wait %s, which is longer than this is worth)",
-				last, wait.Round(time.Second))
+				err, wait.Round(time.Second))
 		}
+		waited += wait
 		select {
 		case <-ctx.Done():
 			return nil, ctx.Err()

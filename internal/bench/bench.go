@@ -32,6 +32,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"os"
+	"regexp"
 	"sort"
 	"strings"
 	"time"
@@ -126,6 +127,23 @@ type Answer struct {
 	FactsFound  []string `json:"facts_found,omitempty"`
 	FactsMissed []string `json:"facts_missed,omitempty"`
 	GraderNote  string   `json:"grader_note,omitempty"`
+
+	// Graded records that a grade was actually reached.
+	//
+	// An answer that was produced but never graded -- the grader rate limited,
+	// out of quota, or returning unparseable JSON -- has an Accuracy of zero
+	// that means "not measured", not "wrong". The distinction is the same one
+	// Error draws for the answering call, and it was missing here: a run that
+	// answered every question and graded none reported an accuracy of 0.000
+	// for both conditions, which reads as total failure of the extraction when
+	// nothing had been measured at all.
+	Graded bool `json:"graded"`
+}
+
+// CallFailure is one reason calls failed, and how many times it did.
+type CallFailure struct {
+	Reason string `json:"reason"`
+	Count  int    `json:"count"`
 }
 
 // Report is a complete benchmark run.
@@ -149,7 +167,24 @@ type Report struct {
 	RawTokensSent int  `json:"raw_tokens_sent"`
 	RawTruncated  bool `json:"raw_truncated"`
 
+	// RawVisibleChars is how much readable text the served page carried, with
+	// markup and scripts removed. It decides which criteria can be judged at
+	// all: a page that serves nothing can neither verify the artifact nor be
+	// reduced in size.
+	RawVisibleChars int `json:"raw_visible_chars"`
+
 	Answers []Answer `json:"answers"`
+
+	// CallFailures groups the distinct reasons calls failed, commonest first.
+	//
+	// A failure count on its own is a dead end. The reason is always in the
+	// report's per-answer records, but a reader watching the terminal sees only
+	// a number, and the difference between a wrong model name, an expired key
+	// and a rate limit is the difference between a five-second fix and an
+	// afternoon. The provider already says which it is; this is only a matter
+	// of not throwing it away.
+	CallFailures []CallFailure `json:"call_failures,omitempty"`
+
 	Metrics struct {
 		Raw      ConditionMetrics `json:"raw"`
 		Artifact ConditionMetrics `json:"artifact"`
@@ -191,7 +226,12 @@ type ConditionMetrics struct {
 	// Answered is how many questions actually produced an answer. It differs
 	// from Questions whenever a call failed, and the accuracy below is the mean
 	// over these rather than over all of them.
-	Answered       int              `json:"answered"`
+	Answered int `json:"answered"`
+	// Scored is how many of those answers were graded, and Ungraded how many
+	// were not. Accuracy is the mean over Scored: an answer the grader never
+	// reached is excluded rather than counted as wrong.
+	Scored         int              `json:"scored"`
+	Ungraded       int              `json:"ungraded"`
 	MeanAccuracy   float64          `json:"mean_accuracy"`
 	MeanInputToks  float64          `json:"mean_input_tokens"`
 	TotalInputToks int64            `json:"total_input_tokens"`
@@ -229,13 +269,21 @@ type Verdict struct {
 	// conditions, not the difference of the two means. See judge.
 	AccuracyGain float64 `json:"accuracy_gain"`
 	// ComparedQuestions is how many questions that pairing covered.
-	ComparedQuestions int    `json:"compared_questions"`
-	MetTokenTarget    bool   `json:"met_token_target"`
-	MetAccuracyTarget bool   `json:"met_accuracy_target"`
-	MetCoverageTarget bool   `json:"met_coverage_target"`
-	MetFidelityTarget bool   `json:"met_fidelity_target"`
-	Passed            bool   `json:"passed"`
-	Summary           string `json:"summary"`
+	ComparedQuestions int  `json:"compared_questions"`
+	MetTokenTarget    bool `json:"met_token_target"`
+	MetAccuracyTarget bool `json:"met_accuracy_target"`
+	MetCoverageTarget bool `json:"met_coverage_target"`
+	MetFidelityTarget bool `json:"met_fidelity_target"`
+	// TokenReductionApplies is false on a page that served no readable text,
+	// where there was nothing to reduce. MetTokenTarget is then true by
+	// vacancy rather than by achievement, and this is how to tell them apart.
+	TokenReductionApplies bool `json:"token_reduction_applies"`
+
+	Passed  bool   `json:"passed"`
+	Summary string `json:"summary"`
+	// Notes record criteria that did not apply, so a pass is never mistaken
+	// for having cleared a bar that was never raised.
+	Notes []string `json:"notes,omitempty"`
 }
 
 // Targets are the success criteria for v1.
@@ -330,15 +378,31 @@ func computeMetrics(answers []Answer, questions map[string]Question, cond Condit
 			continue
 		}
 		m.Answered++
-		accSum += a.Accuracy
 		latSum += float64(a.LatencyMS)
 		m.TotalInputToks += a.Usage.InputTokens + a.Usage.CacheReadTokens
+
+		// An answer that was never graded is not a wrong answer either.
+		//
+		// The same argument as above, one stage later in the pipeline. The
+		// answering call succeeded, so Error is empty and the answer counts
+		// towards cost and latency, which is right -- it really was produced.
+		// But its Accuracy is zero only because no grade was ever reached, and
+		// averaging that in reports the extraction as having failed when the
+		// instrument was what failed.
+		if !a.Graded {
+			m.Ungraded++
+			continue
+		}
+		m.Scored++
+		accSum += a.Accuracy
 		q := questions[a.QuestionID]
 		bandSum[q.Band] += a.Accuracy
 		bandCount[q.Band]++
 	}
+	if m.Scored > 0 {
+		m.MeanAccuracy = round3(accSum / float64(m.Scored))
+	}
 	if m.Answered > 0 {
-		m.MeanAccuracy = round3(accSum / float64(m.Answered))
 		m.MeanLatencyMS = round1(latSum / float64(m.Answered))
 		m.MeanInputToks = round1(float64(m.TotalInputToks) / float64(m.Answered))
 	}
@@ -361,18 +425,30 @@ func (r *Report) judge() {
 	// zero and hands the artifact a large apparent gain, which is the one
 	// direction this benchmark must never fail in. Say it could not be
 	// measured instead.
-	if raw.Answered == 0 || art.Answered == 0 {
-		side := "the raw page"
-		if art.Answered == 0 {
-			side = "the artifact"
-			if raw.Answered == 0 {
-				side = "neither condition"
+	if raw.Scored == 0 || art.Scored == 0 {
+		// Distinguish nothing answered from nothing graded: they point at
+		// different broken things, and the remedy differs.
+		noun := "produced no answers"
+		if raw.Answered > 0 && art.Answered > 0 {
+			noun = "had no answer graded"
+		}
+		side := "the raw page " + noun
+		if art.Scored == 0 {
+			side = "the artifact " + noun
+			if raw.Scored == 0 {
+				side = "neither condition " + noun
+				if noun == "produced no answers" {
+					side = "neither condition produced any answers"
+				}
 			}
 		}
 		v.Summary = fmt.Sprintf(
-			"could not be measured: %s produced no answers (%d error(s) of %d question(s)); "+
+			"could not be measured: %s (%d error(s) of %d question(s)); "+
 				"no comparison is possible and none is reported",
 			side, raw.Errors+art.Errors, raw.Questions)
+		if why := r.dominantFailure(); why != "" {
+			v.Summary += "; " + why
+		}
 		r.Verdict = v
 		return
 	}
@@ -394,13 +470,13 @@ func (r *Report) judge() {
 	// both sides this is identical to subtracting the means.
 	rawByID := map[string]float64{}
 	for _, a := range r.Answers {
-		if a.Condition == ConditionRaw && a.Error == "" {
+		if a.Condition == ConditionRaw && a.Graded {
 			rawByID[a.QuestionID] = a.Accuracy
 		}
 	}
 	var pairRaw, pairArt float64
 	for _, a := range r.Answers {
-		if a.Condition != ConditionArtifact || a.Error != "" {
+		if a.Condition != ConditionArtifact || !a.Graded {
 			continue
 		}
 		ra, ok := rawByID[a.QuestionID]
@@ -415,7 +491,19 @@ func (r *Report) judge() {
 		v.AccuracyGain = round3((pairArt - pairRaw) / float64(v.ComparedQuestions))
 	}
 
-	v.MetTokenTarget = v.TokenReduction >= TargetTokenReduction
+	// Token reduction only means something when there was something to reduce.
+	//
+	// On a page that serves an empty body -- the case this project exists for --
+	// the control's prompt is a shell of a few hundred tokens and the artifact
+	// carries the content the page actually renders. The artifact is then
+	// legitimately larger, and scoring that as a failed criterion marks sieve
+	// down precisely for having done its job. It is the same situation as
+	// fidelity on such a page: not a failure, a criterion with no subject.
+	//
+	// The threshold is the one fidelity already uses, because it is the same
+	// question being asked -- whether the served page carries readable text.
+	v.TokenReductionApplies = r.RawVisibleChars >= minFidelitySource
+	v.MetTokenTarget = !v.TokenReductionApplies || v.TokenReduction >= TargetTokenReduction
 	v.MetAccuracyTarget = v.AccuracyGain >= TargetAccuracyGain
 	v.MetCoverageTarget = r.Coverage >= TargetCoverage
 	v.MetFidelityTarget = r.FidelityMeasured && r.Fidelity >= TargetFidelity
@@ -425,6 +513,13 @@ func (r *Report) judge() {
 	if !v.MetTokenTarget {
 		missed = append(missed, fmt.Sprintf("token reduction %.1f%% is below the %.0f%% target",
 			v.TokenReduction*100, TargetTokenReduction*100))
+	}
+	if !v.TokenReductionApplies {
+		v.Notes = append(v.Notes, fmt.Sprintf(
+			"token reduction does not apply: the served page carries only %d characters of "+
+				"readable text, so there was nothing to reduce and the artifact is larger by "+
+				"exactly the content the page renders some other way",
+			r.RawVisibleChars))
 	}
 	if !v.MetAccuracyTarget {
 		missed = append(missed, fmt.Sprintf("accuracy gain %.1f points is below the %.0f-point target",
@@ -458,8 +553,82 @@ func (r *Report) judge() {
 				"(raw %d of %d, artifact %d of %d) and were excluded rather than "+
 				"counted as wrong answers",
 			n, raw.Errors, raw.Questions, art.Errors, art.Questions)
+		if why := r.dominantFailure(); why != "" {
+			v.Summary += "; " + why
+		}
 	}
 	r.Verdict = v
+}
+
+// failureVariable matches the parts of a provider message that change between
+// two occurrences of the same failure: retry delays, token tallies, request IDs.
+var failureVariable = regexp.MustCompile(`\d[\d.,]*`)
+
+// groupKey collapses a message to what is stable about it.
+//
+// A rate limit says how long to wait and how many tokens were used, and both
+// differ every time. Grouping on the raw text turned eleven occurrences of one
+// problem into "11 distinct failures", which reads as eleven problems and
+// buries the single thing the reader needs to know. The numbers are worth
+// keeping in the message shown -- just not in the identity of the group.
+func groupKey(msg string) string {
+	return failureVariable.ReplaceAllString(msg, "N")
+}
+
+// collectFailures groups the per-answer errors by cause, commonest first.
+func (r *Report) collectFailures() {
+	counts := map[string]int{}
+	example := map[string]string{}
+	note := func(msg string) {
+		k := groupKey(msg)
+		counts[k]++
+		if _, seen := example[k]; !seen {
+			example[k] = msg
+		}
+	}
+	for _, a := range r.Answers {
+		if a.Error != "" {
+			note(a.Error)
+			continue
+		}
+		// A grading failure is a failure of the measurement, and belongs in the
+		// same list. It is easy to miss otherwise: the answers all arrived, so
+		// nothing looks wrong until the accuracy column is inexplicably empty.
+		if !a.Graded && strings.HasPrefix(a.GraderNote, "grading failed: ") {
+			note(a.GraderNote)
+		}
+	}
+	r.CallFailures = nil
+	for k, n := range counts {
+		r.CallFailures = append(r.CallFailures, CallFailure{Reason: example[k], Count: n})
+	}
+	sort.Slice(r.CallFailures, func(i, j int) bool {
+		if r.CallFailures[i].Count != r.CallFailures[j].Count {
+			return r.CallFailures[i].Count > r.CallFailures[j].Count
+		}
+		return r.CallFailures[i].Reason < r.CallFailures[j].Reason
+	})
+}
+
+// dominantFailure names the commonest reason calls failed, for the summary.
+//
+// When every call failed for the same reason -- and they usually do, because
+// the causes are configuration rather than chance -- that one line is the whole
+// diagnosis. Truncated, because a provider is at liberty to return an essay.
+func (r *Report) dominantFailure() string {
+	if len(r.CallFailures) == 0 {
+		return ""
+	}
+	top := r.CallFailures[0]
+	reason := strings.TrimSpace(top.Reason)
+	if len(reason) > 220 {
+		reason = reason[:217] + "..."
+	}
+	if len(r.CallFailures) == 1 {
+		return "every failure was: " + reason
+	}
+	return fmt.Sprintf("commonest of %d distinct failures (%d of them): %s",
+		len(r.CallFailures), top.Count, reason)
 }
 
 // MeasureStability compares two distillations of the same URL.

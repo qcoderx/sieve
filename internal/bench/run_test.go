@@ -12,6 +12,7 @@ import (
 	"testing"
 
 	"github.com/qcoderx/sieve/internal/graph"
+	"github.com/qcoderx/sieve/internal/llm"
 )
 
 // The benchmark is the instrument every other claim in this project rests on,
@@ -523,6 +524,180 @@ func TestFidelityUnmeasurableWhenSourceIsEmpty(t *testing.T) {
 	}
 	if !strings.Contains(rep.Verdict.Summary, "not measured") {
 		t.Errorf("the verdict blamed the artifact rather than the missing source: %q",
+			rep.Verdict.Summary)
+	}
+}
+
+// TestFailuresAreGroupedByCause: eleven occurrences of one rate limit are one
+// problem, not eleven.
+//
+// A provider's rate-limit message carries the wait time and the token tally,
+// and both differ every time it is sent. Grouping on the raw text reported "11
+// distinct failures" for a single misconfiguration, which reads as eleven
+// separate things to investigate and hides the one that matters.
+func TestFailuresAreGroupedByCause(t *testing.T) {
+	rep := &Report{}
+	for i, wait := range []string{"1.2s", "3.5s", "7.91s"} {
+		rep.Answers = append(rep.Answers, Answer{
+			QuestionID: fmt.Sprintf("q%02d", i),
+			Error: "rate limited: Limit 12000, Used " + fmt.Sprint(9000+i) +
+				". Please try again in " + wait,
+		})
+	}
+	rep.Answers = append(rep.Answers, Answer{QuestionID: "q99", Error: "model `x` does not exist"})
+	rep.collectFailures()
+
+	if len(rep.CallFailures) != 2 {
+		t.Fatalf("grouped into %d causes, want 2: %+v", len(rep.CallFailures), rep.CallFailures)
+	}
+	if rep.CallFailures[0].Count != 3 {
+		t.Errorf("commonest cause counted %d, want 3", rep.CallFailures[0].Count)
+	}
+	// The example kept must be a real message, numbers and all -- the numbers
+	// are useless for grouping and essential for diagnosis.
+	if !strings.Contains(rep.CallFailures[0].Reason, "12000") {
+		t.Errorf("the reported example lost its detail: %q", rep.CallFailures[0].Reason)
+	}
+}
+
+// TestTokenReductionNeedsSomethingToReduce covers the page this project exists
+// for: one that serves an empty body.
+//
+// The artifact is then legitimately larger than the control's prompt, because
+// the control's prompt is a shell and the artifact holds the content the page
+// renders some other way. Scoring that as a failed criterion marks sieve down
+// for having worked.
+func TestTokenReductionNeedsSomethingToReduce(t *testing.T) {
+	mk := func(visible int) *Report {
+		r := &Report{RawVisibleChars: visible}
+		for i := 0; i < 4; i++ {
+			id := fmt.Sprintf("q%02d", i)
+			r.Answers = append(r.Answers,
+				Answer{QuestionID: id, Condition: ConditionRaw, Accuracy: 0,
+					Graded: true, Usage: llm.Usage{InputTokens: 100}},
+				Answer{QuestionID: id, Condition: ConditionArtifact, Accuracy: 1,
+					Graded: true, Usage: llm.Usage{InputTokens: 400}})
+		}
+		byID := map[string]Question{}
+		for i := 0; i < 4; i++ {
+			byID[fmt.Sprintf("q%02d", i)] = Question{ID: fmt.Sprintf("q%02d", i)}
+		}
+		r.Metrics.Raw = computeMetrics(r.Answers, byID, ConditionRaw)
+		r.Metrics.Artifact = computeMetrics(r.Answers, byID, ConditionArtifact)
+		r.Coverage, r.Fidelity, r.FidelityMeasured = 1, 1, true
+		r.judge()
+		return r
+	}
+
+	empty := mk(10)
+	if !empty.Verdict.MetTokenTarget {
+		t.Error("a page that served no text was failed for not being reduced")
+	}
+	if empty.Verdict.TokenReductionApplies {
+		t.Error("the criterion was reported as applying to an empty page")
+	}
+	if len(empty.Verdict.Notes) == 0 {
+		t.Error("a criterion was waived without saying so")
+	}
+
+	// Where the page did serve text, a fourfold increase is still a failure.
+	full := mk(50000)
+	if full.Verdict.MetTokenTarget {
+		t.Error("a real page that grew fourfold was passed")
+	}
+}
+
+// TestUngradedAnswersAreNotWrongAnswers covers the failure that made a complete
+// run report a total collapse of both conditions.
+//
+// Every question was answered; the grader then ran out of daily quota. Each
+// answer kept the zero Accuracy it was born with, and the means were taken over
+// answers rather than over grades, so the report showed 0.000 against 0.000 --
+// the extraction apparently failing on a page where coverage was 1.000 in the
+// same report. It is the same mistake the answering path already guards
+// against, one stage further along: a measurement that did not happen is not a
+// result of zero.
+func TestUngradedAnswersAreNotWrongAnswers(t *testing.T) {
+	rep := &Report{RawVisibleChars: 50000}
+	byID := map[string]Question{}
+	for i := 0; i < 4; i++ {
+		id := fmt.Sprintf("q%02d", i)
+		byID[id] = Question{ID: id, Band: BandFactual}
+		// The raw side graded cleanly and scored nothing.
+		rep.Answers = append(rep.Answers, Answer{
+			QuestionID: id, Condition: ConditionRaw, Text: "no idea",
+			Accuracy: 0, Graded: true, Usage: llm.Usage{InputTokens: 9000},
+		})
+		// The artifact side answered, but the grader was never reached.
+		a := Answer{
+			QuestionID: id, Condition: ConditionArtifact, Text: "the real answer",
+			Usage: llm.Usage{InputTokens: 300}, GraderNote: "grading failed: quota",
+		}
+		if i == 0 {
+			// One did get graded, so there is something to compare.
+			a.Graded, a.Accuracy, a.GraderNote = true, 1, ""
+		}
+		rep.Answers = append(rep.Answers, a)
+	}
+	rep.Metrics.Raw = computeMetrics(rep.Answers, byID, ConditionRaw)
+	rep.Metrics.Artifact = computeMetrics(rep.Answers, byID, ConditionArtifact)
+	rep.collectFailures()
+	rep.judge()
+
+	art := rep.Metrics.Artifact
+	if art.Answered != 4 {
+		t.Errorf("answered = %d, want 4: the calls did succeed", art.Answered)
+	}
+	if art.Scored != 1 || art.Ungraded != 3 {
+		t.Errorf("scored=%d ungraded=%d, want 1 and 3", art.Scored, art.Ungraded)
+	}
+	// The one graded answer was correct, so accuracy is 1.0 -- not 0.25, which
+	// is what averaging three ungraded zeros into it would give.
+	if art.MeanAccuracy != 1.0 {
+		t.Errorf("accuracy = %.3f, want 1.000; ungraded answers were averaged in",
+			art.MeanAccuracy)
+	}
+	if rep.Verdict.ComparedQuestions != 1 {
+		t.Errorf("compared %d questions, want 1", rep.Verdict.ComparedQuestions)
+	}
+	// And the reason has to be visible, not left in the JSON.
+	if len(rep.CallFailures) == 0 {
+		t.Fatal("a grading failure was not reported as a failure at all")
+	}
+	if !strings.Contains(rep.CallFailures[0].Reason, "quota") {
+		t.Errorf("failure reason = %q, want the grader's own message",
+			rep.CallFailures[0].Reason)
+	}
+}
+
+// TestNothingGradedIsNotAResult: if the grader never succeeded at all, there is
+// no comparison to report, only a missing one.
+func TestNothingGradedIsNotAResult(t *testing.T) {
+	rep := &Report{RawVisibleChars: 50000}
+	byID := map[string]Question{}
+	for i := 0; i < 3; i++ {
+		id := fmt.Sprintf("q%02d", i)
+		byID[id] = Question{ID: id}
+		rep.Answers = append(rep.Answers,
+			Answer{QuestionID: id, Condition: ConditionRaw, Text: "a",
+				GraderNote: "grading failed: quota"},
+			Answer{QuestionID: id, Condition: ConditionArtifact, Text: "b",
+				GraderNote: "grading failed: quota"})
+	}
+	rep.Metrics.Raw = computeMetrics(rep.Answers, byID, ConditionRaw)
+	rep.Metrics.Artifact = computeMetrics(rep.Answers, byID, ConditionArtifact)
+	rep.collectFailures()
+	rep.judge()
+
+	if rep.Verdict.Passed {
+		t.Error("a run in which nothing was graded was marked as passing")
+	}
+	if !strings.Contains(rep.Verdict.Summary, "could not be measured") {
+		t.Errorf("summary = %q, want it to say the run could not be measured",
+			rep.Verdict.Summary)
+	}
+	if !strings.Contains(rep.Verdict.Summary, "graded") {
+		t.Errorf("summary = %q, want it to distinguish ungraded from unanswered",
 			rep.Verdict.Summary)
 	}
 }

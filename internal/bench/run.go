@@ -149,9 +149,10 @@ func (r *Runner) Run(ctx context.Context, in Input) (*Report, error) {
 		ContentHash: in.Artifact.ContentHash,
 		Tier:        in.Artifact.Provenance.Tier,
 
-		RawTokens:     rep0RawTokens,
-		RawTokensSent: rawSent,
-		RawTruncated:  truncated,
+		RawTokens:       rep0RawTokens,
+		RawTokensSent:   rawSent,
+		RawTruncated:    truncated,
+		RawVisibleChars: visibleTextLen(rawText),
 	}
 
 	r.opts.logf("raw page ~%d tokens, artifact ~%d tokens",
@@ -227,6 +228,7 @@ func (r *Runner) Run(ctx context.Context, in Input) (*Report, error) {
 		rep.GraderAgreement, rep.GraderRegraded = r.measureGraderAgreement(ctx, in.Set, answers, n)
 	}
 
+	rep.collectFailures()
 	rep.judge()
 	return rep, nil
 }
@@ -321,12 +323,13 @@ func (r *Runner) grade(ctx context.Context, q Question, a *Answer) error {
 		// the only honest options are a hand grade or none. Scoring it anyway
 		// would put a number in the report that nobody could check.
 		a.GraderNote = "no ground-truth facts supplied for this question; not scored"
-		return nil
+		return nil // Graded stays false: excluded, not scored zero.
 	}
 	if strings.Contains(strings.ToUpper(a.Text), "NOT IN THE PROVIDED TEXT") {
 		a.Accuracy = 0
 		a.FactsMissed = q.Facts
 		a.GraderNote = "the answer reported the information was absent"
+		a.Graded = true // A real grade: the answer was given and found none of the facts.
 		return nil
 	}
 
@@ -350,6 +353,7 @@ func (r *Runner) grade(ctx context.Context, q Question, a *Answer) error {
 	a.FactsMissed = v.Missed
 	a.GraderNote = v.Note
 	a.Accuracy = round3(float64(len(v.Found)) / float64(len(q.Facts)))
+	a.Graded = true
 	return nil
 }
 
