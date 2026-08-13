@@ -1,0 +1,232 @@
+# Question set for pear.no.
+#
+# The counterpart to igloo.inc. igloo serves an empty body, so the control can
+# read nothing and any comparison is a walkover; pear serves roughly four
+# thousand characters of real prose, so the control can genuinely answer and the
+# artifact has to earn its margin. It is also the only set here where the token
+# reduction criterion applies at all, which means it is the only one that tests
+# it.
+#
+# What makes pear worth distilling is the shape of its markup rather than its
+# absence. The headline is animated letter by letter, so "Pear makes you appear."
+# is thirty-odd elements each holding a single character, and the two navigation
+# labels and several headings are duplicated between a desktop and a mobile
+# rendering of the same page. A reader handed the served HTML meets the text in
+# pieces; q13 and q14 are there to check that sieve hands over sentences.
+#
+# Ground truth was read from the served HTML itself:
+#
+#   curl -sL https://pear.no | python -c "...strip tags..."
+#
+# Every fact below appears in that output. Nothing here was taken from sieve's
+# artifact, and nothing asserts an absence or describes the artifact rather than
+# the page -- both were mistakes in an earlier set and neither is checkable.
+#
+# This page needs a larger read budget than the default, and that is the most
+# useful thing it has to teach. pear cancels native scrolling and is driven with
+# wheel events, revealing each section as it comes into view, so the sweep is
+# rate-limited by the page rather than by the machine. Coverage against the same
+# build, varying only -timeout:
+#
+#   -timeout 10s (default)   0.733    15 blocks
+#   -timeout 45s             0.778    43 blocks
+#   -timeout 90s             0.956    51 blocks
+#
+# Nothing was unreachable at ten seconds; the sweep was simply stopped before it
+# arrived. Run it with room:
+#
+#   sieve distill https://pear.no -timeout 90s -out ./artifacts
+#   sieve bench ./artifacts/pear.no --questions testdata/questions/pear.yaml
+#
+# The two facts in q20 are still missing at 90s. They are in the last paragraph
+# of the page and are left in deliberately: a set that scores a clean 1.000 stops
+# being able to detect improvement.
+
+name: Pear (revenue-share studio, per-letter animated headings)
+url: https://pear.no
+
+questions:
+  # --- Factual retrieval ----------------------------------------------------
+  - id: q01
+    band: factual
+    ask: What does it cost to start working with Pear?
+    expect: Nothing upfront and nothing hourly — no retainer, no project fee.
+    facts:
+      - nothing upfront
+      - nothing hourly
+
+  - id: q02
+    band: factual
+    ask: How does Pear get paid?
+    expect: An agreed percentage of the new revenue the work generates.
+    facts:
+      - agreed percentage
+      - new revenue
+
+  - id: q03
+    band: factual
+    ask: What happens if the client's revenue does not grow?
+    expect: The client owes Pear nothing.
+    facts:
+      - you owe us nothing
+
+  - id: q04
+    band: factual
+    ask: Is the revenue share applied to all of a client's revenue?
+    expect: No — only to growth above the existing baseline, never to revenue
+      the client already had.
+    facts:
+      - growth above your existing baseline
+      - never to the revenue you already had
+
+  - id: q05
+    band: factual
+    ask: Why does Pear say it uses revenue share rather than fees?
+    expect: Because hourly billing pays agencies for effort rather than results,
+      and a retainer earns the same whether the client grows or not.
+    facts:
+      - pays agencies for effort, not results
+      - earns the same whether you grow or not
+
+  - id: q06
+    band: factual
+    ask: How is the revenue Pear creates measured?
+    expect: Against a baseline agreed from existing numbers, attributed through
+      analytics, order data or bookings, on a dashboard both sides can see.
+    facts:
+      - baseline from your existing numbers
+      - analytics, order data or bookings
+      - both sides see the same dashboard
+
+  - id: q07
+    band: factual
+    ask: How quickly does Pear say the work pays off?
+    expect: Software and technical fixes land in weeks; rankings and revenue
+      typically move within months.
+    facts:
+      - land in weeks
+      - move within months
+
+  - id: q08
+    band: factual
+    ask: What is Pear's organisation number and where is it based?
+    expect: Org nr 919 062 517, Oslo.
+    facts:
+      - 919 062 517
+      - Oslo
+
+  - id: q09
+    band: factual
+    ask: What kinds of business does Pear say it partners with?
+    expect: E-commerce, SaaS, marketplaces and service companies — businesses
+      with real products, existing revenue, and customers who search.
+    facts:
+      - e-commerce
+      - marketplaces
+      - service companies
+
+  - id: q10
+    band: factual
+    ask: Who does Pear say it is the wrong partner for?
+    expect: Pre-revenue companies, those wanting to rent developers by the hour,
+      and those needing results by Friday.
+    facts:
+      - pre-revenue
+      - rent developers by the hour
+      - results by Friday
+
+  - id: q11
+    band: factual
+    ask: What does Pear say about who owns the work it produces?
+    expect: The client keeps everything Pear builds — the software, the content
+      and the rankings.
+    facts:
+      - you keep everything we build
+      - software, the content, the rankings
+
+  - id: q12
+    band: factual
+    ask: What does Pear say about how many partners it takes on, and why?
+    expect: A few at a time, because being paid on the outcome means a yes has
+      to be earned.
+    facts:
+      - a few partners at a time
+      - yes has to be earned
+
+  # --- Structural -----------------------------------------------------------
+  #
+  # The two questions this page exists in the set for. Both target text the
+  # served HTML holds one character per element, so an extraction that does not
+  # reassemble runs will answer them as gibberish or not at all.
+  - id: q13
+    band: structural
+    ask: What is the site's main headline or tagline?
+    expect: 'Pear makes you appear. — followed by: Not an agency on the clock,
+      a partner in the upside.'
+    facts:
+      - Pear makes you appear
+      - not an agency on the clock
+      - partner in the upside
+
+  - id: q14
+    band: structural
+    ask: How does Pear summarise what it does, in its own three short sentences?
+    expect: "We build it. We rank it. We share in what it earns."
+    facts:
+      - We build it
+      - We rank it
+      - We share in what it earns
+
+  - id: q15
+    band: structural
+    ask: How is the page divided into chapters, and what are they called?
+    expect: Four chapters — The Model, The Work, The Terms and Questions.
+    facts:
+      - The Model
+      - The Work
+      - The Terms
+      - Questions
+
+  - id: q16
+    band: structural
+    ask: What two disciplines does Pear present as its offering?
+    expect: Search engine optimization and custom software, treated as one
+      discipline.
+    facts:
+      - search engine optimization
+      - custom software
+
+  # --- Actionable -----------------------------------------------------------
+  - id: q17
+    band: actionable
+    ask: How does someone apply to work with Pear, and what should they say?
+    expect: Send an application saying what they sell and where they want to
+      grow.
+    facts:
+      - what you sell
+      - where you want to grow
+
+  - id: q18
+    band: actionable
+    ask: How long does Pear take to respond to an application?
+    expect: Every application is read, and when the model fits they answer
+      within a week.
+    facts:
+      - every application is read
+      - within a week
+
+  - id: q19
+    band: actionable
+    ask: What email address can Pear be reached at?
+    expect: info@pear.no
+    facts:
+      - info@pear.no
+
+  - id: q20
+    band: actionable
+    ask: What does Pear say about how it builds software so that it ranks?
+    expect: Architecture, speed and structure decide rankings before the first
+      word of copy is written, so its software ships fast and renders clean.
+    facts:
+      - architecture, speed and structure
+      - before the first word of copy

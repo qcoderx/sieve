@@ -385,15 +385,7 @@ func (r *Runner) measureCoverage(set *Set, artifactText string) float64 {
 // string, since ground truth is written as a claim and the page states it in
 // its own words.
 func factPresent(haystackLower, fact string) bool {
-	words := strings.Fields(strings.ToLower(fact))
-	var significant []string
-	for _, w := range words {
-		w = strings.Trim(w, ".,;:!?\"'()")
-		if len(w) < 4 || stopWords[w] {
-			continue
-		}
-		significant = append(significant, w)
-	}
+	significant := significantWords(fact)
 	if len(significant) == 0 {
 		return strings.Contains(haystackLower, strings.ToLower(fact))
 	}
@@ -634,3 +626,72 @@ func findQuestion(set *Set, id string) Question {
 // Model reports the model the runner resolved to, so a caller can name it
 // before the run rather than after.
 func (r *Runner) Model() string { return r.opts.Model }
+
+// FactCheck is one ground-truth fact and whether the artifact carries it.
+type FactCheck struct {
+	QuestionID string `json:"question_id"`
+	Fact       string `json:"fact"`
+	Present    bool   `json:"present"`
+	// Missing lists the fact's distinctive words that appear nowhere in the
+	// artifact. It is what turns "coverage 0.81" into something actionable:
+	// usually either a real gap in the extraction or a fact whose wording was
+	// never on the page to begin with.
+	Missing []string `json:"missing,omitempty"`
+}
+
+// CoverageResult is the whole check.
+type CoverageResult struct {
+	Coverage float64     `json:"coverage"`
+	Total    int         `json:"total"`
+	Found    int         `json:"found"`
+	Facts    []FactCheck `json:"facts"`
+}
+
+// CheckCoverage measures coverage without calling a model.
+//
+// Coverage is pure string matching against the artifact, so it never needed a
+// provider -- but it was only reachable by running the full benchmark, which
+// does. Anyone writing a question set therefore had to spend a complete graded
+// run to discover that a fact was worded in a way the page never uses, and
+// several such mistakes were only found by hand-editing a temporary test. A set
+// is a test; checking a test should be free.
+func CheckCoverage(set *Set, g *graph.Graph) CoverageResult {
+	opt := emit.CompactMarkdownOptions()
+	opt.Actions, opt.Navigation, opt.Structured, opt.Gaps, opt.Notes = true, true, true, true, true
+	lower := strings.ToLower(emit.Markdown(g, opt))
+
+	var res CoverageResult
+	for _, q := range set.Questions {
+		for _, f := range q.Facts {
+			res.Total++
+			fc := FactCheck{QuestionID: q.ID, Fact: f, Present: factPresent(lower, f)}
+			if fc.Present {
+				res.Found++
+			} else {
+				for _, w := range significantWords(f) {
+					if !strings.Contains(lower, w) && !strings.Contains(lower, stem(w)) {
+						fc.Missing = append(fc.Missing, w)
+					}
+				}
+			}
+			res.Facts = append(res.Facts, fc)
+		}
+	}
+	if res.Total > 0 {
+		res.Coverage = round3(float64(res.Found) / float64(res.Total))
+	}
+	return res
+}
+
+// significantWords is the part of a fact that matching actually looks at.
+func significantWords(fact string) []string {
+	var out []string
+	for _, w := range strings.Fields(strings.ToLower(fact)) {
+		w = strings.Trim(w, ".,;:!?\"'()")
+		if len(w) < 4 || stopWords[w] {
+			continue
+		}
+		out = append(out, w)
+	}
+	return out
+}

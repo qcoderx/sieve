@@ -1,4 +1,4 @@
-﻿# Build artifacts
+# Build artifacts
 /sieve
 /sieve.exe
 /dist/
@@ -12,3 +12,13 @@
 # Go
 *.test
 *.out
+
+# Distilled output from local runs. These are regenerable by definition -- each
+# is whatever `sieve distill` produced on some machine on some day -- and they
+# are large, numerous, and change on every run. /reports is the conventional
+# place for them here; the question sets under testdata name it in their
+# examples.
+/reports/
+/scratch-*/
+/artifacts-*/
+tout.txt

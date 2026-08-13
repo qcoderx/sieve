@@ -1013,8 +1013,20 @@ func (b *Browser) runSweep(ctx context.Context, res *Result, col *collector,
 		return fmt.Errorf("decode sweep reply (%d bytes): %w", len(raw), err)
 	}
 	if reply.Partial {
+		// Name the flag, as the load-timeout note does.
+		//
+		// This note said what had happened and left the reader to work out what
+		// to do about it, which is a poor trade when the remedy is one flag. On
+		// a scroll-jacked page driven by wheel events, raising the read budget
+		// from ten seconds to ninety took coverage from 0.73 to 0.96 -- the
+		// content was never unreachable, the sweep was simply stopped before it
+		// got there, and nothing in the output suggested trying again with more
+		// time.
 		res.note(fmt.Sprintf("the sweep ran out of time after %d checkpoint(s) and was collected "+
-			"where it stood; the page continued below the point it reached", reply.Checkpoints))
+			"where it stood; the page continued below the point it reached. Pages that "+
+			"reveal content gradually, or that drive their own scrolling, can be read "+
+			"more completely by raising -timeout, which is the budget for reading a page "+
+			"once it has loaded", reply.Checkpoints))
 	}
 
 	for i := range reply.Snapshots {
@@ -1101,7 +1113,7 @@ type gateState struct {
 	Loading bool   `json:"loading"`
 	Invites bool   `json:"invites"`
 	// Keys is the page asking for a keystroke rather than a pointer.
-	Keys bool `json:"keys"`
+	Keys    bool `json:"keys"`
 	Control *struct {
 		Label string  `json:"label"`
 		X     float64 `json:"x"`
@@ -1629,7 +1641,7 @@ func (b *Browser) openEntryGate(ctx context.Context, res *Result, deadline time.
 			// from here.
 			if g.Keys && !keyed {
 				keyed = true
-				b.opts.logf("the control did not answer, and the page also asks for a key; "+
+				b.opts.logf("the control did not answer, and the page also asks for a key; " +
 					"pressing Enter")
 				if b.pressKey(ctx) {
 					b.noteEntered(res, "the screen asking a visitor to press a key")

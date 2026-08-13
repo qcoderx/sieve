@@ -1,0 +1,216 @@
+# Question set for hatom.com.
+#
+# A second near-empty page, and deliberately a different kind of empty from
+# igloo.inc. igloo draws its words as glyph geometry inside a WebGL scene;
+# hatom is a Nuxt application whose served HTML carries a language switcher, a
+# three-item menu and the words "Loading 5 phases" — about two hundred and forty
+# characters — while the content proper arrives afterwards in a JSON payload the
+# page fetches for itself. Both defeat an unaided fetch, for unrelated reasons,
+# and an extractor that handles one need not handle the other.
+#
+# Ground truth was read from that payload rather than from sieve:
+#
+#   curl -sL 'https://hatom.com/_payload.json?<build-id>'
+#
+# The build id changes; it is the value in the <script src> the page itself
+# requests. Every fact below is a literal string in that document.
+#
+# One note on provenance, because it caused a real error. An earlier version of
+# the igloo set credited "headphones recommended" to igloo.inc. It is hatom's,
+# and it is here, in the served HTML, where it belongs. Two sites of the same
+# genre are easy to conflate, and ground truth taken from memory rather than
+# from the page is how a benchmark ends up grading the wrong thing.
+#
+# THIS SET CURRENTLY FAILS, AND IS COMMITTED FAILING ON PURPOSE.
+#
+# sieve scores about 0.05 on it. That is not a set that needs fixing: every fact
+# below was read out of the payload the page itself fetches, so the content is
+# real and the site does display it. sieve cannot get to it, and says so rather
+# than guessing -- the artifact it produces carries a note reading "this site is
+# behind an entry screen labelled LOADING 5 PHASES ... HEADPHONES RECOMMENDED;
+# the page past it never loaded, so this artifact describes the interstitial and
+# not the site".
+#
+# What was ruled out, so the next person does not repeat it:
+#
+#   - Not a load-timeout problem. At -load-timeout 120s the loader still reports
+#     100 and the render still comes back with nothing readable.
+#   - Not the entry-gate handler. There is no button to press: the bundle has no
+#     enter, start or begin label, only framework internals that match those
+#     words (beforeRouteEnter, onEnterFrame).
+#   - Not the scene walk either, which is what reads igloo.inc. hatom does use
+#     three.js -- the devtools hook, WebGLRenderer and isScene are all in the
+#     bundle -- but it has no MSDF or troika glyph text, so its words are most
+#     likely painted as textures. There is no geometry to read them out of.
+#
+# The value of a failing test here is that it is specific. If the phases ever
+# start appearing, this set will say so on the first run; and if the answer
+# turns out to be that texture-drawn text cannot be recovered without OCR, that
+# is a limit worth having written down against a real page rather than
+# rediscovered.
+#
+#   sieve distill https://hatom.com -load-timeout 40s -out ./artifacts
+#   sieve bench ./artifacts/hatom.com --questions testdata/questions/hatom.yaml
+
+name: Hatom (Nuxt, content arrives in a fetched payload)
+url: https://hatom.com
+
+questions:
+  # --- Factual retrieval ----------------------------------------------------
+  - id: q01
+    band: factual
+    ask: What does Hatom describe itself as?
+    expect: The first liquidity protocol on MultiversX — an innovative,
+      non-custodial ecosystem.
+    facts:
+      - liquidity protocol
+      - MultiversX
+      - non-custodial
+
+  - id: q02
+    band: factual
+    ask: What is the title of Phase 01?
+    expect: Building synergistic DeFi primitives.
+    facts:
+      - synergistic
+      - DeFi primitives
+
+  - id: q03
+    band: factual
+    ask: What does Phase 02 say a user can do with their assets?
+    expect: Lend, borrow or stake them.
+    facts:
+      - lend
+      - borrow
+      - stake
+
+  - id: q04
+    band: factual
+    ask: How does Hatom describe itself in the Phase 02 legend?
+    expect: An inclusive and decentralized DeFi hub.
+    facts:
+      - inclusive
+      - decentralized DeFi hub
+
+  - id: q05
+    band: factual
+    ask: What is the Booster, according to Phase 03?
+    expect: A means of incentivizing growth — described as the shield for a
+      sustainable ecosystem.
+    facts:
+      - incentivizing growth
+      - Booster
+      - shield
+
+  - id: q06
+    band: factual
+    ask: What is USH?
+    expect: An unbiased stablecoin, called the bond of a decentralized world.
+    facts:
+      - USH
+      - stablecoin
+      - unbiased
+
+  - id: q07
+    band: factual
+    ask: What is Phase 05 about?
+    expect: Expanding without borders — multi-chain expansion, shaping global
+      finance.
+    facts:
+      - expanding without borders
+      - global finance
+
+  - id: q08
+    band: factual
+    ask: Which networks does Hatom say it will expand into?
+    expect: Ethereum, Base, Solana and Avalanche.
+    facts:
+      - Ethereum
+      - Base
+      - Solana
+      - Avalanche
+
+  - id: q09
+    band: factual
+    ask: Which chain is Hatom rooted in?
+    expect: MultiversX.
+    facts:
+      - MultiversX
+
+  - id: q10
+    band: factual
+    ask: What does the page recommend for the experience?
+    expect: Headphones.
+    facts:
+      - headphones
+
+  # --- Structural -----------------------------------------------------------
+  - id: q11
+    band: structural
+    ask: How many phases does the page present, and what are they called?
+    expect: Five, numbered Phase 01 through Phase 05.
+    facts:
+      - five phases
+      - Phase 01
+      - Phase 05
+
+  - id: q12
+    band: structural
+    ask: What are the top-level menu items?
+    expect: Home, About and Contact.
+    facts:
+      - Home
+      - About
+      - Contact
+
+  - id: q13
+    band: structural
+    ask: In which languages is the site offered?
+    expect: English, French, Chinese, Korean, Portuguese, Romanian and Spanish.
+    facts:
+      - English
+      - French
+      - Spanish
+
+  - id: q14
+    band: structural
+    ask: Each phase carries a short caption and a longer legend. What are the
+      captions?
+    expect: Phase 01, Phase 02, Phase 03, Phase 04 and Phase 05.
+    facts:
+      - Phase 02
+      - Phase 03
+      - Phase 04
+
+  # --- Actionable -----------------------------------------------------------
+  - id: q15
+    band: actionable
+    ask: How does the page invite a visitor to begin?
+    expect: By scrolling — "Scroll To Discover".
+    facts:
+      - scroll to discover
+
+  - id: q16
+    band: actionable
+    ask: If someone wanted to read about the Booster specifically, which part of
+      the page would they go to?
+    expect: Phase 03.
+    facts:
+      - Phase 03
+
+  - id: q17
+    band: actionable
+    ask: Does the page carry audio, and what for?
+    expect: Yes — each phase has a narration track, with subtitles.
+    facts:
+      - audio
+      - subtitles
+
+  - id: q18
+    band: actionable
+    ask: Where can a visitor go to learn about the networks Hatom plans to
+      expand into?
+    expect: Phase 05 links out to Ethereum, Base, Solana and Avalanche.
+    facts:
+      - ethereum.foundation
+      - solana.com

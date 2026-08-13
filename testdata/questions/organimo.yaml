@@ -1,0 +1,232 @@
+# Question set for organimo.com.
+#
+# A commerce page, and the third shape in this directory. igloo.inc and
+# hatom.com serve nothing and have to be rendered; pear.no serves its prose but
+# animates its headings letter by letter. organimo does both at once: it serves
+# around three thousand characters, splits words across elements mid-syllable
+# ("Li m itless", "e v er n eed", "i n gredients"), and hides most of its
+# substance behind seven collapsed accordion panels.
+#
+# Those panels are why it is here. The health-benefit sections are the only
+# place the page states anything specific, and each is behind a "+" toggle. An
+# extractor that reads what is painted on first load gets marketing slogans; one
+# that opens what a reader would open gets the content. q08 to q14 are all
+# inside them, so the set fails loudly if that stops working.
+#
+# Ground truth is the served HTML, which does carry the panel text even while
+# the panels are shut:
+#
+#   curl -sL https://organimo.com | python -c "...strip tags..."
+#
+# Note that the page writes some entities in a form worth knowing about --
+# "no preserv&shy;atives" carries a soft hyphen inside the word. The fact below
+# is written as the reader sees it, not as the markup spells it, because that is
+# what a correct extraction should produce.
+#
+#   sieve distill https://organimo.com -out ./artifacts
+#   sieve bench ./artifacts/organimo.com --questions testdata/questions/organimo.yaml
+
+name: Organimo (commerce, split words, collapsed panels)
+url: https://organimo.com
+
+questions:
+  # --- Factual retrieval ----------------------------------------------------
+  - id: q01
+    band: factual
+    ask: What does Organimo sell?
+    expect: A supplement blend of sea moss and bladderwrack.
+    facts:
+      - sea moss
+      - bladderwrack
+
+  - id: q02
+    band: factual
+    ask: How does the site describe the product in one line?
+    expect: The only natural multivitamin you will ever need.
+    facts:
+      - only natural multivitamin
+      - ever need
+
+  - id: q03
+    band: factual
+    ask: Where are the ingredients sourced from?
+    expect: Canada — naturally sourced marine ingredients, harvested in Canada.
+    facts:
+      - Canada
+      - marine ingredients
+
+  - id: q04
+    band: factual
+    ask: Where do the algae plants grow?
+    expect: Naturally, on marine beds and rocks, in high-grade regions the
+      company describes as clean and 100% natural.
+    facts:
+      - marine beds and rocks
+
+  - id: q05
+    band: factual
+    ask: What dietary and sourcing claims does the product carry?
+    expect: Vegan, harvested in Canada, non-GMO, gluten free, no preservatives,
+      made in USA — and 100% wildcrafted and raw.
+    facts:
+      - vegan
+      - non gmo
+      - gluten free
+      - no preservatives
+      - made in usa
+
+  - id: q06
+    band: factual
+    ask: What nickname does the page give the product?
+    expect: The real limitless pill.
+    facts:
+      - the real limitless pill
+
+  - id: q07
+    band: factual
+    ask: What regulatory disclaimer does the page carry?
+    expect: That the statements have not been evaluated by the Food and Drug
+      Administration, and the product is not intended to diagnose, treat, cure
+      or prevent any disease.
+    facts:
+      - not been evaluated by the Food and Drug Administration
+      - diagnose, treat, cure or prevent any disease
+
+  # --- The collapsed panels -------------------------------------------------
+  #
+  # Seven of them, each behind a "+". This is the part of the page a reader has
+  # to act on to see, and the part an extraction is most likely to miss.
+  - id: q08
+    band: factual
+    ask: What health benefits does the page claim, as its own section headings?
+    expect: Energy levels, immune support, cognitive function, skin health,
+      sexual health, respiratory health and heart health, plus digestive health.
+    facts:
+      - energy levels
+      - immune support
+      - cognitive function
+      - skin health
+      - respiratory health
+      - heart health
+      - digestive health
+
+  - id: q09
+    band: factual
+    ask: Why does the page say the product increases energy?
+    expect: It is rich in vitamins and minerals like iron, and its
+      anti-inflammatory properties reduce the risk of fatigue.
+    facts:
+      - iron
+      - anti-inflammatory
+      - fatigue
+
+  - id: q10
+    band: factual
+    ask: What does the page claim about cognitive function, and which minerals
+      does it credit?
+    expect: High magnesium and potassium levels impact brain health, increasing
+      focus, memory and mood.
+    facts:
+      - magnesium
+      - potassium
+      - focus, memory
+
+  - id: q11
+    band: factual
+    ask: What skin conditions does the page mention by name?
+    expect: Eczema and psoriasis, alongside acne.
+    facts:
+      - eczema
+      - psoriasis
+      - acne
+
+  - id: q12
+    band: factual
+    ask: What does the page claim for heart health, and which nutrients does it
+      name?
+    expect: High in omega-3 fatty acids, fiber and potassium, lowering the risk
+      of heart disease, diabetes, blood clots, high cholesterol and high blood
+      pressure.
+    facts:
+      - omega-3
+      - fiber
+      - heart disease
+      - cholesterol
+
+  - id: q13
+    band: factual
+    ask: What does the page say about digestive health?
+    expect: It is a natural prebiotic supplement that improves gut health,
+      digestion and weight loss and promotes a healthy colon.
+    facts:
+      - prebiotic
+      - gut health
+      - colon
+
+  - id: q14
+    band: factual
+    ask: What does the page claim about respiratory health?
+    expect: It removes mucus from the body, improves breathing and boosts lung
+      function, with natural decongestants soothing the bronchial system.
+    facts:
+      - mucus
+      - lung function
+      - bronchial
+
+  # --- Structural -----------------------------------------------------------
+  - id: q15
+    band: structural
+    ask: What is the site's main headline?
+    expect: From body to mind — limitless begins here.
+    facts:
+      - from body to mind
+      - limitless begins here
+
+  - id: q16
+    band: structural
+    ask: Which currencies can prices be shown in?
+    expect: USD, CAD, GBP, EUR and AUD.
+    facts:
+      - USD
+      - CAD
+      - GBP
+      - EUR
+      - AUD
+
+  - id: q17
+    band: structural
+    ask: What are the main navigation items?
+    expect: Shop, Home, Affirm, News and Login.
+    facts:
+      - Shop
+      - Affirm
+      - News
+      - Login
+
+  # --- Actionable -----------------------------------------------------------
+  - id: q18
+    band: actionable
+    ask: What is the page's call to action for buying?
+    expect: Shop now.
+    facts:
+      - shop now
+
+  - id: q19
+    band: actionable
+    ask: What support and policy pages does the site link to?
+    expect: Contact, wholesale, returns policy, disclaimer, privacy policy and
+      terms of service.
+    facts:
+      - contact
+      - wholesale
+      - returns policy
+      - privacy policy
+      - terms of service
+
+  - id: q20
+    band: actionable
+    ask: A visitor wants to buy at trade prices rather than retail. Where should
+      they go?
+    expect: The wholesale page.
+    facts:
+      - wholesale

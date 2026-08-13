@@ -32,6 +32,8 @@ func runBench(args []string, stdout, stderr io.Writer) int {
 		budget    int64
 		rawCap    int
 		regrade   int
+
+		coverageOnly bool
 	)
 	common.register(fs)
 	fs.StringVar(&questions, "questions", "", "path to a question set (YAML or JSON)")
@@ -49,6 +51,12 @@ func runBench(args []string, stdout, stderr io.Writer) int {
 	fs.IntVar(&regrade, "regrade", 0,
 		"re-grade this many answers to measure how far the grader agrees with\n"+
 			"itself. It is the error bar on every accuracy figure; 12 is useful.")
+	fs.BoolVar(&coverageOnly, "coverage-only", false,
+		"check which ground-truth facts are present in the artifact and stop.\n"+
+			"No model is called and no credentials are needed. This is how to\n"+
+			"check a question set you have just written: a fact whose wording\n"+
+			"appears nowhere is usually a mistake in the set rather than a loss\n"+
+			"in the extraction, and finding that out should not cost a run.")
 
 	fs.Usage = func() {
 		fmt.Fprint(stderr, `Usage: sieve bench <artifact-dir> --questions <file> [flags]
@@ -89,7 +97,8 @@ Flags:
 		fmt.Fprintln(stderr, "sieve: --questions is required unless --stability is set")
 		return 2
 	}
-	if !llm.HasCredentials("") {
+	// Credentials are only needed once a model is going to be called.
+	if !coverageOnly && !llm.HasCredentials("") {
 		return fail(stderr, llm.ErrNoCredentials)
 	}
 
@@ -100,6 +109,11 @@ Flags:
 	g, err := emit.LoadGraph(target)
 	if err != nil {
 		return fail(stderr, fmt.Errorf("load artifact from %s: %w", target, err))
+	}
+
+	if coverageOnly {
+		printCoverage(stdout, set, bench.CheckCoverage(set, g))
+		return 0
 	}
 
 	// The raw condition needs the page as an unaided agent would receive it, so
@@ -359,4 +373,38 @@ func fetchRaw(target string, common commonFlags) (string, error) {
 		return "", err
 	}
 	return string(resp.Body), nil
+}
+
+// printCoverage reports which ground-truth facts the artifact carries.
+//
+// The missing ones are the point. A bare score says something is wrong without
+// saying what, and the two causes look identical from the number alone: the
+// extraction lost content, or the fact was written in words the page never
+// used. Printing the words that appear nowhere lets the author tell those apart
+// in a second, and the wording is often the answer.
+func printCoverage(w io.Writer, set *bench.Set, res bench.CoverageResult) {
+	fmt.Fprintf(w, "\n%s\n", set.URL)
+	fmt.Fprintf(w, "  coverage %.3f  (%d of %d ground-truth facts present)\n\n",
+		res.Coverage, res.Found, res.Total)
+
+	missing := 0
+	for _, f := range res.Facts {
+		if f.Present {
+			continue
+		}
+		missing++
+		fmt.Fprintf(w, "  missing  %-5s %q\n", f.QuestionID, f.Fact)
+		if len(f.Missing) > 0 {
+			fmt.Fprintf(w, "           words absent from the artifact: %s\n",
+				strings.Join(f.Missing, ", "))
+		}
+	}
+	if missing == 0 {
+		fmt.Fprintf(w, "  every fact in the set is present in the artifact\n")
+	} else {
+		fmt.Fprintf(w, "\n  %d fact(s) missing. Before treating these as extraction failures,\n", missing)
+		fmt.Fprintf(w, "  check them against the page's own source: a fact the page never\n")
+		fmt.Fprintf(w, "  states, or states in other words, is a fault in the question set.\n")
+	}
+	fmt.Fprintln(w)
 }

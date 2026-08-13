@@ -701,3 +701,54 @@ func TestNothingGradedIsNotAResult(t *testing.T) {
 			rep.Verdict.Summary)
 	}
 }
+
+// TestCheckCoverageNamesWhatIsMissing: the offline check has to say which
+// facts are absent, not just how many.
+//
+// A bare score cannot distinguish the two causes, and they need opposite
+// responses: content the extraction lost, versus a fact worded in a way the
+// page never uses. Three faults in a hand-written set were found this way, and
+// each had been costing a full graded run to discover.
+func TestCheckCoverageNamesWhatIsMissing(t *testing.T) {
+	g := &graph.Graph{
+		Title: "Workshop",
+		Blocks: []graph.Block{
+			{ID: "b_000", Type: graph.TypeParagraph, Source: graph.SourceDOM,
+				Text: "The workshop was founded in 1974 in Oslo."},
+		},
+	}
+	set := &Set{URL: "https://example.com/", Questions: []Question{
+		{ID: "q01", Facts: []string{"founded in 1974", "Oslo"}},
+		{ID: "q02", Facts: []string{"ships internationally"}},
+	}}
+
+	res := CheckCoverage(set, g)
+	if res.Total != 3 || res.Found != 2 {
+		t.Fatalf("found %d of %d, want 2 of 3", res.Found, res.Total)
+	}
+	if res.Coverage != round3(2.0/3.0) {
+		t.Errorf("coverage = %.3f", res.Coverage)
+	}
+
+	var missing *FactCheck
+	for i := range res.Facts {
+		if !res.Facts[i].Present {
+			missing = &res.Facts[i]
+		}
+	}
+	if missing == nil {
+		t.Fatal("no fact reported missing")
+	}
+	if missing.QuestionID != "q02" {
+		t.Errorf("missing fact attributed to %s, want q02", missing.QuestionID)
+	}
+	// The words are the actionable part.
+	if len(missing.Missing) == 0 {
+		t.Error("a missing fact was reported without saying which words were absent")
+	}
+	for _, w := range missing.Missing {
+		if strings.Contains("the workshop was founded in 1974 in oslo.", w) {
+			t.Errorf("%q was reported absent but is in the artifact", w)
+		}
+	}
+}
