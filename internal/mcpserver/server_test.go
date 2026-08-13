@@ -275,3 +275,49 @@ func TestUnknownJobIsAClearError(t *testing.T) {
 		t.Fatal("asking for an unknown job should be an error")
 	}
 }
+
+// TestToolSurfaceStaysSmall is a budget, not a style preference.
+//
+// Tool definitions are sent on every session before the model has read a single
+// page, and the ecosystem is actively rationing MCP installs over exactly this:
+// four servers reported at ~67,000 tokens before the first message, Chrome
+// DevTools MCP at ~17,000 for its definitions alone, teams banning browser
+// tools outright during some phases. A page reader whose selling point is not
+// destroying the context window cannot arrive costing a chunk of one.
+//
+// The surface here was 4,257 tokens, and almost all of it was a single mistake:
+// letting the SDK reflect emit.Manifest into an output schema, which produced
+// nearly 4,000 characters and was emitted by two tools. The navigation guidance
+// a model actually needs now lives in Instructions, which is sent once per
+// session rather than once per tool.
+//
+// The budget is deliberately generous against the 1,737 measured when this was
+// written. It exists to catch a struct being reflected into a schema again by
+// accident, not to argue about a sentence.
+func TestToolSurfaceStaysSmall(t *testing.T) {
+	const budgetTokens = 2200
+
+	fx := fixtureServer(t)
+	sess, done := connect(t, fx)
+	defer done()
+
+	tools, err := sess.ListTools(context.Background(), nil)
+	if err != nil {
+		t.Fatalf("list tools: %v", err)
+	}
+	blob, err := json.Marshal(tools.Tools)
+	if err != nil {
+		t.Fatal(err)
+	}
+	// The same rough four-characters-per-token estimate used elsewhere in this
+	// project; the budget is set with room for its imprecision.
+	got := (len(blob) + len(mcpserver.Instructions)) / 4
+	if got > budgetTokens {
+		t.Errorf("tool surface is ~%d tokens, over the %d budget. "+
+			"Something is expanding a struct into a schema again: look for an "+
+			"OutputSchema that is inferred rather than declared with shape().",
+			got, budgetTokens)
+	}
+	t.Logf("tool surface ~%d tokens across %d tools (budget %d)",
+		got, len(tools.Tools), budgetTokens)
+}
