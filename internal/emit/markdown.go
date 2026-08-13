@@ -49,6 +49,16 @@ type MarkdownOptions struct {
 	Structured bool
 	// Audit appends the artifact's account of its own reliability.
 	Audit bool
+	// Notes appends the prose the extraction recorded about itself: where the
+	// content came from, and what it could not reach.
+	//
+	// Separate from Audit, which is retention ratios and confidence buckets --
+	// statistics about the extraction. These are statements about the content,
+	// and a reader needs them for a different reason: "the words on this page
+	// were read out of a 3D scene rather than the document" changes how much a
+	// figure should be trusted and what a follow-up should ask for, and it was
+	// being computed and then withheld.
+	Notes bool
 	// Strict drops every metadata channel: alt text, aria labels, structured
 	// data, captions. It is the minimal-trust surface for a caller who wants
 	// only text a visitor could have read on screen.
@@ -136,6 +146,9 @@ func Markdown(g *graph.Graph, opt MarkdownOptions) string {
 	}
 	if opt.Gaps {
 		writeGaps(&b, g)
+	}
+	if opt.Notes {
+		writeNotes(&b, g)
 	}
 	if opt.Audit {
 		writeAudit(&b, g)
@@ -541,6 +554,18 @@ func writeGaps(b *strings.Builder, g *graph.Graph) {
 			fmt.Fprintf(b, " Retrieve with `get_hidden_content` for %d block(s).", len(gap.LatentIDs))
 		}
 		b.WriteByte('\n')
+	}
+	b.WriteByte('\n')
+}
+
+// writeNotes emits what the extraction recorded about itself.
+func writeNotes(b *strings.Builder, g *graph.Graph) {
+	if len(g.Audit.Notes) == 0 {
+		return
+	}
+	b.WriteString("## About this extraction\n\n")
+	for _, n := range g.Audit.Notes {
+		fmt.Fprintf(b, "- %s\n", n)
 	}
 	b.WriteByte('\n')
 }

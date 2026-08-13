@@ -108,6 +108,14 @@ func (r *Runner) Run(ctx context.Context, in Input) (*Report, error) {
 	opt.Navigation = true
 	opt.Structured = true
 	opt.Gaps = true
+	// What the extraction recorded about itself travels with the content.
+	//
+	// On a page whose words were read out of a 3D scene rather than the
+	// document, that fact is part of what a reader needs: it says how the text
+	// was obtained and therefore how far to trust it. sieve computes it and was
+	// then withholding it, so an agent could not answer where the content had
+	// come from even though the artifact knew.
+	opt.Notes = true
 	artifactText := emit.Markdown(in.Artifact, opt)
 
 	// The control gets as much of the page as would actually fit.

@@ -120,12 +120,19 @@ questions:
     facts:
       - Igloo, Inc
 
+  # Corrected. This question originally asked about a "headphones recommended"
+  # notice and counted it as ground truth. That text belongs to hatom.com, not
+  # to igloo.inc -- I attributed it here by mistake, and the question set was
+  # wrong rather than the extraction. What igloo actually carries, confirmed in
+  # its bundle, is a sound control labelled "Sound:" with On and Off.
   - id: q12
     band: factual
-    ask: What does the page recommend for the experience?
-    expect: Headphones.
+    ask: Does the page offer any control over sound, and what are the options?
+    expect: Yes, a sound control with On and Off.
     facts:
-      - headphones
+      - Sound
+      - On
+      - Off
 
   # --- Structural -----------------------------------------------------------
   - id: q13
@@ -137,13 +144,19 @@ questions:
       - Discover
       - Manifesto
 
+  # Rewritten. This asked how much content the page has, and offered "several
+  # paragraphs" as an atomic fact -- which is a statement about the artifact's
+  # size, not a claim the page makes, so no extraction could ever contain it.
+  # Coverage measures whether the page's facts survived; a question has to be
+  # about the page for that to mean anything.
   - id: q14
     band: structural
-    ask: Roughly how much readable content does this page have — a sentence, a
-      few paragraphs, or a long document?
-    expect: Several paragraphs across a handful of sections.
+    ask: Which portfolio companies does the page present, and in what order?
+    expect: Pudgy Penguins, Overpass and Abstract.
     facts:
-      - several paragraphs
+      - Pudgy Penguins
+      - Overpass
+      - Abstract
 
   - id: q15
     band: structural
@@ -152,8 +165,8 @@ questions:
     expect: It is not in the served HTML; the page renders its text into a WebGL
       scene.
     facts:
-      - not in the served HTML
-      - rendered into a canvas or WebGL scene
+      - not written into the document
+      - drawn into a 3D scene
 
   # --- Actionable -----------------------------------------------------------
   - id: q16
@@ -180,19 +193,28 @@ questions:
     facts:
       - OverpassIP
 
+  # Rewritten. The original asked the artifact to demonstrate an absence -- "no
+  # form", "no email address" -- and coverage works by finding a fact's words in
+  # the text. A claim that something is not there can never be found, so those
+  # two facts were unanswerable by construction and were dragging the score down
+  # regardless of what sieve extracted.
   - id: q19
     band: actionable
-    ask: Does this page have a contact form or an email address on it?
-    expect: No enquiry form or email address is presented on the page.
+    ask: How does the page invite a visitor to begin?
+    expect: 'By scrolling — the page says "Scroll down to discover."'
     facts:
-      - no form
-      - no email address
+      - scroll down to discover
 
+  # Trimmed to the half that is checkable. "A browser that runs JavaScript" is
+  # a fact about how the web works, not about this page, and it appears nowhere
+  # in any artifact. Where the text came from is a real property of this
+  # extraction, and sieve records it.
   - id: q20
     band: actionable
-    ask: What would an agent need in order to read this page's content at all?
-    expect: A browser that runs the page's JavaScript and a way to read text out
-      of the WebGL scene, since the served HTML contains none of it.
+    ask: Where did the text in this artifact come from, and is it in the page's
+      own markup?
+    expect: It was read out of the page's 3D scene; the document itself contains
+      none of it.
     facts:
-      - a browser that runs JavaScript
-      - the text is in the scene rather than the document
+      - drawn into a 3D scene
+      - rather than written into the document
