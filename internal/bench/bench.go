@@ -231,7 +231,10 @@ type Options struct {
 	Budget int64
 	// Concurrency bounds simultaneous API calls.
 	Concurrency int
-	Logf        func(format string, args ...any)
+	// BaseURL points the run at an OpenAI-compatible provider. Empty means
+	// Anthropic, or whatever LLM_BASE_URL names.
+	BaseURL string
+	Logf    func(format string, args ...any)
 }
 
 // DefaultOptions returns usable settings.

@@ -51,14 +51,14 @@ func NewRunner(opts Options) (*Runner, error) {
 		opts.Concurrency = 4
 	}
 	answer, err := llm.New(llm.Options{
-		APIKey: opts.APIKey, Model: opts.Model,
+		APIKey: opts.APIKey, Model: opts.Model, BaseURL: opts.BaseURL,
 		MaxTokens: 512, Budget: opts.Budget, Effort: "low",
 	})
 	if err != nil {
 		return nil, err
 	}
 	grader, err := llm.New(llm.Options{
-		APIKey: opts.APIKey, Model: opts.GraderModel,
+		APIKey: opts.APIKey, Model: opts.GraderModel, BaseURL: opts.BaseURL,
 		MaxTokens: 1024, Budget: opts.Budget,
 		// The grader is the measurement instrument. Cheapening it makes every
 		// number in the report less trustworthy, so it runs at higher effort
@@ -350,13 +350,23 @@ source says nothing about it, or says something different.
 Be strict. The purpose of this check is to catch content that was invented rather than
 extracted, so err towards marking a statement unsupported when you are unsure.
 
-Reply with JSON only:
-{"supported": <count>, "unsupported": ["statement", ...], "note": "one sentence"}`
+The statements are numbered from 0. Reply with JSON only, giving the NUMBERS of the
+unsupported statements rather than their text:
+{"unsupported": [0, 4, 11], "note": "one short sentence"}`
 
+// fidelityVerdict is the grader's reply.
+//
+// Unsupported carries indices rather than the statements themselves. Asking a
+// model to echo the text back put an unbounded list of long strings inside a
+// bounded reply, so on a page with real content the JSON was cut off
+// mid-string and the whole check failed to parse -- reported as "fidelity
+// could not be measured" on exactly the pages where invention would matter
+// most, silently removing the one criterion that gates a release. Indices cost
+// a handful of tokens whatever the statements say, and the caller already
+// holds the statements to look them up in.
 type fidelityVerdict struct {
-	Supported   int      `json:"supported"`
-	Unsupported []string `json:"unsupported"`
-	Note        string   `json:"note"`
+	Unsupported []int  `json:"unsupported"`
+	Note        string `json:"note"`
 }
 
 // measureFidelity samples the artifact and checks each statement against the
@@ -399,8 +409,11 @@ func (r *Runner) measureFidelity(ctx context.Context, g *graph.Graph, rawText st
 		return 1, []string{"no statements to check"}, nil
 	}
 
-	stmts, _ := json.Marshal(sample)
-	prompt := fmt.Sprintf("SOURCE:\n<<<\n%s\n>>>\n\nSTATEMENTS:\n%s", rawText, stmts)
+	var numbered strings.Builder
+	for i, st := range sample {
+		fmt.Fprintf(&numbered, "%d. %s\n", i, st)
+	}
+	prompt := fmt.Sprintf("SOURCE:\n<<<\n%s\n>>>\n\nSTATEMENTS:\n%s", rawText, numbered.String())
 
 	res, err := r.grader.Ask(ctx, fidelitySystem, []llm.ContentBlock{llm.TextBlock(prompt)})
 	if err != nil {
@@ -412,13 +425,36 @@ func (r *Runner) measureFidelity(ctx context.Context, g *graph.Graph, rawText st
 
 	var v fidelityVerdict
 	if err := json.Unmarshal([]byte(extractJSON(res.Text)), &v); err != nil {
+		// A reply cut off at the token ceiling is a different problem from a
+		// model that cannot follow the format, and the difference tells an
+		// operator whether to raise a limit or change models.
+		if res.StopReason == "length" || res.StopReason == "max_tokens" {
+			return 0, nil, fmt.Errorf("the fidelity grader's reply was cut off at the " +
+				"token ceiling before it could be parsed; raise the grader's max tokens " +
+				"or reduce the sample")
+		}
 		return 0, nil, fmt.Errorf("fidelity grader returned unparseable JSON: %w", err)
 	}
-	score := round3(float64(v.Supported) / float64(len(sample)))
+
+	// An index outside the sample is the grader inventing a statement number.
+	// Letting it through would move the score that gates the release, so it is
+	// discarded and said aloud.
 	notes := []string{v.Note}
-	for _, u := range v.Unsupported {
-		notes = append(notes, "unsupported: "+truncate(u, 120))
+	bad := 0
+	flagged := map[int]bool{}
+	for _, i := range v.Unsupported {
+		if i < 0 || i >= len(sample) || flagged[i] {
+			bad++
+			continue
+		}
+		flagged[i] = true
+		notes = append(notes, "unsupported: "+truncate(sample[i], 120))
 	}
+	if bad > 0 {
+		notes = append(notes, fmt.Sprintf("%d statement number(s) the grader returned "+
+			"were outside the sample and were ignored", bad))
+	}
+	score := round3(float64(len(sample)-len(flagged)) / float64(len(sample)))
 	return score, notes, nil
 }
 
