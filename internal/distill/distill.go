@@ -529,7 +529,21 @@ func (d *Distiller) Distill(ctx context.Context, rawURL string) (*Result, error)
 		d.adoptServed(g, staticRes)
 		timing["total"] = time.Since(start)
 		d.progress(Progress{Stage: "done", Tier: escalate.TierFetch, Elapsed: time.Since(start)})
-		return &Result{Graph: g, Freshness: freshness, Decision: decision, Timing: timing}, nil
+		// The capture and the served bytes travel with the result here as they
+		// do on every other path.
+		//
+		// This one returned neither, and it is the path most pages take: a
+		// tier-0 answer is the commonest answer sieve gives. The visible effect
+		// was that -snapshot wrote a file containing nothing but a URL, so the
+		// pages whose bugs are cheapest to reproduce were exactly the ones that
+		// could not be attached to a report -- and replay refused the file with
+		// "contains no capture", which read like a corrupt snapshot rather than
+		// a snapshot that was never given anything to hold.
+		return &Result{
+			Graph: g, Freshness: freshness, Decision: decision, Timing: timing,
+			Capture: staticRes.Merged, StaticHTML: staticRes.RawHTML,
+			Status: int64(resp.Status),
+		}, nil
 	}
 
 	// --- Tiers 1-3 ----------------------------------------------------------

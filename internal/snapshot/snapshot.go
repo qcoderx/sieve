@@ -36,6 +36,7 @@ import (
 
 	"github.com/qcoderx/sieve/internal/capture"
 	"github.com/qcoderx/sieve/internal/graph"
+	"github.com/qcoderx/sieve/internal/static"
 )
 
 // FormatVersion is bumped when the snapshot layout changes incompatibly.
@@ -69,7 +70,7 @@ type Snapshot struct {
 	// Redacted records that content was removed before writing. A snapshot from
 	// an authenticated session must never be attachable to a public bug report
 	// with the session's contents intact.
-	Redacted bool   `json:"redacted,omitempty"`
+	Redacted        bool   `json:"redacted,omitempty"`
 	RedactionReason string `json:"redaction_reason,omitempty"`
 }
 
@@ -163,8 +164,15 @@ func Read(path string) (*Snapshot, error) {
 		return nil, fmt.Errorf("%s was written by a newer sieve (format %d, this build understands %d)",
 			path, s.FormatVersion, FormatVersion)
 	}
-	if s.Merged == nil {
-		return nil, fmt.Errorf("%s contains no capture", path)
+	// A snapshot of a page answered without a browser has no capture, and that
+	// is not a broken file: tier 0 is the commonest answer sieve gives, and the
+	// graph stage runs over the served HTML there exactly as it runs over a
+	// rendered one. Refusing it meant a snapshot could not be taken of the very
+	// pages whose bugs are cheapest to reproduce -- the text welding and reading
+	// order defects fixed in this branch were all tier-0 defects, and none of
+	// them could have been attached to a report.
+	if s.Merged == nil && s.StaticHTML == "" {
+		return nil, fmt.Errorf("%s contains neither a capture nor the served HTML", path)
 	}
 	return &s, nil
 }
@@ -178,6 +186,20 @@ func Replay(s *Snapshot, in graph.Input) (*graph.Graph, error) {
 	in.RequestedURL = s.RequestedURL
 	in.FinalURL = s.FinalURL
 	in.Merged = s.Merged
+	// A page answered at tier 0 has no capture, only the bytes the server sent.
+	// Re-running the static extraction over those bytes reproduces the same
+	// input the live run built its graph from, which is what makes a tier-0 bug
+	// reproducible offline at all.
+	if in.Merged == nil && s.StaticHTML != "" {
+		res, err := static.Extract(s.FinalURL, strings.NewReader(s.StaticHTML), len(s.StaticHTML))
+		if err != nil {
+			return nil, fmt.Errorf("re-extract served HTML: %w", err)
+		}
+		in.Merged = res.Merged
+	}
+	if in.Merged == nil {
+		return nil, fmt.Errorf("snapshot contains neither a capture nor the served HTML")
+	}
 	if in.Notes == nil {
 		in.Notes = s.Notes
 	}
