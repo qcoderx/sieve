@@ -151,8 +151,12 @@ func TestDistillReturnsManifestNotBody(t *testing.T) {
 			Guidance string `json:"guidance"`
 		} `json:"manifest"`
 	}
+	// index_only, because this test is about the index. A small page now
+	// arrives with its content inlined -- describing it and then fetching it
+	// costs more than sending it -- and a caller surveying pages to choose
+	// between them asks for the description alone.
 	callJSON(t, sess, "distill", map[string]any{
-		"url": fx.URL + "/adversarial/", "wait_seconds": 60,
+		"url": fx.URL + "/adversarial/", "wait_seconds": 60, "index_only": true,
 	}, &out)
 
 	if out.State != "ready" {
@@ -320,4 +324,67 @@ func TestToolSurfaceStaysSmall(t *testing.T) {
 	}
 	t.Logf("tool surface ~%d tokens across %d tools (budget %d)",
 		got, len(tools.Tools), budgetTokens)
+}
+
+// TestSmallPageArrivesWhole covers the trade the manifest makes and when it
+// stops being worth making.
+//
+// The manifest exists so a caller can read part of a large document. On a small
+// one it is pure overhead: the caller pays for an index, then calls get_content
+// and buys the whole book anyway. On pear.no the index cost more tokens than
+// the content it indexed.
+//
+// So below a threshold the content travels with the first response and the
+// section list is dropped, because there is nothing left to navigate to. That
+// is right for a caller reading one page and wrong for a caller surveying
+// twenty to choose between them, which is what index_only is for.
+func TestSmallPageArrivesWhole(t *testing.T) {
+	fx := fixtureServer(t)
+	sess, done := connect(t, fx)
+	defer done()
+
+	var out struct {
+		State    string `json:"state"`
+		Content  string `json:"content"`
+		Manifest *struct {
+			Sections []struct {
+				ID string `json:"id"`
+			} `json:"sections"`
+			Counts struct {
+				TotalTokens int `json:"est_total_tokens"`
+			} `json:"counts"`
+		} `json:"manifest"`
+	}
+	callJSON(t, sess, "distill", map[string]any{
+		"url": fx.URL + "/adversarial/", "wait_seconds": 60,
+	}, &out)
+
+	if out.State != "ready" {
+		t.Fatalf("state = %q", out.State)
+	}
+	if out.Manifest.Counts.TotalTokens > 1500 {
+		t.Skip("fixture grew past the inlining threshold; nothing to assert here")
+	}
+	if out.Content == "" {
+		t.Fatal("a small page did not arrive with its content; the caller now pays " +
+			"for an index and then fetches the whole thing anyway")
+	}
+	if !strings.Contains(out.Content, "wheel-thrown and wood-fired") {
+		t.Error("inlined content does not contain the page text")
+	}
+	if len(out.Manifest.Sections) != 0 {
+		t.Error("sections were listed alongside inlined content; a caller holding " +
+			"the page has no use for a table of contents pointing into it")
+	}
+
+	// The quarantine holds regardless of how the content is delivered. This is
+	// the one property that must not bend for a token saving.
+	for _, injected := range []string{
+		"INJECT_HIDDEN_TAB", "INJECT_CONTRAST", "INJECT_OPACITY",
+		"INJECT_JSONLD_UNWHITELISTED",
+	} {
+		if strings.Contains(out.Content, injected) {
+			t.Errorf("inlined content leaked %s", injected)
+		}
+	}
 }

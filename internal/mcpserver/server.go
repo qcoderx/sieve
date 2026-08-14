@@ -178,14 +178,40 @@ type distillIn struct {
 	ForceRefresh bool   `json:"force_refresh,omitempty" jsonschema:"ignore any cached artifact for this URL"`
 	// Wait bounds how long distill blocks before handing back a job id.
 	WaitSeconds int `json:"wait_seconds,omitempty" jsonschema:"how long to wait for completion before returning a job id to poll, default 25"`
+	// IndexOnly keeps a small page's content out of the response.
+	//
+	// A small artifact is cheaper to send whole than to describe and then
+	// fetch, so it arrives with the first response. That is the right trade for
+	// a caller reading one page and the wrong one for a caller surveying twenty
+	// to choose between them, who wants twenty descriptions and one body.
+	IndexOnly bool `json:"index_only,omitempty" jsonschema:"never inline page content, even on a small page. Use when surveying several pages to choose between them"`
 }
 
 type distillOut struct {
 	JobID    string         `json:"job_id"`
 	State    string         `json:"state"`
 	Manifest *emit.Manifest `json:"manifest,omitempty"`
-	Message  string         `json:"message,omitempty"`
+	// Content is the whole page, included when the whole page is small.
+	//
+	// The manifest exists so a caller can read part of a large document. On a
+	// small one it is pure overhead: the caller pays for an index, then calls
+	// get_content and buys the entire book anyway. On pear.no the index cost
+	// more than the content it indexed. Below the threshold the content comes
+	// with the first response and the section list is dropped, because there is
+	// nothing left to navigate to.
+	Content string `json:"content,omitempty"`
+	Message string `json:"message,omitempty"`
 }
+
+// inlineContentMax is the artifact size below which the content travels with
+// the manifest.
+//
+// Set from what the split actually costs: a manifest runs a few hundred tokens
+// plus roughly twenty-five per section, so anything under about this size is
+// cheaper to send whole than to describe and then fetch. Above it the index
+// starts paying for itself, because a caller reads one section instead of
+// forty.
+const inlineContentMax = 1500
 
 type statusIn struct {
 	JobID string `json:"job_id"`
@@ -303,7 +329,9 @@ func (s *Server) registerTools(srv *mcp.Server) {
 			"title, summary, the list of sections with their sizes, and counts of actions, links and media. " +
 			"Returns the manifest, never the page body. Call this first for any URL. " +
 			"Heavy pages take tens of seconds; if the wait elapses you get a job_id to poll with status.",
-		OutputSchema: shape(manifestShape + " Also message, when the call returned before the page was ready."),
+		OutputSchema: shape(manifestShape + " On a small page, content holds the whole " +
+			"artifact and there are no sections to fetch. Also message, when the call " +
+			"returned before the page was ready."),
 	}), s.handleDistill)
 
 	mcp.AddTool(srv, add(&mcp.Tool{
@@ -371,9 +399,9 @@ func (s *Server) handleDistill(ctx context.Context, _ *mcp.CallToolRequest, in d
 
 	if !in.ForceRefresh {
 		if j := s.lookupFresh(in.URL); j != nil {
-			m := j.manifest()
+			body, m := j.inlineIfSmall(j.manifest(), in.IndexOnly)
 			return nil, distillOut{JobID: j.ID, State: "ready", Manifest: m,
-				Message: "served from cache"}, nil
+				Content: body, Message: "served from cache"}, nil
 		}
 	}
 
@@ -394,7 +422,7 @@ func (s *Server) handleDistill(ctx context.Context, _ *mcp.CallToolRequest, in d
 	out := distillOut{JobID: j.ID, State: state}
 	switch state {
 	case "ready":
-		out.Manifest = j.manifest()
+		out.Content, out.Manifest = j.inlineIfSmall(j.manifest(), in.IndexOnly)
 	case "failed", "blocked":
 		out.Message = errMsg
 	default:
@@ -680,7 +708,9 @@ func (s *Server) run(j *job, tier string) {
 		return
 	}
 	j.Graph = res.Graph
-	j.Manifest = emit.BuildManifest(res.Graph)
+	// Stored lean: this is what goes back over the wire, and the full record
+	// already lives in the artifact on disk.
+	j.Manifest = emit.BuildManifest(res.Graph).ForAgent()
 	j.State = "ready"
 	if res.Graph.Provenance.Blocked {
 		j.State = "ready"
@@ -778,3 +808,25 @@ func snippet(text string, at, width int) string {
 }
 
 func round2(v float64) float64 { return float64(int(v*100+0.5)) / 100 }
+
+// inlineIfSmall returns the whole artifact when it is cheaper to send than to
+// index, and strips the section list when it does.
+//
+// A caller holding the content has no use for a table of contents pointing into
+// it, and leaving the sections in would spend on navigation what the inlining
+// just saved.
+func (j *job) inlineIfSmall(m *emit.Manifest, indexOnly bool) (string, *emit.Manifest) {
+	j.mu.RLock()
+	g := j.Graph
+	j.mu.RUnlock()
+	if indexOnly || g == nil || m == nil || m.Counts.TotalTokens > inlineContentMax {
+		return "", m
+	}
+	opt := emit.CompactMarkdownOptions()
+	opt.Actions, opt.Navigation, opt.Structured, opt.Gaps, opt.Notes = true, true, true, true, true
+	body := emit.Markdown(g, opt)
+
+	lean := *m
+	lean.Sections = nil
+	return body, &lean
+}

@@ -33,7 +33,7 @@ type Manifest struct {
 	Sections []ManifestSection `json:"sections"`
 
 	Counts     ManifestCounts   `json:"counts"`
-	Stats      graph.Stats      `json:"stats"`
+	Stats      *graph.Stats     `json:"stats,omitempty"`
 	Audit      graph.Audit      `json:"audit"`
 	Provenance graph.Provenance `json:"provenance"`
 	// Gaps names content the page has that this artifact does not, so an agent
@@ -52,12 +52,12 @@ type Manifest struct {
 type ManifestSection struct {
 	ID         string `json:"id"`
 	Title      string `json:"title"`
-	Level      int    `json:"level"`
-	Blocks     int    `json:"blocks"`
-	Chars      int    `json:"chars"`
+	Level      int    `json:"level,omitempty"`
+	Blocks     int    `json:"blocks,omitempty"`
+	Chars      int    `json:"chars,omitempty"`
 	Tokens     int    `json:"est_tokens"`
-	FirstBlock string `json:"first_block"`
-	LastBlock  string `json:"last_block"`
+	FirstBlock string `json:"first_block,omitempty"`
+	LastBlock  string `json:"last_block,omitempty"`
 }
 
 // ManifestCounts is the shape of the artifact at a glance.
@@ -87,6 +87,7 @@ const manifestGuidance = "This is a manifest, not the page content. " +
 
 // BuildManifest derives the manifest from the graph.
 func BuildManifest(g *graph.Graph) Manifest {
+	st := g.Stats
 	m := Manifest{
 		SchemaVersion: g.SchemaVersion,
 		Outcome:       g.Outcome,
@@ -97,7 +98,7 @@ func BuildManifest(g *graph.Graph) Manifest {
 		Lang:          g.Lang,
 		ContentHash:   g.ContentHash,
 		DistilledAt:   g.DistilledAt,
-		Stats:         g.Stats,
+		Stats:         &st,
 		Audit:         g.Audit,
 		Provenance:    g.Provenance,
 		Gaps:          g.Gaps,
@@ -128,4 +129,69 @@ func BuildManifest(g *graph.Graph) Manifest {
 		TotalTokens: tokens.Estimate(graph.PlainText(g)),
 	}
 	return m
+}
+
+// ForAgent returns the manifest an MCP client should receive.
+//
+// The manifest on disk is a record: it carries the trace that makes a run
+// reproducible, the dropped-run tallies that explain a retention figure, and
+// the block ids bounding each section. All of that is worth keeping in a file
+// nobody pays to read.
+//
+// A tool response is not a file. It lands in a context window, every time, and
+// on pear.no the diagnostic half of the manifest came to 644 of 1,884 tokens --
+// a third of the payload spent on the viewport size, the locale, the Chromium
+// build and a list of what was dropped, none of which an agent reading a page
+// has any use for. The reproducibility argument is not weakened by this: the
+// artifact still has all of it, and a caller debugging an extraction is reading
+// the artifact rather than asking an agent to relay it.
+//
+// What survives is what a caller acts on: whether the read worked, what the
+// page contains, what each part would cost, what is missing, and how hard sieve
+// had to work.
+func (m Manifest) ForAgent() Manifest {
+	out := m
+
+	// The trace is the largest single item and the least actionable.
+	out.Provenance.Trace = nil
+
+	// Retention and the confidence buckets stay: they tell a caller how far to
+	// trust what follows. The per-reason drop tally is a diagnostic.
+	out.Audit.Dropped = nil
+
+	// Sections keep their id, title and cost. The bounding block ids are for a
+	// caller assembling ranges by hand, which get_content does for them, and
+	// the character count says the same thing as the token estimate in units
+	// nobody is budgeting in.
+	out.Sections = make([]ManifestSection, len(m.Sections))
+	copy(out.Sections, m.Sections)
+	for i := range out.Sections {
+		out.Sections[i].FirstBlock = ""
+		out.Sections[i].LastBlock = ""
+		out.Sections[i].Chars = 0
+		// The block count says nothing a caller acts on: the token estimate
+		// beside it is what decides whether to fetch.
+		out.Sections[i].Blocks = 0
+	}
+
+	// Sizes in bytes and nodes describe the extraction, not the page.
+	out.Stats = nil
+
+	// The audit keeps what changes how far to trust the content: how much
+	// survived, how confident the ordering and headings are, whether the sweep
+	// reached the end, and the notes, which are statements about the content
+	// rather than statistics about the run. The scoring internals go.
+	out.Audit = graph.Audit{
+		GraphRetention:    m.Audit.GraphRetention,
+		OrderConfidence:   m.Audit.OrderConfidence,
+		HeadingConfidence: m.Audit.HeadingConfidence,
+		ReachedBottom:     m.Audit.ReachedBottom,
+		Notes:             m.Audit.Notes,
+	}
+
+	// The long form of this is in the server instructions, which are sent once
+	// per session rather than once per page.
+	out.Guidance = "Read outcome.status first. Fetch sections by id with get_content; " +
+		"counts.est_total_tokens is what the whole artifact would cost."
+	return out
 }
