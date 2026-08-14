@@ -55,50 +55,53 @@ A page can still put an instruction in visible prose, or in alt text, and sieve
 will carry it as data with an untrusted-content notice attached. The claim is
 that one whole channel is closed, which markup-based extraction cannot say.
 
-**It has a price, and the price is real.** pear.no ships its FAQ twice, once as
-JSON-LD and once in a `div` at zero opacity that no visitor sees. Firecrawl
-takes the invisible copy and scores 45 of 45. sieve refuses it and scores 37.
-The same refusal that loses that row is the one that closes the channel above.
+**It has a price.** pear.no ships its FAQ twice, once as JSON-LD and once in a
+`div` at zero opacity that no visitor sees. A markup reader takes the invisible
+copy; sieve refuses it and reaches the same content by the JSON-LD instead. On
+that page the price turns out to be small -- 43 of 45 against 44 -- but it is
+the same refusal, and on a page that hides content with no second copy it would
+cost more.
 
 ---
 
-## Where sieve loses
+## The ordinary pages
 
-On an ordinary page whose text is in the HTML, the cheap readers are cheaper and
-more complete. pear.no, 45 facts:
+Three runs per cell, median with the range beside it. Single runs are what
+produced every wrong number in the earlier version of this document.
 
-| tool | tokens | facts | coverage |
-|---|---|---|---|
-| firecrawl | **1,032** | **45/45** | 1.000 |
-| webfetch-approx | 1,045 | 44/45 | 0.978 |
-| jina-reader | 1,213 | 44/45 | 0.978 |
-| sieve | 1,897 | 37/45 | 0.822 |
+**organimo.com**, 59 facts. A commerce page that splits words across elements
+and folds most of its substance into seven collapsed panels.
 
-This is worth publishing rather than hiding. It says what sieve is for: not
-every page, but the pages the others cannot read, and the cases where knowing
-the read failed matters more than the tokens.
+| tool | facts | tokens |
+|---|---|---|
+| **sieve** | **59/59** | 1,671 |
+| jina-reader | 58/59 | 1,735 |
+| webfetch-approx | 57/59 | 780 |
+| firecrawl | 43/59 | 991 |
 
-All three miss one thing on that page: `Pear makes you appear`, the headline
-split one letter per element for animation. sieve reassembles it.
+**pear.no**, 45 facts. Prose in the HTML, headings animated one letter per
+element.
 
-### How much of that row to believe
+| tool | facts | tokens |
+|---|---|---|
+| webfetch-approx | 44/45 [44-44] | 1,045 |
+| jina-reader | 44/45 [33-44] | 1,212 |
+| sieve | 43/45 [43-43] | 1,902 |
+| firecrawl | failed on all three runs | |
 
-sieve's figure on this page is noisy and the others are not. Two runs of the
-same build against the same URL, minutes apart, scored 42 of 45 and 35 of 45.
-The page cancels native scrolling, drives itself with wheel events and animates
-continuously, so how far the sweep gets varies between runs; the cheap readers
-take one fetch and have nothing to vary.
+sieve costs more here and recovers about the same. The cheap readers get this
+page because its prose is in the document; what they miss is `Pear makes you
+appear`, the animated headline, which sieve reassembles.
 
-That spread is wider than most of the differences reported in this document, so
-a single run against pear.no cannot separate one tool from another. Treat the
-row above as "the cheap readers reliably get this page and sieve usually gets
-most of it", and nothing finer. The honest fix is repeated runs with the spread
-reported, which has not been done.
+### On variance
 
-It does not touch the igloo.inc result. Forty of forty against zero of forty is
-not a margin any amount of variance closes.
+sieve was believed to be noisy on pear.no: two runs scored 42 and 35 of 45. It
+is not. Three consecutive runs scored 43, 43 and 43, and igloo.inc scored 40, 40
+and 40. The earlier swing was machine contention during a 200-site sweep, not
+the tool, which is worth knowing because it is the same contention that produced
+eighteen empty artifacts in that sweep.
 
----
+Jina is the one that varies: 33 to 44 on the same page.
 
 ## Reading failure is reported rather than implied
 
