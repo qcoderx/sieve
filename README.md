@@ -353,23 +353,6 @@ would otherwise hand the artifact a large apparent win.
 
 ---
 
-## What it does not do
-
-- **Not a general-purpose crawler.** Single site, bounded depth, one domain per
-  job.
-- **Not a visual clone.** Layout, animation and art direction are explicitly
-  discarded. That is the point, not a shortcoming.
-- **Not a bypass.** sieve obeys `robots.txt` and `crawl-delay`, sends an
-  identifying user agent with a contact URL, caps concurrency per domain, and
-  enforces a minimum interval that cannot be configured to zero. It does not
-  fingerprint-spoof, solve challenges, or authenticate. A site that blocks it
-  stays unread, and the artifact says so.
-- **Not immune to prompt injection.** It closes the hidden-element channel
-  completely, which markup-based extractors do not. That is a precise claim and
-  not a general one. See [THREAT_MODEL.md](THREAT_MODEL.md).
-
----
-
 ## Honest limits
 
 - **Text painted as a texture cannot be read.** sieve reads glyph *geometry*
