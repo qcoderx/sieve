@@ -690,6 +690,19 @@ func (d *Distiller) Distill(ctx context.Context, rawURL string) (*Result, error)
 	for _, n := range render.LibraryNotes(res.Libraries) {
 		notes = append(notes, n)
 	}
+	// Say what was folded away and had to be opened. A reader weighing a claim
+	// should know whether it was on screen or behind a tab, and the gap list
+	// only ever named what stayed shut.
+	if n := len(res.OpenedDisclosures); n > 0 {
+		shown := res.OpenedDisclosures
+		if len(shown) > 6 {
+			shown = shown[:6]
+		}
+		notes = append(notes, fmt.Sprintf("%d disclosure control(s) on this page were "+
+			"opened to read what they hold, including %s; each reveals content the page "+
+			"already carried and none submits anything",
+			n, strconv.Quote(strings.Join(shown, ", "))))
+	}
 	if res.EntryGate != "" && res.EnteredGate == "" {
 		notes = append(notes, "this site is behind an entry screen labelled "+
 			strconv.Quote(res.EntryGate)+"; the page past it never loaded, so this artifact "+

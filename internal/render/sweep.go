@@ -41,6 +41,11 @@ type Result struct {
 	Status       int64
 	Merged       *capture.Merged
 
+	// OpenedDisclosures names the tabs and accordions sieve pressed open, so a
+	// reader can tell content that was on screen from content that had to be
+	// revealed.
+	OpenedDisclosures []string
+
 	// Assets holds response bodies for scene-graph formats, kept so canvas
 	// recovery can read them without a second fetch.
 	Assets []Asset
@@ -506,6 +511,11 @@ func (b *Browser) Sweep(ctx context.Context, rawURL string, guard NavGuard) (*Re
 		loadDeadline = dl
 	}
 	b.openEntryGate(tabCtx, res, loadDeadline)
+
+	// Then what is already on the page but folded away. This runs after the
+	// gate and before the sweep, so everything a tab or accordion reveals is
+	// on screen for every checkpoint rather than appearing halfway through.
+	b.openDisclosures(tabCtx, res, loadDeadline)
 
 	res.Timing.Load = time.Since(start)
 
@@ -1731,4 +1741,106 @@ func isSceneGraphMIME(m string) bool {
 		return true
 	}
 	return false
+}
+
+// maxDisclosures bounds how many controls one page may have opened, and
+// disclosureBudget bounds the wall clock spent doing it.
+//
+// Both are small. Opening what is already on the page is worth a few seconds
+// and never worth a minute: a page with forty accordions is a page whose
+// content is mostly in accordions, and the artifact says which ones were left
+// shut rather than spending the read budget on them.
+const (
+	maxDisclosures   = 24
+	disclosureBudget = 8 * time.Second
+	disclosureSettle = 220 * time.Millisecond
+)
+
+// disclosure is a control the page says will reveal something.
+type disclosure struct {
+	X     float64 `json:"x"`
+	Y     float64 `json:"y"`
+	Label string  `json:"label"`
+	Kind  string  `json:"kind"`
+}
+
+// openDisclosures presses tabs, accordions and "show more" controls.
+//
+// This is the one interaction sieve performs beyond the front door, and it is
+// deliberately the narrowest useful one: it reveals content the page is already
+// carrying. Nothing is typed, nothing is submitted, no link to another document
+// is followed, and the refusal list that governs the entry gate governs this
+// too -- a tab labelled "Accept cookies" is not a tab.
+//
+// The alternative was what sieve did before, which was to declare a gap and
+// move on. That was honest and not very useful: an artifact could report "there
+// is a section behind a tab labelled Pricing" and say nothing about what was in
+// it. A reader who cannot open a tab is not reading the page a visitor sees.
+func (b *Browser) openDisclosures(ctx context.Context, res *Result, deadline time.Time) {
+	stop := time.Now().Add(disclosureBudget)
+	if deadline.Before(stop) {
+		stop = deadline
+	}
+	if dl, ok := ctx.Deadline(); ok && dl.Before(stop) {
+		stop = dl
+	}
+
+	before := b.currentURL(ctx)
+	opened := 0
+
+	for round := 0; round < 3 && time.Now().Before(stop); round++ {
+		var raw string
+		if err := chromedp.Run(ctx, chromedp.Evaluate(
+			fmt.Sprintf("window.__sieve.disclosures(%d)", maxDisclosures-opened), &raw)); err != nil {
+			return
+		}
+		var found []disclosure
+		if raw == "" || json.Unmarshal([]byte(raw), &found) != nil || len(found) == 0 {
+			return
+		}
+
+		pressedThisRound := 0
+		for _, d := range found {
+			if opened >= maxDisclosures || !time.Now().Before(stop) {
+				break
+			}
+			if !b.press(ctx, d.X, d.Y) {
+				continue
+			}
+			opened++
+			pressedThisRound++
+
+			// A press that navigates has left the page sieve was reading. Stop
+			// rather than carry on extracting from somewhere else, and say so:
+			// an artifact that silently describes a different document is worse
+			// than one that admits it opened nothing.
+			if now := b.currentURL(ctx); now != "" && before != "" && now != before {
+				res.note("a disclosure control navigated to another page; sieve stopped " +
+					"opening controls and this artifact describes the page as it stood")
+				res.OpenedDisclosures = append(res.OpenedDisclosures, d.Label)
+				return
+			}
+			_ = chromedp.Run(ctx, chromedp.Sleep(disclosureSettle))
+			if d.Label != "" {
+				res.OpenedDisclosures = append(res.OpenedDisclosures, d.Label)
+			}
+		}
+		// Nothing left that this pass could press.
+		if pressedThisRound == 0 {
+			break
+		}
+	}
+
+	if opened > 0 {
+		b.opts.logf("opened %d disclosure control(s)", opened)
+	}
+}
+
+// currentURL reads the document's location, to notice a press that navigated.
+func (b *Browser) currentURL(ctx context.Context) string {
+	var u string
+	if err := chromedp.Run(ctx, chromedp.Evaluate("location.href", &u)); err != nil {
+		return ""
+	}
+	return u
 }

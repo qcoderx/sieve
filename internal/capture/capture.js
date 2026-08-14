@@ -3380,6 +3380,110 @@
 
     // Native smooth scrolling turns every step into an animation the sweep
     // then has to wait out. Disabling it is not a change to page content.
+    // disclosures finds controls that reveal content already in the page.
+    //
+    // The line this draws is the whole feature. A disclosure control shows the
+    // reader something the page is already carrying: a tab panel, an accordion
+    // body, a "show more" that unclamps a paragraph. Pressing it asserts
+    // nothing, submits nothing, and asks the server for nothing. It is the same
+    // category as scrolling -- a gesture every reader makes to see what is
+    // there -- and refusing to make it is why an artifact could say "there is a
+    // section behind a tab labelled Pricing" and nothing about what is in it.
+    //
+    // What this is not is browser automation. It will not type, will not
+    // submit, will not follow a link to another document, and will not press
+    // anything whose label suggests the visitor is being asked to say something
+    // on their own behalf. REFUSE_WORDS is the same list the entry gate uses
+    // and it wins ties: a tab labelled "Accept cookies" is not a tab.
+    //
+    // The controls returned are candidates, not commands. The driver presses
+    // them one at a time, within a budget, and stops if the document navigates.
+    disclosures: function (max) {
+      var out = [];
+      var seen = new Set();
+      var vw = window.innerWidth || 1;
+      var vh = window.innerHeight || 1;
+      var limit = max || 24;
+
+      function labelOf(el) {
+        try {
+          return capText(accessibleName(el, "") || el.textContent || "");
+        } catch (e) {
+          return "";
+        }
+      }
+
+      // A control that leaves this document is navigation, not disclosure.
+      // A bare "#" or an in-page anchor stays.
+      function navigatesAway(el) {
+        var a = el.closest ? el.closest("a[href]") : null;
+        if (!a) return false;
+        var href = a.getAttribute("href") || "";
+        if (href === "" || href === "#" || href.charAt(0) === "#") return false;
+        try {
+          var u = new URL(href, location.href);
+          return u.origin !== location.origin || u.pathname !== location.pathname;
+        } catch (e) {
+          return true;
+        }
+      }
+
+      // Anything that can submit is out, whatever it is called. A form is the
+      // one place on a page where a press can change something on a server.
+      function canSubmit(el) {
+        var t = (el.getAttribute("type") || "").toLowerCase();
+        if (t === "submit" || t === "reset" || t === "image") return true;
+        if (el.tagName === "BUTTON" && el.form && t !== "button") return true;
+        if (el.tagName === "INPUT") return true;
+        return false;
+      }
+
+      function consider(el, kind) {
+        if (!el || seen.has(el) || out.length >= limit) return;
+        var r;
+        try {
+          r = el.getBoundingClientRect();
+        } catch (e) {
+          return;
+        }
+        // On screen, and big enough to be a control a person could hit.
+        if (r.width < 8 || r.height < 8) return;
+        if (r.bottom < 0 || r.top > vh || r.right < 0 || r.left > vw) return;
+
+        var label = labelOf(el);
+        // The refusal list is checked first and wins ties, exactly as it does
+        // at the front door.
+        if (label && REFUSE_WORDS.test(label)) return;
+        if (navigatesAway(el)) return;
+        if (canSubmit(el)) return;
+
+        seen.add(el);
+        out.push({
+          x: Math.round(r.left + r.width / 2),
+          y: Math.round(r.top + r.height / 2),
+          label: label,
+          kind: kind,
+        });
+      }
+
+      try {
+        // A closed <details> is unambiguous: the content is in the document and
+        // the summary is the control that shows it.
+        var d = document.querySelectorAll("details:not([open]) > summary");
+        for (var i = 0; i < d.length; i++) consider(d[i], "details");
+
+        // aria-expanded="false" is the accessible spelling of "there is more
+        // here". aria-selected="false" on a tab is the same statement.
+        var e = document.querySelectorAll('[aria-expanded="false"]');
+        for (var j = 0; j < e.length; j++) consider(e[j], "disclosure");
+
+        var t = document.querySelectorAll('[role="tab"][aria-selected="false"]');
+        for (var k = 0; k < t.length; k++) consider(t[k], "tab");
+      } catch (err) {}
+
+      return JSON.stringify(out);
+    },
+
     unsmooth: function () {
       try {
         var s = document.createElement("style");

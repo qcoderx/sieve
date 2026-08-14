@@ -1,0 +1,73 @@
+<!doctype html>
+<meta charset="utf-8">
+<title>Disclosure</title>
+<!--
+  Two kinds of control that look identical and are not.
+
+  The first three reveal content the page already carries: a details element, an
+  aria-expanded accordion, and an unselected tab. Pressing any of them asserts
+  nothing and submits nothing. A visitor opens them without thinking about it,
+  and an extractor that will not is reading less of the page than a person does.
+
+  The rest are the line. An age gate, a consent banner and a purchase button all
+  present as pressable controls, and each asks the visitor to *say* something on
+  their own behalf. A link to another document is not disclosure either: it is
+  navigation, and following it means describing a different page.
+-->
+<style>
+  body { font: 16px system-ui, sans-serif; margin: 2rem; }
+  [hidden] { display: none; }
+  .panel { padding: .5rem 0; }
+</style>
+
+<h1>Kiln notes</h1>
+<p>The workshop has fired the same anagama kiln since 1974.</p>
+
+<details>
+  <summary>Firing schedule</summary>
+  <div class="panel">REVEAL_DETAILS the kiln is fired twice a year, in March and October.</div>
+</details>
+
+<h2 id="glaze-h"><button aria-expanded="false" aria-controls="glaze">Glaze recipe</button></h2>
+<div id="glaze" class="panel" hidden>REVEAL_ACCORDION feldspar, silica and wood ash in equal parts.</div>
+
+<div role="tablist">
+  <button role="tab" aria-selected="true" aria-controls="p1">Stoneware</button>
+  <button role="tab" aria-selected="false" aria-controls="p2">Porcelain</button>
+</div>
+<div id="p1" class="panel">Stoneware is thrown on a kick wheel.</div>
+<div id="p2" class="panel" hidden>REVEAL_TAB porcelain is fired to cone ten.</div>
+
+<!-- Everything below must remain shut. -->
+<button aria-expanded="false" aria-controls="age">I am over 18</button>
+<div id="age" class="panel" hidden>REFUSED_AGE should never be read.</div>
+
+<button aria-expanded="false" aria-controls="cookies">Accept all cookies</button>
+<div id="cookies" class="panel" hidden>REFUSED_CONSENT should never be read.</div>
+
+<button aria-expanded="false" aria-controls="buy">Add to cart</button>
+<div id="buy" class="panel" hidden>REFUSED_PURCHASE should never be read.</div>
+
+<form action="/submitted" method="get">
+  <button type="submit" aria-expanded="false">Show more results</button>
+</form>
+
+<a href="/other.html"><span aria-expanded="false">Read the full essay</span></a>
+
+<script>
+  // Ordinary disclosure behaviour: flip the attribute, unhide the panel.
+  document.querySelectorAll('[aria-controls]').forEach(function (b) {
+    b.addEventListener('click', function () {
+      var panel = document.getElementById(b.getAttribute('aria-controls'));
+      if (!panel) return;
+      var open = b.getAttribute('aria-expanded') === 'true' ||
+                 b.getAttribute('aria-selected') === 'true';
+      if (b.getAttribute('role') === 'tab') {
+        b.setAttribute('aria-selected', String(!open));
+      } else {
+        b.setAttribute('aria-expanded', String(!open));
+      }
+      panel.hidden = open;
+    });
+  });
+</script>
