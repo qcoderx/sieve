@@ -1,0 +1,1198 @@
+- generic [active] [ref=e1]:
+  - generic [ref=e3]:
+    - banner [ref=e4]:
+      - navigation [ref=e6]:
+        - link "Stripe homepage" [ref=e7] [cursor=pointer]:
+          - /url: /
+          - img "Stripe logo" [ref=e8]
+        - list [ref=e11]:
+          - listitem [ref=e12]:
+            - button "Products" [ref=e13] [cursor=pointer]
+          - listitem [ref=e17]:
+            - button "Solutions" [ref=e18] [cursor=pointer]
+          - listitem [ref=e22]:
+            - button "Developers" [ref=e23] [cursor=pointer]
+          - listitem [ref=e27]:
+            - button "Resources" [ref=e28] [cursor=pointer]
+          - listitem [ref=e32]:
+            - link "Pricing" [ref=e33] [cursor=pointer]:
+              - /url: /pricing
+        - generic: ⁠
+        - list [ref=e34]:
+          - listitem [ref=e35]:
+            - link "Sign in" [ref=e36] [cursor=pointer]:
+              - /url: https://dashboard.stripe.com/login
+              - img:
+                - generic: Sign in
+          - listitem [ref=e38]:
+            - link [ref=e39] [cursor=pointer]:
+              - /url: /contact/sales
+              - text: Contact sales
+              - generic [ref=e40]: ⁠
+    - main [ref=e46]:
+      - generic [ref=e47]:
+        - generic [ref=e49]:
+          - generic [ref=e50]:
+            - text: "Global GDP running on Stripe:"
+            - generic [ref=e51]:
+              - generic [ref=e52]:
+                - generic [ref=e53]: "1"
+                - generic [ref=e54]: .
+                - generic [ref=e55]: "6"
+                - generic [ref=e56]: "9"
+                - generic [ref=e57]: "7"
+                - generic [ref=e58]: "8"
+                - generic [ref=e59]: "2"
+                - generic [ref=e60]: "3"
+                - generic [ref=e61]: "8"
+                - generic [ref=e62]: "7"
+                - generic [ref=e63]: "%"
+              - generic [ref=e64]:
+                - generic [ref=e65]: "1"
+                - generic [ref=e66]: .
+                - generic [ref=e67]: "6"
+                - generic [ref=e68]: "9"
+                - generic [ref=e69]: "7"
+                - generic [ref=e70]: "8"
+                - generic [ref=e71]: "2"
+                - generic [ref=e72]: "3"
+                - generic [ref=e73]: "8"
+                - generic [ref=e74]: "7"
+                - generic [ref=e75]: "%"
+          - heading [level=1] [ref=e76]:
+            - emphasis [ref=e77]: Financial infrastructure to grow your revenue.
+            - text: Accept payments, offer financial services, and implement custom revenue models—from your first transaction to your billionth.
+          - heading [level=1] [ref=e78]:
+            - emphasis [ref=e79]: Financial infrastructure to grow your revenue.
+            - text: Accept payments, offer financial services, and implement custom revenue models—from your first transaction to your billionth.
+          - generic [ref=e80]:
+            - link [ref=e81] [cursor=pointer]:
+              - /url: https://dashboard.stripe.com/register
+              - text: Get started
+              - generic [ref=e82]: ⁠
+            - link "Sign up with Google" [ref=e88] [cursor=pointer]:
+              - /url: https://dashboard.stripe.com/login/oauth/google/init
+        - list [ref=e97]:
+          - listitem [ref=e98]:
+            - link [ref=e99] [cursor=pointer]:
+              - /url: /newsroom/news/stripe-openai-instant-checkout
+              - img "OpenAI" [ref=e101]
+          - listitem [ref=e104]:
+            - link [ref=e105] [cursor=pointer]:
+              - /url: /customers/amazon
+              - img "Amazon" [ref=e107]
+          - listitem [ref=e112]:
+            - link [ref=e113] [cursor=pointer]:
+              - /url: /newsroom/news/nvidia-collaboration-with-stripe
+              - img "Nvidia" [ref=e115]
+          - listitem [ref=e122]:
+            - link [ref=e123] [cursor=pointer]:
+              - /url: /newsroom/news/stripe-ford-agreement
+              - img "Ford" [ref=e125]
+          - listitem [ref=e131]:
+            - img "Coinbase" [ref=e133]
+          - listitem [ref=e136]:
+            - link [ref=e137] [cursor=pointer]:
+              - /url: /newsroom/news/google-and-stripe
+              - img "Google" [ref=e139]
+          - listitem [ref=e146]:
+            - link [ref=e147] [cursor=pointer]:
+              - /url: /customers/shopify
+              - img "Shopify" [ref=e149]
+          - listitem [ref=e155]:
+            - link [ref=e156] [cursor=pointer]:
+              - /url: /customers/mindbody
+              - img "Mindbody" [ref=e158]
+          - listitem [ref=e161]:
+            - img "MetLife" [ref=e163]
+          - listitem [ref=e169]:
+            - link [ref=e170] [cursor=pointer]:
+              - /url: /customers/ramp
+              - img "Ramp" [ref=e172]
+          - listitem [ref=e176]:
+            - img "Marriott" [ref=e178]
+          - listitem [ref=e182]:
+            - link [ref=e183] [cursor=pointer]:
+              - /url: /customers/figma
+              - img "Figma" [ref=e185]
+          - listitem [ref=e188]:
+            - link [ref=e189] [cursor=pointer]:
+              - /url: /customers/woo
+              - img "WooCommerce" [ref=e191]
+          - listitem [ref=e194]:
+            - img "Vercel" [ref=e196]
+          - listitem [ref=e199]:
+            - link [ref=e200] [cursor=pointer]:
+              - /url: /newsroom/news/stripe-and-uber
+              - img "Uber" [ref=e202]
+          - listitem [ref=e205]:
+            - link [ref=e206] [cursor=pointer]:
+              - /url: /customers/anthropic
+              - img "Anthropic" [ref=e208]
+          - listitem [ref=e216]:
+            - link [ref=e217] [cursor=pointer]:
+              - /url: /customers/lightspeed-terminal
+              - img "Lightspeed" [ref=e219]
+          - listitem [ref=e223]:
+            - link [ref=e224] [cursor=pointer]:
+              - /url: /customers/cursor
+              - img "Cursor" [ref=e226]
+          - listitem [ref=e234]:
+            - link [ref=e235] [cursor=pointer]:
+              - /url: /newsroom/news/stripe-openai-instant-checkout
+              - img "OpenAI" [ref=e237]
+          - listitem [ref=e240]:
+            - link [ref=e241] [cursor=pointer]:
+              - /url: /customers/amazon
+              - img "Amazon" [ref=e243]
+          - listitem [ref=e248]:
+            - link [ref=e249] [cursor=pointer]:
+              - /url: /newsroom/news/nvidia-collaboration-with-stripe
+              - img "Nvidia" [ref=e251]
+          - listitem [ref=e258]:
+            - link [ref=e259] [cursor=pointer]:
+              - /url: /newsroom/news/stripe-ford-agreement
+              - img "Ford" [ref=e261]
+          - listitem [ref=e267]:
+            - img "Coinbase" [ref=e269]
+          - listitem [ref=e272]:
+            - link [ref=e273] [cursor=pointer]:
+              - /url: /newsroom/news/google-and-stripe
+              - img "Google" [ref=e275]
+          - listitem [ref=e282]:
+            - link [ref=e283] [cursor=pointer]:
+              - /url: /customers/shopify
+              - img "Shopify" [ref=e285]
+          - listitem [ref=e291]:
+            - link [ref=e292] [cursor=pointer]:
+              - /url: /customers/mindbody
+              - img "Mindbody" [ref=e294]
+          - listitem [ref=e297]:
+            - img "MetLife" [ref=e299]
+          - listitem [ref=e305]:
+            - link [ref=e306] [cursor=pointer]:
+              - /url: /customers/ramp
+              - img "Ramp" [ref=e308]
+          - listitem [ref=e312]:
+            - img "Marriott" [ref=e314]
+          - listitem [ref=e318]:
+            - link [ref=e319] [cursor=pointer]:
+              - /url: /customers/figma
+              - img "Figma" [ref=e321]
+          - listitem [ref=e324]:
+            - link [ref=e325] [cursor=pointer]:
+              - /url: /customers/woo
+              - img "WooCommerce" [ref=e327]
+          - listitem [ref=e330]:
+            - img "Vercel" [ref=e332]
+          - listitem [ref=e335]:
+            - link [ref=e336] [cursor=pointer]:
+              - /url: /newsroom/news/stripe-and-uber
+              - img "Uber" [ref=e338]
+          - listitem [ref=e341]:
+            - link [ref=e342] [cursor=pointer]:
+              - /url: /customers/anthropic
+              - img "Anthropic" [ref=e344]
+          - listitem [ref=e352]:
+            - link [ref=e353] [cursor=pointer]:
+              - /url: /customers/lightspeed-terminal
+              - img "Lightspeed" [ref=e355]
+          - listitem [ref=e359]:
+            - link [ref=e360] [cursor=pointer]:
+              - /url: /customers/cursor
+              - img "Cursor" [ref=e362]
+      - generic [ref=e371]:
+        - generic [ref=e372]:
+          - heading "Flexible solutions for every business model." [level=2] [ref=e373]
+          - paragraph [ref=e374]: Grow your business with a comprehensive set of payments and financial tools⁠—⁠designed to work individually or together.
+        - generic [ref=e377]:
+          - button "Accept and optimize payments globally—online and in person" [ref=e378] [cursor=pointer]:
+            - generic:
+              - heading "Accept and optimize payments globally—online and in person" [level=3]
+            - generic:
+              - generic:
+                - generic:
+                  - generic:
+                    - generic:
+                      - generic:
+                        - generic:
+                          - img "Mobile payment terminal with instructions to tap, insert, or swipe to pay.":
+                            - generic:
+                              - generic:
+                                - generic:
+                                  - generic:
+                                    - generic: Pay Roastery
+                                    - generic: Cartsy bezahlen
+                                    - generic: Showflix に支払う
+                                    - generic: Pay Roastery
+                                - generic:
+                                  - generic:
+                                    - generic: $5.46
+                                    - generic: €26.89
+                                    - generic: ¥5,000
+                                    - generic: $5.46
+                                - generic:
+                                  - generic:
+                                    - generic: Tap, insert, or swipe to pay
+                                    - generic: Zum Bezahlen Karte auflegen, einführen oder durchziehen
+                                    - generic: タップ、挿入、またはスワイプして支払う
+                                    - generic: Tap, insert, or swipe to pay
+                                - generic:
+                                  - generic:
+                                    - generic:
+                                      - generic:
+                                        - generic: Mocha Latte
+                                        - generic: $5.50
+                                      - generic:
+                                        - generic: Loyalty (10% off)
+                                        - generic: "-$0.55"
+                                      - generic:
+                                        - generic: Tax
+                                        - generic: $0.51
+                                      - generic:
+                                        - generic: Total
+                                        - generic: $5.46
+                                    - generic:
+                                      - generic:
+                                        - generic: Deluxe-Hemd
+                                        - generic: €22.60
+                                      - generic:
+                                        - generic: VAT
+                                        - generic: €4.29
+                                      - generic:
+                                        - generic: Summe
+                                        - generic: €26.89
+                                    - generic:
+                                      - generic:
+                                        - generic: ギフトカード
+                                        - generic: ¥5,000
+                                      - generic:
+                                        - generic: 合計
+                                        - generic: ¥5,000
+                                    - generic:
+                                      - generic:
+                                        - generic: Mocha Latte
+                                        - generic: $5.50
+                                      - generic:
+                                        - generic: Loyalty (10% off)
+                                        - generic: "-$0.55"
+                                      - generic:
+                                        - generic: Tax
+                                        - generic: $0.51
+                                      - generic:
+                                        - generic: Total
+                                        - generic: $5.46
+                                - generic:
+                                  - generic:
+                                    - generic:
+                                      - generic: Continue
+                                      - generic: Weiter
+                                      - generic: 続行
+                                      - generic: Continue
+                        - generic:
+                          - img "Ecommerce checkout screen showing a variety of payment options.":
+                            - generic:
+                              - generic:
+                                - generic:
+                                  - generic:
+                                    - generic:
+                                      - generic:
+                                        - generic:
+                                          - generic:
+                                            - generic:
+                                              - generic:
+                                                - generic: roastery.com/checkout
+                                                - generic: cartsy.com/checkout
+                                                - generic: showflixapp.com/checkout
+                                                - generic: roastery.com/checkout
+                                  - generic:
+                                    - generic:
+                                      - generic:
+                                        - generic:
+                                          - generic:
+                                            - generic: Email
+                                            - generic: E-Mail
+                                            - generic: メールアドレス
+                                            - generic: Email
+                                        - generic:
+                                          - generic:
+                                            - generic: jane.diaz@stripe.com
+                                            - generic: damian.michelfelder@example.com
+                                            - generic: taro.yamada@example.com
+                                            - generic: jane.diaz@stripe.com
+                                        - generic:
+                                          - generic:
+                                            - generic:
+                                              - generic: or
+                                              - generic: oder
+                                              - generic: または
+                                              - generic: or
+                                        - generic:
+                                          - generic:
+                                            - generic: Payment method
+                                            - generic: Zahlungsmethode
+                                            - generic: 支払い方法
+                                            - generic: Payment method
+                                        - generic:
+                                          - generic:
+                                            - generic:
+                                              - generic:
+                                                - generic: Card
+                                                - generic: Karte
+                                                - generic: カード
+                                                - generic: Card
+                                            - generic:
+                                              - generic: カード番号
+                                              - generic: 有効期限
+                                              - generic: セキュリティコード
+                                          - generic:
+                                            - generic: Klarna
+                                            - generic: Zahlen Sie jetzt oder in 4 zinsfreien Raten zu je €50.28.
+                                          - generic:
+                                            - generic: Affirm
+                                            - generic: Pay now or in 4 interest-free payments of $40.73.
+                                          - generic: Cash App
+                                          - generic: Crypto
+                                          - generic: PayPay
+                                          - generic: FamilyMart
+                                          - generic: Rechnung
+                                          - generic: US bank account
+                                        - generic:
+                                          - generic:
+                                            - generic:
+                                              - generic: Continue
+                                              - generic: Weiter
+                                              - generic: 続行
+                                              - generic: Continue
+                                      - generic:
+                                        - generic:
+                                          - generic:
+                                            - generic: Order summary
+                                            - generic: Zusammenfassung der Bestellung
+                                            - generic: 注文概要
+                                            - generic: Order summary
+                                        - generic:
+                                          - generic:
+                                            - generic:
+                                              - generic:
+                                                - generic: Electric Kettle with Temperature Control
+                                                - generic: $150.00
+                                            - generic:
+                                              - generic:
+                                                - generic: Unverzichtbarer Hoodie
+                                                - generic: Marineblau
+                                                - generic: Mittel
+                                                - generic: €41.70
+                                            - generic:
+                                              - generic:
+                                                - generic: ストリーミング月次サブスクリプション
+                                                - generic: ¥1,886
+                                            - generic:
+                                              - generic:
+                                                - generic: Electric Kettle with Temperature Control
+                                                - generic: $150.00
+                                        - generic:
+                                          - generic:
+                                            - generic:
+                                              - generic:
+                                                - generic: Subtotal
+                                                - generic: Zwischensumme
+                                                - generic: 小計
+                                                - generic: Subtotal
+                                            - generic:
+                                              - generic:
+                                                - generic: $150.00
+                                                - generic: €41.70
+                                                - generic: ¥1,886
+                                                - generic: $150.00
+                                          - generic:
+                                            - generic:
+                                              - generic:
+                                                - generic: Tax
+                                                - generic: VAT
+                                                - generic: JCT
+                                                - generic: Tax
+                                            - generic:
+                                              - generic:
+                                                - generic: $15.38
+                                                - generic: €7.92
+                                                - generic: ¥189.00
+                                                - generic: $15.38
+                                          - generic:
+                                            - generic:
+                                              - generic:
+                                                - generic: Shipping
+                                                - generic: Versand
+                                                - generic: 消費税
+                                                - generic: Shipping
+                                            - generic: Free
+                                          - generic:
+                                            - generic:
+                                              - generic:
+                                                - generic: Total
+                                                - generic: Summe
+                                                - generic: 合計
+                                                - generic: Total
+                                            - generic:
+                                              - generic:
+                                                - generic: $165.38
+                                                - generic: €49.62
+                                                - generic: ¥2,075.00
+                                                - generic: $165.38
+          - button "Enable any billing model" [ref=e379] [cursor=pointer]:
+            - generic:
+              - heading "Enable any billing model" [level=3]
+            - generic:
+              - generic:
+                - generic:
+                  - generic:
+                    - generic:
+                      - img "Usage-based billing panel for a Pro plan showing a token cost and usage meter, and a bar chart with the number of tokens used over the last 30 days.":
+                        - generic:
+                          - generic:
+                            - generic:
+                              - generic:
+                                - generic:
+                                  - generic: Pro Plan
+                                  - generic: Billed monthly
+                              - generic:
+                                - generic: Tokens
+                                - generic: $0.01 per 1,000 units
+                              - generic: Usage meter
+                        - generic:
+                          - generic:
+                            - generic:
+                              - generic: Tokens used in the last 30 days
+                              - generic: 1,500,000,000
+          - button "Monetize through agentic commerce" [ref=e380] [cursor=pointer]:
+            - generic:
+              - heading "Monetize through agentic commerce" [level=3]
+          - button "Create a card issuing program" [ref=e381] [cursor=pointer]:
+            - generic:
+              - heading "Create a card issuing program" [level=3]
+          - button "Access borderless money movement with stablecoins and crypto" [ref=e382] [cursor=pointer]:
+            - generic:
+              - heading "Access borderless money movement with stablecoins and crypto" [level=3]
+          - button "Embed payments in your platform" [ref=e383] [cursor=pointer]:
+            - generic:
+              - heading "Embed payments in your platform" [level=3]
+      - generic [ref=e389]:
+        - generic [ref=e390]:
+          - generic [ref=e391]: Building the economic infrastructure for AI
+          - link [ref=e392] [cursor=pointer]:
+            - /url: https://stripe.com/sessions/2026?utm_medium=owned-surfaces&utm_source=9cb9&utm_campaign=GLOBAL_4301&utm_content=8a70&utm_term=5a728d3d167c
+            - text: Watch now
+            - generic [ref=e393]: ⁠
+        - img "Stripe Sessions logo" [ref=e400]
+      - generic [ref=e407]:
+        - heading "The backbone of global commerce" [level=2] [ref=e408]
+        - generic [ref=e409]:
+          - generic [ref=e410] [cursor=pointer]:
+            - button [ref=e411]:
+              - paragraph [ref=e412]: 135+
+            - generic [ref=e413]: currencies and payment methods supported
+          - generic [ref=e414] [cursor=pointer]:
+            - button [ref=e415]:
+              - paragraph [ref=e416]: $1.9T
+            - generic [ref=e417]: in payments volume processed in 2025
+          - generic [ref=e418] [cursor=pointer]:
+            - button [ref=e419]:
+              - paragraph [ref=e420]: 99.999%
+            - generic [ref=e421]:
+              - link "historical uptime":
+                - /url: https://status.stripe.com
+              - text: for Stripe services
+          - generic [ref=e422] [cursor=pointer]:
+            - button [ref=e423]:
+              - paragraph [ref=e424]: 200M+
+            - generic [ref=e425]: active subscriptions managed on Stripe Billing
+      - generic [ref=e428]:
+        - generic [ref=e429]:
+          - heading "Powering businesses of all sizes." [level=2] [ref=e430]
+          - paragraph [ref=e431]: Run your business on a reliable platform that adapts to your needs.
+        - generic [ref=e433]:
+          - generic [ref=e434]:
+            - generic [ref=e435]:
+              - generic [ref=e436]:
+                - heading "Transform your enterprise with agile financial infrastructure" [level=3] [ref=e437]
+                - link [ref=e439] [cursor=pointer]:
+                  - /url: /enterprise
+                  - text: Stripe for enterprises
+                  - generic [ref=e440]: ⁠
+              - paragraph [ref=e446]: 50% of Fortune 100 companies have used Stripe to grow their businesses—from expanding internationally to reimagining the customer experience.
+            - generic [ref=e447]:
+              - generic [ref=e448]:
+                - generic [ref=e449]:
+                  - button [expanded] [ref=e455] [cursor=pointer]:
+                    - heading "Hertz unifies commerce with Stripe." [level=3] [ref=e456]
+                  - link "Read Hertz's story" [ref=e458] [cursor=pointer]:
+                    - /url: /customers/hertz
+                    - generic [ref=e460]:
+                      - generic [ref=e461]: Read the story
+                      - generic [ref=e462]: ⁠
+                - region "Hertz unifies commerce with Stripe." [ref=e471]:
+                  - img "Aerial view of a street intersection where the crosswalks form a slanted parallelogram, imitating the Stripe logo." [ref=e474]
+                  - generic [ref=e475]:
+                    - generic [ref=e477]:
+                      - paragraph [ref=e478]: "160"
+                      - text: countries
+                    - generic [ref=e480]:
+                      - paragraph [ref=e481]: 11K+
+                      - text: locations globally
+                    - generic [ref=e483]:
+                      - paragraph [ref=e484]: Products used
+                      - text: Payments, Terminal, Connect, Radar, and Stripe Sigma
+                  - text: ⁠
+              - generic [ref=e486] [cursor=pointer]:
+                - button [ref=e491]:
+                  - heading "URBN consolidates $5 billion in online and in-store revenue onto Stripe." [level=3] [ref=e492]
+                - link "Read URBN's story" [ref=e494]:
+                  - /url: /customers/urbn
+                  - generic [ref=e496]:
+                    - generic [ref=e497]: Read the story
+                    - generic [ref=e498]: ⁠
+              - generic [ref=e508] [cursor=pointer]:
+                - button [ref=e514]:
+                  - heading "Instacart powers online grocery delivery with Stripe." [level=3] [ref=e515]
+                - link "Read Instacart's story" [ref=e517]:
+                  - /url: /customers/instacart
+                  - generic [ref=e519]:
+                    - generic [ref=e520]: Read the story
+                    - generic [ref=e521]: ⁠
+              - generic [ref=e531] [cursor=pointer]:
+                - button [ref=e539]:
+                  - heading "Le Monde improves local and international payments with Stripe." [level=3] [ref=e540]
+                - link "Read LeMonde's story" [ref=e542]:
+                  - /url: /customers/le-monde
+                  - generic [ref=e544]:
+                    - generic [ref=e545]: Read the story
+                    - generic [ref=e546]: ⁠
+            - generic [ref=e555]:
+              - generic [ref=e556]: Realize value faster with dedicated experts
+              - generic [ref=e557]:
+                - generic [ref=e558]:
+                  - generic [ref=e565]:
+                    - heading "Professional services." [level=4] [ref=e566]
+                    - paragraph [ref=e567]: Get tailored guidance from Stripe on implementation, complex integrations, or major migrations.
+                  - link [ref=e569] [cursor=pointer]:
+                    - /url: /professional-services
+                    - text: View services
+                    - generic [ref=e570]:
+                      - text: ⁠
+                      - generic [ref=e571]: ⁠
+                - generic [ref=e577]:
+                  - generic [ref=e583]:
+                    - heading "Stripe-certified experts." [level=4] [ref=e584]
+                    - paragraph [ref=e585]: Work with a Stripe consulting partner that can integrate and deploy Stripe solutions on your behalf.
+                  - link [ref=e587] [cursor=pointer]:
+                    - /url: /partners
+                    - text: View partners
+                    - generic [ref=e588]:
+                      - text: ⁠
+                      - generic [ref=e589]: ⁠
+                - generic [ref=e595]:
+                  - generic [ref=e601]:
+                    - heading "Support plans." [level=4] [ref=e602]
+                    - paragraph [ref=e603]: Receive ongoing assistance and day-to-day support for technical questions with tiered plans based on your needs.
+                  - link [ref=e605] [cursor=pointer]:
+                    - /url: /support-plans
+                    - text: View plans
+                    - generic [ref=e606]:
+                      - text: ⁠
+                      - generic [ref=e607]: ⁠
+          - generic [ref=e613]:
+            - generic [ref=e614]:
+              - generic [ref=e615]:
+                - heading "Build a foundation for your startup that enables faster growth" [level=3] [ref=e616]
+                - link [ref=e618] [cursor=pointer]:
+                  - /url: /startups
+                  - text: Stripe for startups
+                  - generic [ref=e619]: ⁠
+              - paragraph [ref=e625]: From stablecoin pioneers to 88% of the Forbes AI 50, Stripe helps startups build what’s next on easy-to-integrate financial infrastructure.
+            - region "Customer stories" [ref=e626]:
+              - group [ref=e627]:
+                - button "Previous customer story" [disabled] [ref=e628]
+                - button "Next customer story" [ref=e631] [cursor=pointer]
+              - list [ref=e635]:
+                - listitem:
+                  - link [ref=e637] [cursor=pointer]:
+                    - /url: /customers/lovable
+                    - generic:
+                      - img "Lovable logo"
+                    - heading "Lovable grows into a vibe-coding juggernaut with Stripe." [level=4] [ref=e639]
+                    - generic [ref=e640]:
+                      - text: Read Lovable’s story
+                      - generic [ref=e641]:
+                        - text: ⁠
+                        - generic [ref=e642]: ⁠
+                - listitem:
+                  - link [ref=e649] [cursor=pointer]:
+                    - /url: /customers/gamma
+                    - generic:
+                      - img "Gamma logo"
+                    - heading "Gamma expands to $100M ARR and 70 million users with Stripe." [level=4] [ref=e651]
+                    - generic [ref=e652]:
+                      - text: Read Gamma’s story
+                      - generic [ref=e653]:
+                        - text: ⁠
+                        - generic [ref=e654]: ⁠
+                - listitem:
+                  - link [ref=e661] [cursor=pointer]:
+                    - /url: /customers/runway
+                    - generic:
+                      - img "Runway logo"
+                    - heading "Runway protects developer time with no-code solutions from Stripe." [level=4] [ref=e663]
+                    - generic [ref=e664]:
+                      - text: Read Runway’s story
+                      - generic [ref=e665]:
+                        - text: ⁠
+                        - generic [ref=e666]: ⁠
+                - listitem:
+                  - link [ref=e673] [cursor=pointer]:
+                    - /url: /customers/supabase
+                    - generic:
+                      - img "Supabase logo"
+                    - heading "Supabase delivers its backend-as-a-service to 150 countries with Stripe." [level=4] [ref=e675]
+                    - generic [ref=e676]:
+                      - text: Read Supabase’s story
+                      - generic [ref=e677]:
+                        - text: ⁠
+                        - generic [ref=e678]: ⁠
+                - listitem:
+                  - link [ref=e685] [cursor=pointer]:
+                    - /url: /customers/linear
+                    - generic:
+                      - img "Linear logo"
+                    - heading "Linear partners with Stripe to handle billing and payments." [level=4] [ref=e687]
+                    - generic [ref=e688]:
+                      - text: Read Linear’s story
+                      - generic [ref=e689]:
+                        - text: ⁠
+                        - generic [ref=e690]: ⁠
+                - listitem:
+                  - link [ref=e697] [cursor=pointer]:
+                    - /url: /customers/elevenlabs
+                    - generic:
+                      - img "ElevenLabs logo"
+                    - heading "ElevenLabs grows into a $3B AI audio leader with Stripe." [level=4] [ref=e699]
+                    - generic [ref=e700]:
+                      - text: Watch the video
+                      - generic [ref=e701]:
+                        - text: ⁠
+                        - generic [ref=e702]: ⁠
+                - listitem:
+                  - link [ref=e709] [cursor=pointer]:
+                    - /url: /customers/browserbase
+                    - generic:
+                      - img "Browserbase logo"
+                    - heading "Browserbase offers usage-based billing for an AI agent browser with Stripe." [level=4] [ref=e711]
+                    - generic [ref=e712]:
+                      - text: Read Browserbase’s story
+                      - generic [ref=e713]:
+                        - text: ⁠
+                        - generic [ref=e714]: ⁠
+                - listitem:
+                  - link [ref=e721] [cursor=pointer]:
+                    - /url: /customers/decagon
+                    - generic:
+                      - img "Decagon logo"
+                    - heading "Decagon decreases support costs by 65% with Stripe-integrated agents." [level=4] [ref=e723]
+                    - generic [ref=e724]:
+                      - text: Read Decagon’s story
+                      - generic [ref=e725]:
+                        - text: ⁠
+                        - generic [ref=e726]: ⁠
+            - generic [ref=e732]:
+              - link [ref=e733] [cursor=pointer]:
+                - /url: /startups#application
+                - generic [ref=e735]:
+                  - generic [ref=e736]:
+                    - heading "Stripe Startups program." [level=4] [ref=e737]
+                    - paragraph [ref=e738]: Access financial benefits, a focused community, and expert resources to help you grow your business.
+                  - generic [ref=e739]:
+                    - text: Apply now
+                    - generic [ref=e740]:
+                      - text: ⁠
+                      - generic [ref=e741]: ⁠
+              - link [ref=e748] [cursor=pointer]:
+                - /url: /atlas
+                - generic [ref=e750]:
+                  - generic [ref=e751]:
+                    - heading "Stripe Atlas." [level=4] [ref=e752]
+                    - paragraph [ref=e753]: Incorporate and get everything you need to fundraise, bank, and accept payments in two business days.
+                  - generic [ref=e754]:
+                    - text: Start your company
+                    - generic [ref=e755]:
+                      - text: ⁠
+                      - generic [ref=e756]: ⁠
+          - generic [ref=e763]:
+            - generic [ref=e764]:
+              - generic [ref=e765]:
+                - heading "Make your SaaS platform a complete financial operating system" [level=3] [ref=e766]
+                - link [ref=e768] [cursor=pointer]:
+                  - /url: /use-cases/platforms
+                  - text: Stripe for platforms
+                  - generic [ref=e769]: ⁠
+              - paragraph [ref=e775]: From the Fortune 100 to the Forbes Cloud 100, vertical SaaS platforms use Stripe to expand their product offerings with embedded payments and financial services.
+            - generic [ref=e780]:
+              - generic [ref=e781]:
+                - generic [ref=e786]:
+                  - heading "Get to market faster." [level=4] [ref=e787]
+                  - paragraph [ref=e788]: Launch and scale payments products with lower operational overhead using embedded components and no-code tools.
+                - link [ref=e790] [cursor=pointer]:
+                  - /url: /guides/best-practices-for-launching-and-scaling-platform-payments
+                  - text: Read the guide
+                  - generic [ref=e791]:
+                    - text: ⁠
+                    - generic [ref=e792]: ⁠
+              - generic [ref=e798]:
+                - generic [ref=e802]:
+                  - heading "Grow new lines of revenue." [level=4] [ref=e803]
+                  - paragraph [ref=e804]: Monetize platform transactions—including payments, card interchange, and financing fees.
+                - link [ref=e806] [cursor=pointer]:
+                  - /url: /guides/introduction-to-monetizing-payments
+                  - text: Read the guide
+                  - generic [ref=e807]:
+                    - text: ⁠
+                    - generic [ref=e808]: ⁠
+              - generic [ref=e814]:
+                - generic [ref=e818]:
+                  - heading "Manage platform risk." [level=4] [ref=e819]
+                  - paragraph [ref=e820]: Stay ahead of global regulations with tools for compliance, credit risk, fraud prevention, and account security.
+                - link [ref=e822] [cursor=pointer]:
+                  - /url: /guides/introduction-to-risk-management
+                  - text: Read the guide
+                  - generic [ref=e823]:
+                    - text: ⁠
+                    - generic [ref=e824]: ⁠
+            - generic [ref=e830]:
+              - generic [ref=e832]:
+                - generic [ref=e833]:
+                  - generic [ref=e835]: With Stripe, we have a global technology partner to help our customers—from Canadian yoga studios to British boxing classes—keep growing and evolving in a new wellness world.
+                  - generic [ref=e836]: Kurtis Moyer, Lead Product Manager of Payments, Mindbody
+                  - link [ref=e837] [cursor=pointer]:
+                    - /url: /customers/mindbody
+                    - text: Read the story
+                    - generic [ref=e838]:
+                      - text: ⁠
+                      - generic [ref=e839]: ⁠
+                - generic [ref=e845]:
+                  - generic [ref=e847]: Without Stripe, it would have taken significant time and engineering effort to offer these resources to our customers. The financial infrastructure Stripe offers is incredibly valuable to Jobber, and we look forward to seeing what comes next.
+                  - generic [ref=e848]: Laura Collinson, Director of Fintech, Jobber
+                  - link [ref=e849] [cursor=pointer]:
+                    - /url: /customers/jobber
+                    - text: Read the story
+                    - generic [ref=e850]:
+                      - text: ⁠
+                      - generic [ref=e851]: ⁠
+                - generic [ref=e857]:
+                  - generic [ref=e859]: Stripe makes the subscriptions and payment piece really easy for everyone involved. And that helps us make it easy for writers and other creators to do the work they want to do on Substack and get paid for it.
+                  - generic [ref=e860]: Seth McMillan, Engineering Manager, Substack
+                  - link [ref=e861] [cursor=pointer]:
+                    - /url: /customers/substack
+                    - text: Read the story
+                    - generic [ref=e862]:
+                      - text: ⁠
+                      - generic [ref=e863]: ⁠
+                - generic [ref=e869]:
+                  - generic [ref=e871]: Stripe offers an enterprise-grade infrastructure that puts our customers on the cutting edge of modern payments technology. The combination of Terminal and Connect is a powerful integrated solution.
+                  - generic [ref=e872]: Dax Dasilva, Founder and CEO, Lightspeed
+                  - link [ref=e873] [cursor=pointer]:
+                    - /url: /customers/lightspeed-terminal
+                    - text: Read the story
+                    - generic [ref=e874]:
+                      - text: ⁠
+                      - generic [ref=e875]: ⁠
+              - generic [ref=e885]:
+                - button "Show testimonial from Mindbody" [ref=e886]
+                - button "Show testimonial from Jobber" [ref=e891] [cursor=pointer]
+                - button "Show testimonial from Substack" [ref=e896] [cursor=pointer]
+                - button "Show testimonial from Lightspeed" [ref=e902] [cursor=pointer]
+      - generic [ref=e909]:
+        - generic [ref=e910]:
+          - generic [ref=e911]:
+            - heading "Reliable, extensible infrastructure for every stack." [level=2] [ref=e912]
+            - paragraph [ref=e913]: Adapt Stripe to your business needs with flexible integration options.
+          - generic [ref=e914]:
+            - link [ref=e915] [cursor=pointer]:
+              - /url: https://docs.stripe.com/development
+              - text: View developer docs
+              - generic [ref=e916]: ⁠
+            - link "View Stripe’s GitHub" [ref=e922] [cursor=pointer]:
+              - /url: https://github.com/stripe
+        - generic [ref=e924]:
+          - generic [ref=e926]:
+            - heading "Connect to existing systems." [level=3] [ref=e927]
+            - paragraph [ref=e928]: Orchestrate payments across multiple processors, build custom workflows, and connect to third parties using APIs, partner apps, or prebuilt integrations.
+          - generic [ref=e930]:
+            - generic [ref=e931]:
+              - heading "Scale with confidence." [level=3] [ref=e932]
+              - paragraph [ref=e933]: Handle thousands of transactions per second with consistent speed and reliability, even during peak traffic periods.
+            - generic [ref=e934]:
+              - generic [ref=e935]:
+                - heading "500M+" [level=4] [ref=e936]
+                - paragraph [ref=e937]: API requests per day
+              - generic [ref=e938]:
+                - heading "10K+" [level=4] [ref=e939]
+                - paragraph [ref=e940]: API requests per second
+              - generic [ref=e941]:
+                - heading "150K+" [level=4] [ref=e942]
+                - paragraph [ref=e943]: transactions per minute
+          - generic [ref=e944]:
+            - generic [ref=e945]:
+              - heading "Choose an integration path." [level=3] [ref=e946]
+              - paragraph [ref=e947]: With AI-powered support, rich documentation, and built-in debugging tools, you can quickly get started with the best option for your business.
+            - generic [ref=e948]:
+              - generic [ref=e949]:
+                - generic [ref=e952]:
+                  - heading "Don’t code?" [level=4] [ref=e953]
+                  - paragraph [ref=e954]: Set up billing, take in-person payments, or share a payment link—right from the Stripe Dashboard, no code required.
+                - link [ref=e956] [cursor=pointer]:
+                  - /url: https://docs.stripe.com/no-code
+                  - text: Explore no-code
+                  - generic [ref=e957]:
+                    - text: ⁠
+                    - generic [ref=e958]: ⁠
+              - generic [ref=e964]:
+                - generic [ref=e967]:
+                  - heading "Use a pre-integrated platform." [level=4] [ref=e968]
+                  - paragraph [ref=e969]: Browse our directory of platforms that integrate Stripe with website-building tools.
+                - link [ref=e971] [cursor=pointer]:
+                  - /url: https://marketplace.stripe.com/
+                  - text: See directory
+                  - generic [ref=e972]:
+                    - text: ⁠
+                    - generic [ref=e973]: ⁠
+              - generic [ref=e979]:
+                - generic [ref=e982]:
+                  - heading "Build your own integration." [level=4] [ref=e983]
+                  - paragraph [ref=e984]: Use our SDKs, APIs, MCP server, and AI developer tools to build and maintain your own integration with Stripe.
+                - link [ref=e986] [cursor=pointer]:
+                  - /url: https://docs.stripe.com/development
+                  - text: Get started
+                  - generic [ref=e987]:
+                    - text: ⁠
+                    - generic [ref=e988]: ⁠
+      - generic [ref=e996]:
+        - region [ref=e997]:
+          - generic [ref=e998]:
+            - generic [ref=e999]:
+              - heading "What’s happening" [level=2] [ref=e1000]
+              - paragraph [ref=e1001]: See the latest from Stripe.
+            - group "Carousel navigation" [ref=e1002]:
+              - button "Previous slide" [ref=e1003] [cursor=pointer]
+              - button "Next slide" [ref=e1006] [cursor=pointer]
+          - generic [ref=e1011]:
+            - generic [ref=e1012]:
+              - generic [ref=e1013]:
+                - heading "Businesses on Stripe generated $1.9T in 2025." [level=3] [ref=e1014]
+                - paragraph [ref=e1015]: Our annual letter explores the trends defining the internet economy—including steeper growth for newer businesses, faster international expansion, stablecoin progress, agentic commerce, and more.
+              - link [ref=e1016] [cursor=pointer]:
+                - /url: /annual-updates/2025
+                - text: Read the letter
+                - generic [ref=e1017]: ⁠
+            - generic:
+              - generic:
+                - heading [level=3]: 150K+ users have their best day ever on Stripe.
+                - paragraph: From Black Friday through Cyber Monday 2025, Stripe processed more than $40B for businesses while maintaining a 99.9999% uptime.
+              - link:
+                - /url: /newsroom/news/bfcm2025
+                - text: See the numbers
+                - generic: ⁠
+            - generic:
+              - generic:
+                - heading [level=3]: Tidemark’s vertical and SMB SaaS benchmark report.
+                - paragraph: Learn what’s driving growth in vertical SaaS in 2025—going multiproduct, embedding fintech, and integrating AI into the core of their products.
+              - link:
+                - /url: /lp/vertical-saas-benchmark-2025?utm_medium=owned-surfaces&utm_source=33d6&utm_campaign=GLOBAL_4250&utm_content=819a&utm_term=a6a6d7b23e01
+                - text: Get the data
+                - generic: ⁠
+            - generic:
+              - generic:
+                - heading [level=3]: Shopify’s Tobi Lütke sits down with John Collison.
+                - paragraph: Hear them discuss the choices that shaped Shopify and Stripe, the future of commerce, and their advice for founders.
+              - link:
+                - /url: https://www.youtube.com/watch?v=eMSqlQMk480
+                - text: Watch video
+                - generic: ⁠
+            - generic:
+              - generic:
+                - heading [level=3]: New tools to process payments outside app stores.
+                - paragraph: New regulations mean new opportunities. Read how Stripe can help you process payments outside of the iOS and Android app stores, giving you more control and helping grow your revenue.
+              - link:
+                - /url: /use-cases/in-app-payments
+                - text: Learn how
+                - generic: ⁠
+            - generic:
+              - generic:
+                - heading [level=3]: Crypto.com partners with Stripe to enable better crypto payments.
+                - paragraph: Learn how the partnership can help you tap into a new global customer base by letting customers pay with their crypto balance directly at checkout.
+              - link:
+                - /url: /customers/crypto-com-spotlight
+                - text: View announcement
+                - generic: ⁠
+            - generic:
+              - generic:
+                - heading [level=3]: Make your products shoppable through AI platforms.
+                - paragraph: Find out how the Agentic Commerce Protocol (ACP) allows any business to accept purchases from AI platforms without requiring any major technical changes.
+              - link:
+                - /url: /blog/introducing-our-agentic-commerce-solutions
+                - text: Read more
+                - generic: ⁠
+            - generic:
+              - generic:
+                - heading [level=3]: How leading retailers unify customer experiences and drive growth.
+                - paragraph: Get insights into how other brands have unified their online and in-store experiences and optimized their checkouts for a seamless shopping experience.
+              - link:
+                - /url: /lp/how-retailers-drive-growth
+                - text: Get the report
+                - generic: ⁠
+          - generic [ref=e1023]: "Item 1 of 8: Businesses on Stripe generated $1.9T in 2025."
+          - text: ⁠ ⁠ ⁠ ⁠ ⁠ ⁠ ⁠ ⁠
+        - generic [ref=e1024]:
+          - generic [ref=e1025]:
+            - heading "Book of the week" [level=3] [ref=e1026]
+            - paragraph [ref=e1027]: Entrepreneurship starts with ideas.
+          - generic [ref=e1040]:
+            - generic [ref=e1041]:
+              - heading [level=4]
+            - generic [ref=e1042]:
+              - paragraph [ref=e1043]: "For more ideas on economic progress and technological advancement, see our in-house publications:"
+              - generic [ref=e1044]:
+                - link "Stripe Press" [ref=e1045] [cursor=pointer]:
+                  - /url: https://press.stripe.com/
+                - link "Works in Progress" [ref=e1054] [cursor=pointer]:
+                  - /url: https://worksinprogress.co/
+      - generic [ref=e1059]:
+        - generic [ref=e1060]:
+          - generic [ref=e1061]:
+            - generic [ref=e1062]: Ready to get started?
+            - paragraph [ref=e1063]: Create an account instantly, or contact us to design a custom package for your business.
+          - generic [ref=e1064]:
+            - link [ref=e1065] [cursor=pointer]:
+              - /url: https://dashboard.stripe.com/register
+              - text: Start now
+              - generic [ref=e1066]: ⁠
+            - link "Contact sales" [ref=e1072] [cursor=pointer]:
+              - /url: /contact/sales
+        - generic [ref=e1073]:
+          - generic [ref=e1075]:
+            - generic [ref=e1083]:
+              - heading "See what you’ll pay" [level=4] [ref=e1084]
+              - paragraph [ref=e1085]: Integrated per-transaction pricing with no hidden fees.
+            - link [ref=e1087] [cursor=pointer]:
+              - /url: /pricing
+              - text: Pricing details
+              - generic [ref=e1088]:
+                - text: ⁠
+                - generic [ref=e1089]: ⁠
+          - generic [ref=e1096]:
+            - generic [ref=e1102]:
+              - heading "Start building" [level=4] [ref=e1103]
+              - paragraph [ref=e1104]: Get up and running with Stripe in as little as 10 minutes.
+            - link [ref=e1106] [cursor=pointer]:
+              - /url: https://docs.stripe.com/get-started
+              - text: Integration options
+              - generic [ref=e1107]:
+                - text: ⁠
+                - generic [ref=e1108]: ⁠
+    - contentinfo [ref=e1114]:
+      - generic [ref=e1115]:
+        - generic [ref=e1116]:
+          - generic [ref=e1118]:
+            - generic [ref=e1119]: Products and pricing
+            - link "Pricing" [ref=e1120] [cursor=pointer]:
+              - /url: /pricing
+            - link "Atlas" [ref=e1121] [cursor=pointer]:
+              - /url: /atlas
+            - link "Authorization Boost" [ref=e1122] [cursor=pointer]:
+              - /url: /authorization-boost
+            - link "Billing" [ref=e1123] [cursor=pointer]:
+              - /url: /billing
+            - link "Capital" [ref=e1124] [cursor=pointer]:
+              - /url: /capital
+            - link "Capital for platforms" [ref=e1125] [cursor=pointer]:
+              - /url: /capital/platforms
+            - link "Checkout" [ref=e1126] [cursor=pointer]:
+              - /url: /payments/checkout
+            - link "Climate" [ref=e1127] [cursor=pointer]:
+              - /url: /climate
+            - link "Connect" [ref=e1128] [cursor=pointer]:
+              - /url: /connect
+            - link "Crypto" [ref=e1129] [cursor=pointer]:
+              - /url: /use-cases/crypto
+            - link "Crypto Onramp" [ref=e1130] [cursor=pointer]:
+              - /url: /crypto-onramp
+            - link "Data Pipeline" [ref=e1131] [cursor=pointer]:
+              - /url: /data-pipeline
+            - link "Elements" [ref=e1132] [cursor=pointer]:
+              - /url: /payments/elements
+            - link "Financial Connections" [ref=e1133] [cursor=pointer]:
+              - /url: /financial-connections
+            - link "Global Payouts" [ref=e1134] [cursor=pointer]:
+              - /url: /payouts
+            - link "Identity" [ref=e1135] [cursor=pointer]:
+              - /url: /identity
+            - link "Invoicing" [ref=e1136] [cursor=pointer]:
+              - /url: /invoicing
+            - link "Issuing" [ref=e1137] [cursor=pointer]:
+              - /url: /issuing
+            - link "Link" [ref=e1138] [cursor=pointer]:
+              - /url: /payments/link
+            - link "Managed Payments" [ref=e1139] [cursor=pointer]:
+              - /url: /managed-payments
+            - link "Payment links" [ref=e1140] [cursor=pointer]:
+              - /url: /payments/payment-links
+            - link "Payment methods" [ref=e1141] [cursor=pointer]:
+              - /url: /payments/payment-methods
+            - link "Payments" [ref=e1142] [cursor=pointer]:
+              - /url: /payments
+            - link "Radar" [ref=e1143] [cursor=pointer]:
+              - /url: /radar
+            - link "Revenue Recognition" [ref=e1144] [cursor=pointer]:
+              - /url: /revenue-recognition
+            - link "Stripe Sigma" [ref=e1145] [cursor=pointer]:
+              - /url: /sigma
+            - link "Subscriptions" [ref=e1146] [cursor=pointer]:
+              - /url: /billing/subscriptions
+            - link "Tax" [ref=e1147] [cursor=pointer]:
+              - /url: /tax
+            - link "Terminal" [ref=e1148] [cursor=pointer]:
+              - /url: /terminal
+            - link "Treasury" [ref=e1149] [cursor=pointer]:
+              - /url: /treasury
+            - link "Treasury for platforms" [ref=e1150] [cursor=pointer]:
+              - /url: /treasury/platforms
+            - link "Usage-based billing" [ref=e1151] [cursor=pointer]:
+              - /url: /billing/usage-based-billing
+          - generic [ref=e1152]:
+            - generic [ref=e1153]:
+              - generic [ref=e1154]: Solutions
+              - link "Enterprises" [ref=e1155] [cursor=pointer]:
+                - /url: /enterprise
+              - link "Startups" [ref=e1156] [cursor=pointer]:
+                - /url: /startups
+              - link "Agentic commerce" [ref=e1157] [cursor=pointer]:
+                - /url: /use-cases/agentic-commerce
+              - link "Crypto" [ref=e1158] [cursor=pointer]:
+                - /url: /use-cases/crypto
+              - link "Ecommerce" [ref=e1159] [cursor=pointer]:
+                - /url: /use-cases/ecommerce
+              - link "Embedded finance" [ref=e1160] [cursor=pointer]:
+                - /url: /use-cases/embedded-finance
+              - link "Finance automation" [ref=e1161] [cursor=pointer]:
+                - /url: /use-cases/finance-automation
+              - link "Global businesses" [ref=e1162] [cursor=pointer]:
+                - /url: /use-cases/global-businesses
+              - link "In-app payments" [ref=e1163] [cursor=pointer]:
+                - /url: /use-cases/in-app-payments
+              - link "Marketplaces" [ref=e1164] [cursor=pointer]:
+                - /url: /use-cases/marketplaces
+              - link "Money management" [ref=e1165] [cursor=pointer]:
+                - /url: /money-management/availability
+              - link "Platforms" [ref=e1166] [cursor=pointer]:
+                - /url: /use-cases/platforms
+              - link "SaaS" [ref=e1167] [cursor=pointer]:
+                - /url: /use-cases/saas
+              - link "AI companies" [ref=e1168] [cursor=pointer]:
+                - /url: /use-cases/ai
+              - link "Creator economy" [ref=e1169] [cursor=pointer]:
+                - /url: /use-cases/creator-economy
+              - link "Gaming" [ref=e1170] [cursor=pointer]:
+                - /url: /industries/gaming
+              - link "Hospitality, travel, and leisure" [ref=e1171] [cursor=pointer]:
+                - /url: /industries/travel
+              - link "Insurance" [ref=e1172] [cursor=pointer]:
+                - /url: /industries/insurance
+              - link "Media and entertainment" [ref=e1173] [cursor=pointer]:
+                - /url: /industries/media-entertainment
+              - link "Nonprofits" [ref=e1174] [cursor=pointer]:
+                - /url: /industries/nonprofits
+              - link "Professional services" [ref=e1175] [cursor=pointer]:
+                - /url: /industries/professional-services
+              - link "Public sector" [ref=e1176] [cursor=pointer]:
+                - /url: /industries/public-sector
+              - link "Retail" [ref=e1177] [cursor=pointer]:
+                - /url: /industries/retail
+            - generic [ref=e1178]:
+              - generic [ref=e1179]: Developers
+              - link "Documentation" [ref=e1180] [cursor=pointer]:
+                - /url: https://docs.stripe.com/
+              - link "API reference" [ref=e1181] [cursor=pointer]:
+                - /url: https://docs.stripe.com/api
+              - link "API status" [ref=e1182] [cursor=pointer]:
+                - /url: https://status.stripe.com/
+              - link "API changelog" [ref=e1183] [cursor=pointer]:
+                - /url: https://docs.stripe.com/changelog
+              - link "Libraries and SDKs" [ref=e1184] [cursor=pointer]:
+                - /url: https://docs.stripe.com/development
+              - link "Stripe Projects" [ref=e1185] [cursor=pointer]:
+                - /url: https://docs.stripe.com/projects
+              - link "Developer blog" [ref=e1186] [cursor=pointer]:
+                - /url: https://stripe.dev/
+          - generic [ref=e1187]:
+            - generic [ref=e1188]:
+              - generic [ref=e1189]: Integrations and custom solutions
+              - link "Stripe App Marketplace" [ref=e1190] [cursor=pointer]:
+                - /url: https://marketplace.stripe.com/
+              - link "Stripe Partner ecosystem" [ref=e1191] [cursor=pointer]:
+                - /url: /partners
+              - link "Professional services" [ref=e1192] [cursor=pointer]:
+                - /url: /professional-services
+            - generic [ref=e1193]:
+              - generic [ref=e1194]: Resources
+              - link "Product roadmap" [ref=e1195] [cursor=pointer]:
+                - /url: /roadmap
+              - link "Guides" [ref=e1196] [cursor=pointer]:
+                - /url: /guides
+              - link "Customer stories" [ref=e1197] [cursor=pointer]:
+                - /url: /customers
+              - link "Blog" [ref=e1198] [cursor=pointer]:
+                - /url: /blog
+              - link "Community" [ref=e1199] [cursor=pointer]:
+                - /url: https://stripecommunity.com/
+              - link "Sessions annual conference" [ref=e1200] [cursor=pointer]:
+                - /url: /sessions
+              - link "Privacy and terms" [ref=e1201] [cursor=pointer]:
+                - /url: /privacy
+              - link "Prohibited and restricted businesses" [ref=e1202] [cursor=pointer]:
+                - /url: /legal/restricted-businesses
+              - link "Licenses" [ref=e1203] [cursor=pointer]:
+                - /url: /spc/licenses
+              - link "Sitemap" [ref=e1204] [cursor=pointer]:
+                - /url: /sitemap
+              - link "Cookie settings" [ref=e1205] [cursor=pointer]:
+                - /url: /cookie-settings
+              - link "Your privacy choices" [ref=e1206] [cursor=pointer]:
+                - /url: https://privacy.stripe.com/
+              - link "More resources" [ref=e1207] [cursor=pointer]:
+                - /url: /resources/more
+          - generic [ref=e1208]:
+            - generic [ref=e1209]:
+              - generic [ref=e1210]: Company
+              - link "Careers" [ref=e1211] [cursor=pointer]:
+                - /url: /careers
+              - link "Newsroom" [ref=e1212] [cursor=pointer]:
+                - /url: /newsroom
+              - link "Stripe Press" [ref=e1213] [cursor=pointer]:
+                - /url: https://press.stripe.com/
+              - link "Contact sales" [ref=e1214] [cursor=pointer]:
+                - /url: /contact/sales
+            - generic [ref=e1215]:
+              - generic [ref=e1216]: Support
+              - link "Get support" [ref=e1217] [cursor=pointer]:
+                - /url: https://support.stripe.com/
+              - link "Managed support plans" [ref=e1218] [cursor=pointer]:
+                - /url: /support-plans
+              - generic [ref=e1219]: "CA residents: +1 888 926 2289"
+            - link [ref=e1221] [cursor=pointer]:
+              - /url: https://dashboard.stripe.com/login
+              - text: Sign in
+              - generic [ref=e1222]:
+                - text: ⁠
+                - generic [ref=e1223]: ⁠
+        - generic [ref=e1230]:
+          - combobox "United States. Choose your country" [ref=e1231] [cursor=pointer]:
+            - generic [ref=e1234]: United States (English)
+          - paragraph [ref=e1235]: © 2026 Stripe, LLC.
+  - alert [ref=e1239]

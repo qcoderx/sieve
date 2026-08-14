@@ -1,0 +1,169 @@
+- main [ref=e3]:
+  - generic [ref=e5]:
+    - paragraph: The film is loading3%
+    - generic:
+      - paragraph:
+        - generic: Asked before
+    - generic:
+      - generic:
+        - paragraph:
+          - generic: Not an agency on the clock, a
+          - generic: partner in the upside.
+        - paragraph: PEAR AS · ORG NR 919 062 517 · OSLO
+        - paragraph:
+          - link [ref=e7] [cursor=pointer]:
+            - /url: mailto:info@pear.no
+            - text: INFO@PEAR.NO
+    - generic:
+      - generic:
+        - generic: The application
+        - paragraph: Tell us what you sell and where you want to grow. Every application is read, and when the model fits we answer within a week.
+      - generic:
+        - generic:
+          - textbox:
+            - /placeholder: Your name
+        - generic:
+          - textbox:
+            - /placeholder: Work email
+        - generic:
+          - textbox:
+            - /placeholder: What do you want to grow?
+        - button: Send the application
+    - generic:
+      - generic:
+        - generic:
+          - generic:
+            - heading [level=2]:
+              - generic: No fees. A share
+              - generic: of the upside.
+        - generic:
+          - generic:
+            - paragraph: "You pay nothing to start: no retainer, no project fee, no hours on a clock. We carry the cost of strategy, development, content and links."
+            - generic:
+              - generic: Full disclosure
+              - paragraph: "Our pay is an agreed share of the revenue the work creates, measured against your baseline and visible to both sides. You keep everything we build: the software, the content, the rankings. And we take on a few partners at a time, because when we are paid on the outcome, yes has to be earned."
+      - generic:
+        - generic:
+          - generic:
+            - heading [level=2]:
+              - generic: We say no more
+              - generic: often than yes.
+        - generic:
+          - generic:
+            - paragraph: "Our partners sell real products and services, have revenue to grow, and compete in markets where customers search: e-commerce, Saas, marketplaces, service companies."
+            - generic:
+              - generic: Full disclosure
+              - paragraph: If that’s you, the terms above are the whole pitch. If you’re pre-revenue, want to rent developers by the hour, or need results by Friday, we’re the wrong partner, and we’ll tell you so in the first call.
+    - generic:
+      - generic:
+        - generic: Search engine optimization
+        - heading [level=2]:
+          - generic: Everything it takes to be
+          - generic: found, under one roof.
+        - paragraph: Search and software are one discipline at Pear. The product is built to rank from its first commit, and the SEO is done by the people who wrote the code.
+      - generic:
+        - generic: Search engine optimization
+        - heading [level=2]:
+          - generic: Search and software are one
+          - generic: discipline at Pear.
+        - paragraph: The product is built to rank from its first commit, and the SEO is done by the people who wrote the code.
+      - generic:
+        - generic: Custom software
+        - heading [level=2]:
+          - generic: We design and build the thing being
+          - generic: "ranked: storefronts, marketplaces,"
+          - generic: booking systems, the machinery a
+          - generic: modern company sells through.
+        - paragraph: Most software is built first and optimized later, which is backwards. Architecture, speed and structure decide rankings before the first word of copy is written, so ours ships fast, renders clean, and gives search engines a site they can read without excuses.
+    - generic:
+      - link "Pear" [ref=e8] [cursor=pointer]:
+        - /url: "#top"
+      - button "Menu" [ref=e11] [cursor=pointer]
+      - navigation:
+        - link "Apply →" [ref=e16] [cursor=pointer]:
+          - /url: "#top"
+          - text: Apply
+          - generic [ref=e17]: →
+      - navigation "Chapters":
+        - link [ref=e18] [cursor=pointer]:
+          - /url: "#model"
+          - emphasis [ref=e20]: The Model
+        - link [ref=e21] [cursor=pointer]:
+          - /url: "#work"
+          - emphasis [ref=e23]: The Work
+        - link [ref=e24] [cursor=pointer]:
+          - /url: "#terms"
+          - emphasis [ref=e26]: The Terms
+        - link [ref=e27] [cursor=pointer]:
+          - /url: "#questions"
+          - emphasis [ref=e29]: Questions
+      - generic:
+        - generic:
+          - heading "Pear makes you appear." [level=1]:
+            - generic:
+              - generic:
+                - generic: Pear
+                - generic: makes
+                - generic: you
+                - generic: appear.
+          - paragraph:
+            - generic:
+              - generic:
+                - generic: Not
+                - generic: an
+                - generic: agency
+                - generic: "on"
+                - generic: the
+                - generic: clock,
+            - generic:
+              - generic:
+                - generic: a
+                - generic: partner
+                - generic: in
+                - generic: the
+                - generic: upside.
+          - link "Request Partnership →" [ref=e30] [cursor=pointer]:
+            - /url: "#top"
+            - generic [ref=e31]:
+              - text: Request Partnership
+              - generic [ref=e32]: →
+            - generic [ref=e34]:
+              - text: Request Partnership
+              - generic [ref=e35]: →
+      - generic:
+        - generic:
+          - paragraph:
+            - generic: We
+            - generic: build
+            - generic: custom
+            - generic: software,
+            - generic: rank
+            - generic: it
+            - generic: where
+            - generic: customers
+            - generic: search,
+            - generic: and
+            - generic: take
+            - generic: our
+            - generic: pay
+            - generic: as
+            - generic: a
+            - generic: share
+            - generic: of
+            - generic: the
+            - generic: revenue
+            - generic: it
+            - generic: earns.
+            - generic: "No"
+            - generic: retainers,
+            - generic: "no"
+            - generic: "hours:"
+            - generic: if
+            - generic: you
+            - generic: don’t
+            - generic: grow,
+            - generic: we
+            - generic: don’t
+            - generic: get
+            - generic: paid.
+      - generic: At your service

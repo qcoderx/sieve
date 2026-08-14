@@ -83,6 +83,19 @@ Flags:
 	dopts.Memory = loadMemory(common.memoryPath)
 	dopts.Render.ViewportW, dopts.Render.ViewportH = w, h
 	dopts.Render.ChromePath = common.chrome
+	// The timeouts the caller asked for, which this command was accepting and
+	// then ignoring.
+	//
+	// common.register puts -timeout and -load-timeout on every subcommand, and
+	// distill applies both. This one set the viewport and the browser path and
+	// stopped, so the MCP server always ran on defaults however it was started.
+	// The effect was not subtle: igloo.inc reads correctly from the CLI with a
+	// longer load budget and returned an empty shell over MCP, which is the
+	// interface almost every user will actually reach it through. A flag that
+	// is advertised and silently discarded is worse than one that does not
+	// exist.
+	dopts.Render.ScaleTo(common.timeout)
+	dopts.Render.LoadBudget = common.loadTimeout
 	dopts.Canvas = canvas.DefaultOptions()
 	dopts.Canvas.EnableVision = vision
 

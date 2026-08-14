@@ -95,9 +95,23 @@ type commonFlags struct {
 
 func (c *commonFlags) register(fs *flag.FlagSet) {
 	fs.StringVar(&c.chrome, "chrome", "", "path to a Chromium binary (default: auto-detect)")
-	fs.DurationVar(&c.timeout, "timeout", 10*time.Second,
-		"time budget for reading a page, measured from the moment it has loaded")
-	fs.DurationVar(&c.loadTimeout, "load-timeout", 20*time.Second,
+	// Both of these are ceilings, not spends.
+	//
+	// A page that is ready stops the load wait immediately, and a sweep that
+	// stops finding new text ends immediately, so raising either costs a fast
+	// page nothing. Measured across example.com, kubernetes.io,
+	// news.ycombinator.com and stripe.com, moving from 10s/20s to 45s/45s
+	// changed total time by less than the run-to-run noise.
+	//
+	// What the old values cost was everything else. pear.no recovers 16 of 45
+	// ground-truth facts at 10s and 43 at 90s; igloo.inc returns an empty shell
+	// at 20s of load budget and its whole site at 40s. Those were being read as
+	// extraction failures when they were budget failures, and the default is
+	// what nearly every caller uses -- an MCP client never passes a flag.
+	fs.DurationVar(&c.timeout, "timeout", 45*time.Second,
+		"time budget for reading a page, measured from the moment it has loaded.\n"+
+			"A ceiling, not a spend: a sweep that stops finding new text ends early")
+	fs.DurationVar(&c.loadTimeout, "load-timeout", 45*time.Second,
 		"how long to wait for a slow page to arrive and stop moving before reading it.\n"+
 			"Separate from -timeout: a site's own loading time is not work sieve is doing,\n"+
 			"and charging it to the extraction only guarantees a thin read")

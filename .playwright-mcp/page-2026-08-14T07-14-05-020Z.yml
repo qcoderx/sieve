@@ -1,0 +1,225 @@
+- generic [active] [ref=e1]:
+  - banner [ref=e2]:
+    - navigation [ref=e3]:
+      - link [ref=e4] [cursor=pointer]:
+        - /url: /
+      - list [ref=e25]:
+        - listitem [ref=e26]:
+          - link "Documentation" [ref=e27] [cursor=pointer]:
+            - /url: /docs/home/
+        - listitem [ref=e28]:
+          - link "Kubernetes Blog" [ref=e29] [cursor=pointer]:
+            - /url: /blog/
+        - listitem [ref=e30]:
+          - link "Training" [ref=e31] [cursor=pointer]:
+            - /url: /training/
+        - listitem [ref=e32]:
+          - link "Careers" [ref=e33] [cursor=pointer]:
+            - /url: /careers/
+        - listitem [ref=e34]:
+          - link "Partners" [ref=e35] [cursor=pointer]:
+            - /url: /partners/
+        - listitem [ref=e36]:
+          - link "Community" [ref=e37] [cursor=pointer]:
+            - /url: /community/
+        - listitem [ref=e38]:
+          - button "Versions" [ref=e40] [cursor=pointer]
+        - listitem [ref=e41]:
+          - button "English" [ref=e43] [cursor=pointer]
+        - listitem [ref=e44]:
+          - button "Toggle theme (auto)" [ref=e45] [cursor=pointer]
+      - text: 
+    - heading "Production-Grade Container Orchestration" [level=1] [ref=e51]
+  - main [ref=e53]:
+    - generic [ref=e57]:
+      - generic: 
+      - searchbox "Search this site" [ref=e58]
+    - link [ref=e60] [cursor=pointer]:
+      - /url: /docs/tutorials/kubernetes-basics/
+      - button "Learn Kubernetes Basics" [ref=e61]
+    - generic [ref=e62]:
+      - generic [ref=e65]:
+        - paragraph [ref=e66]:
+          - link "Kubernetes" [ref=e67] [cursor=pointer]:
+            - /url: /docs/concepts/overview/
+          - text: ", also known as K8s, is an open source system for automating deployment, scaling, and management of containerized applications."
+        - paragraph [ref=e68]:
+          - text: It groups containers that make up an application into logical units for easy management and discovery. Kubernetes builds upon
+          - link "15 years of experience of running production workloads at Google" [ref=e69] [cursor=pointer]:
+            - /url: https://queue.acm.org/detail.cfm?id=2898444
+          - text: ", combined with best-of-breed ideas and practices from the community."
+      - generic [ref=e72]:
+        - heading "Planet scale" [level=4] [ref=e73]
+        - paragraph [ref=e74]: Designed on the same principles that allow Google to run billions of containers a week, Kubernetes can scale without increasing your operations team.
+      - generic [ref=e77]:
+        - heading "Never outgrow" [level=4] [ref=e78]
+        - paragraph [ref=e79]: Whether testing locally or running a global enterprise, Kubernetes flexibility grows with you to deliver your applications consistently and easily no matter how complex your need is.
+      - generic [ref=e82]:
+        - heading "Run K8s anywhere" [level=4] [ref=e83]
+        - paragraph [ref=e84]: Kubernetes is open source giving you the freedom to take advantage of on-premises, hybrid, or public cloud infrastructure, letting you effortlessly move workloads to where it matters to you.
+        - paragraph [ref=e85]:
+          - text: To download Kubernetes, visit the
+          - link "download" [ref=e86] [cursor=pointer]:
+            - /url: /releases/download/
+          - text: section.
+    - button "▶︎ Watch Video" [ref=e91] [cursor=pointer]
+    - generic [ref=e94]:
+      - heading "Attend upcoming KubeCon + CloudNativeCon events" [level=2] [ref=e95]
+      - link [ref=e97] [cursor=pointer]:
+        - /url: https://events.linuxfoundation.org/kubecon-cloudnativecon-japan/
+        - text: •
+        - strong [ref=e98]: Japan
+        - text: (Yokohama, Jul 28–30)
+      - link [ref=e100] [cursor=pointer]:
+        - /url: https://events.linuxfoundation.org/kubecon-cloudnativecon-north-america/
+        - text: •
+        - strong [ref=e101]: North America
+        - text: (Salt Lake City, Nov 9–12)
+    - generic [ref=e102]:
+      - heading "Kubernetes Features" [level=2] [ref=e103]
+      - generic [ref=e104]:
+        - generic [ref=e105]:
+          - heading [level=3] [ref=e106]:
+            - link "Automated rollouts and rollbacks" [ref=e107] [cursor=pointer]:
+              - /url: /docs/concepts/workloads/controllers/deployment/
+          - text: Kubernetes progressively rolls out changes to your application or its configuration, while monitoring application health to ensure it doesn't kill all your instances at the same time. If something goes wrong, Kubernetes will rollback the change for you. Take advantage of a growing ecosystem of deployment solutions.
+        - generic [ref=e108]:
+          - heading [level=3] [ref=e109]:
+            - link "Service discovery and load balancing" [ref=e110] [cursor=pointer]:
+              - /url: /docs/concepts/services-networking/service/
+          - text: No need to modify your application to use an unfamiliar service discovery mechanism. Kubernetes gives Pods their own IP addresses and a single DNS name for a set of Pods, and can load-balance across them.
+        - generic [ref=e111]:
+          - heading [level=3] [ref=e112]:
+            - link "Storage orchestration" [ref=e113] [cursor=pointer]:
+              - /url: /docs/concepts/storage/persistent-volumes/
+          - text: Automatically mount the storage system of your choice, whether from local storage, a public cloud provider, or a network storage system such as iSCSI or NFS.
+        - generic [ref=e114]:
+          - heading [level=3] [ref=e115]:
+            - link "Secret and configuration management" [ref=e116] [cursor=pointer]:
+              - /url: /docs/concepts/configuration/secret/
+          - text: Deploy and update Secrets and application configuration without rebuilding your image and without exposing Secrets in your stack configuration.
+        - generic [ref=e117]:
+          - heading [level=3] [ref=e118]:
+            - link "Automatic bin packing" [ref=e119] [cursor=pointer]:
+              - /url: /docs/concepts/configuration/manage-resources-containers/
+          - text: Automatically places containers based on their resource requirements and other constraints, while not sacrificing availability. Mix critical and best-effort workloads in order to drive up utilization and save even more resources.
+        - generic [ref=e120]:
+          - heading [level=3] [ref=e121]:
+            - link "Batch execution" [ref=e122] [cursor=pointer]:
+              - /url: /docs/concepts/workloads/controllers/job/
+          - text: In addition to services, Kubernetes can manage your batch and CI workloads, replacing containers that fail, if desired.
+        - generic [ref=e123]:
+          - heading [level=3] [ref=e124]:
+            - link "Self-healing" [ref=e125] [cursor=pointer]:
+              - /url: /docs/concepts/architecture/self-healing/#automated-recovery-from-damage
+          - text: Kubernetes restarts containers that crash, replaces entire Pods where needed, reattaches storage in response to wider failures, and can integrate with node autoscalers to self-heal even at the node level.
+        - generic [ref=e126]:
+          - heading [level=3] [ref=e127]:
+            - link "Horizontal scaling" [ref=e128] [cursor=pointer]:
+              - /url: /docs/concepts/workloads/autoscaling/horizontal-pod-autoscale/
+          - text: Scale your application up and down with a simple command, with a UI, or automatically based on CPU usage.
+        - generic [ref=e129]:
+          - heading [level=3] [ref=e130]:
+            - link "Vertical scaling" [ref=e131] [cursor=pointer]:
+              - /url: /docs/concepts/workloads/autoscaling/vertical-pod-autoscale/
+          - text: Automatically adjust resource requests and limits based on actual usage patterns.
+        - generic [ref=e132]:
+          - heading [level=3] [ref=e133]:
+            - link "IPv4/IPv6 dual-stack" [ref=e134] [cursor=pointer]:
+              - /url: /docs/concepts/services-networking/dual-stack/
+          - text: Allocation of IPv4 and IPv6 addresses to Pods and Services
+        - generic [ref=e135]:
+          - heading [level=3] [ref=e136]:
+            - link "Designed for extensibility" [ref=e137] [cursor=pointer]:
+              - /url: /docs/concepts/extend-kubernetes/
+          - text: Add features to your Kubernetes cluster without changing upstream source code.
+    - generic [ref=e138]:
+      - heading [level=3] [ref=e139]:
+        - link "Case Studies" [ref=e140] [cursor=pointer]:
+          - /url: /case-studies/
+      - generic [ref=e141]:
+        - generic [ref=e142]:
+          - img "Babylon Case Study" [ref=e143]
+          - paragraph [ref=e144]: "\"Kubernetes is a great platform for machine learning because it comes with all the scheduling and …\""
+          - link "Read more" [ref=e145] [cursor=pointer]:
+            - /url: /case-studies/babylon/
+        - generic [ref=e146]:
+          - img "Booz Allen Case Study" [ref=e147]
+          - paragraph [ref=e148]: "\"Kubernetes is a great solution for us. It allows us to rapidly iterate on our clients' demands. \""
+          - link "Read more" [ref=e149] [cursor=pointer]:
+            - /url: /case-studies/booz-allen/
+        - generic [ref=e150]:
+          - img "Booking.com Case Study" [ref=e151]
+          - paragraph [ref=e152]: "\"We realized that we needed to learn Kubernetes better in order to fully use the potential of it. At …\""
+          - link "Read more" [ref=e153] [cursor=pointer]:
+            - /url: /case-studies/booking-com/
+        - generic [ref=e154]:
+          - img "AppDirect Case Study" [ref=e155]
+          - paragraph [ref=e156]: "\"We made the right decisions at the right time. Kubernetes and the cloud native technologies are now …\""
+          - link "Read more" [ref=e157] [cursor=pointer]:
+            - /url: /case-studies/appdirect/
+    - generic [ref=e160]:
+      - paragraph [ref=e161]:
+        - text: We are a
+        - link "CNCF" [ref=e162] [cursor=pointer]:
+          - /url: https://cncf.io/
+        - text: graduated project
+      - paragraph
+      - img "Cloud Native Computing Foundation logo" [ref=e163]
+  - contentinfo [ref=e164]:
+    - generic [ref=e166]:
+      - list [ref=e168]:
+        - listitem "YouTube" [ref=e169]:
+          - link "YouTube" [ref=e170] [cursor=pointer]:
+            - /url: https://youtube.com/kubernetescommunity
+            - generic [ref=e171]: 
+        - listitem "Forum" [ref=e172]:
+          - link "Forum" [ref=e173] [cursor=pointer]:
+            - /url: https://discuss.kubernetes.io
+            - generic [ref=e174]: 
+        - listitem "Server Fault" [ref=e175]:
+          - link "Server Fault" [ref=e176] [cursor=pointer]:
+            - /url: https://serverfault.com/questions/tagged/kubernetes
+            - generic [ref=e177]: 
+        - listitem "LinkedIn" [ref=e178]:
+          - link "LinkedIn" [ref=e179] [cursor=pointer]:
+            - /url: https://www.linkedin.com/company/kubernetes/
+            - generic [ref=e180]: 
+        - listitem "Bluesky" [ref=e181]:
+          - link "Bluesky" [ref=e182] [cursor=pointer]:
+            - /url: https://bsky.app/profile/kubernetes.io
+            - generic [ref=e183]: 
+        - listitem "X (formerly Twitter)" [ref=e184]:
+          - link "X (formerly Twitter)" [ref=e185] [cursor=pointer]:
+            - /url: https://x.com/kubernetesio
+            - generic [ref=e186]: 
+      - generic [ref=e187]:
+        - paragraph [ref=e188]:
+          - generic [ref=e189]:
+            - text: © 2026 The Kubernetes Authors | Documentation Distributed under
+            - link "CC BY 4.0" [ref=e190] [cursor=pointer]:
+              - /url: https://git.k8s.io/website/LICENSE
+        - paragraph [ref=e191]:
+          - generic [ref=e192]:
+            - text: © 2026 The Linux Foundation ®. All rights reserved. The Linux Foundation has registered trademarks and uses trademarks. For a list of trademarks of The Linux Foundation, please see our
+            - link "Trademark Usage page" [ref=e193] [cursor=pointer]:
+              - /url: https://www.linuxfoundation.org/trademark-usage
+        - paragraph [ref=e194]: "ICP license: 京ICP备17074266号-3"
+      - list [ref=e196]:
+        - listitem "Contributor website" [ref=e197]:
+          - link "Contributor website" [ref=e198] [cursor=pointer]:
+            - /url: https://k8s.dev/
+            - generic [ref=e199]: 
+        - listitem "GitHub" [ref=e200]:
+          - link "GitHub" [ref=e201] [cursor=pointer]:
+            - /url: https://github.com/kubernetes/kubernetes
+            - generic [ref=e202]: 
+        - listitem "Slack" [ref=e203]:
+          - link "Slack" [ref=e204] [cursor=pointer]:
+            - /url: https://slack.k8s.io
+            - generic [ref=e205]: 
+        - listitem "Events Calendar" [ref=e206]:
+          - link "Events Calendar" [ref=e207] [cursor=pointer]:
+            - /url: https://calendar.google.com/calendar/embed?src=calendar%40kubernetes.io
+            - generic [ref=e208]: 
+  - text: 

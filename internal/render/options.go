@@ -176,7 +176,7 @@ func DefaultOptions() Options {
 		SettleFloor:   60 * time.Millisecond,
 		RevealFloor:   450 * time.Millisecond,
 		SettleFrames:  2,
-		LoadBudget:    20 * time.Second,
+		LoadBudget:    45 * time.Second,
 		SweepBudget:   5 * time.Second,
 		Budget:        10 * time.Second,
 		Passes:        2,
