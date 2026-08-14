@@ -9,7 +9,7 @@
 sieve exists because of two bets about where the web is going.
 
 **The first is that there will be more AI agents on the internet than humans.**
-Not eventually — soon, and then overwhelmingly. Every research task, price
+Not eventually. Soon, and then overwhelmingly. Every research task, price
 check, documentation lookup and comparison that a person used to do by opening
 six tabs is becoming a request made by something that never sees a tab at all.
 
@@ -30,7 +30,7 @@ problem.
 
 A person visiting a beautiful site wants the experience. The reveal as they
 scroll. The type shattering into individual characters and reassembling. The
-canvas that responds to the cursor. That is not decoration — for a brand, it is
+canvas that responds to the cursor. That is not decoration. For a brand it is
 most of the point.
 
 An agent wants none of it. It does not love the animation. It does not need the
@@ -47,7 +47,7 @@ document. An empty `<body>` that fills itself in with JavaScript.
 The site is not broken. It is illegible to a class of visitor that now matters.
 
 **sieve sits between them.** The site keeps its craft for the humans it was
-built for. The agent gets the content and nothing else — no markup, no
+built for. The agent gets the content and nothing else: no markup, no
 boilerplate, no duplication, no layout. Less time, far fewer tokens, and an
 answer that is actually grounded in the page.
 
@@ -91,10 +91,10 @@ Measured, not asserted. Reproduce any row in about thirty seconds with
 | news.ycombinator.com | 11,979 | 3,014 | 4× |
 
 The spread is the interesting part, and it is why sieve does not claim a single
-number. A `distill` call returns a **manifest** — what the page contains, its
-sections and what each would cost — and the manifest is close to flat in the
-size of the document, because it names sections rather than carrying them. So
-the margin tracks page size. A link-dense front page barely benefits. A large
+number. A `distill` call returns a **manifest**: what the page contains, its
+sections, and what each would cost. That manifest is close to flat in the size
+of the document, because it names sections rather than carrying them. So the
+margin tracks page size. A link-dense front page barely benefits. A large
 content page benefits enormously.
 
 **On a page of a few hundred tokens the manifest costs more than the page, and
@@ -139,8 +139,8 @@ So every artifact carries a machine-readable verdict, before the content:
 
 `evidence` is never empty for anything but `ok`: a verdict you cannot check is
 a verdict you have to trust. Across a 334-site corpus, 76.6% came back `ok`,
-8.3% `blocked`, 7.1% `challenge` — and every one of the rest said so rather
-than returning a plausible-looking empty page.
+8.3% `blocked`, 7.1% `challenge`. Every one of the rest said so rather than
+returning a plausible-looking empty page.
 
 ---
 
@@ -158,9 +158,9 @@ or always render and overpay on the easy one. sieve does neither.
 | `sweep` | Checkpoint sweep with deduplication and geometric ordering | Tens of seconds |
 | `recover` | Canvas and 3D-scene recovery on top of the sweep | Plus vision, if enabled |
 
-The decision is scored from the served bytes — text volume, text-to-markup
-ratio, structural richness, script weight, hydration blobs, canvas elements —
-and **every artifact records which tier answered and why**. A domain that has
+The decision is scored from the served bytes (text volume, text-to-markup ratio,
+structural richness, script weight, hydration blobs, canvas elements), and
+**every artifact records which tier answered and why**. A domain that has
 ever escalated stays escalated, so a page near the line is not judged
 differently on different days.
 
@@ -186,12 +186,12 @@ Most of the web is cheap, and sieve only spends where it must.
 An artifact that reports its own uncertainty is a categorically different
 object from one that does not.
 
-- **Graph retention** — what share of the observed text survived into the graph.
+- **Graph retention**: what share of the observed text survived into the graph.
   Narrowly named on purpose: it measures the graph stage, not the sweep.
-- **Order agreement** — geometry and first-appearance are two independent
+- **Order agreement**: geometry and first-appearance are two independent
   orderings from entirely different evidence. Where they disagree is where
   reading order goes wrong.
-- **Heading separation** — a clean gap between type sizes means the inference
+- **Heading separation**: a clean gap between type sizes means the inference
   had something real to work with; an overlapping continuum means it guessed.
 
 Confidence ships as `high` / `medium` / `low`, not as a decimal. A wrong number
@@ -200,14 +200,14 @@ is worse than no number, because people trust numbers more than prose.
 ### It cannot invent content
 
 **No model touches the extraction path.** Token reduction comes from removing
-markup, boilerplate and duplication — never from a model paraphrasing. That is
+markup, boilerplate and duplication, never from a model paraphrasing. That is
 a claim summarising pipelines structurally cannot make.
 
 Vision is off by default, and with it off the artifact structurally cannot
 contain invented text. With it on, anything recovered from pixels is
 cross-checked against text the site actually shipped: found → `confirmed`, not
 found → `speculative` and excluded from every default payload. The site's own
-data payload is used **only to confirm, never as a source** — hydration blobs
+data payload is used **only to confirm, never as a source**. Hydration blobs
 routinely carry draft copy, other locales and unpublished records.
 
 ### It keeps hidden content without trusting it
@@ -218,8 +218,8 @@ labelled with the control that would reveal it. An artifact can say *"there is a
 section behind a tab labelled Pricing"* instead of silently omitting it.
 
 No default rendering includes it. That is a security property, not a formatting
-choice — hidden text is exactly where a page would place instructions aimed at
-an automated reader.
+choice: hidden text is exactly where a page would place instructions aimed at an
+automated reader.
 
 ### It is reproducible
 
@@ -240,9 +240,9 @@ sieve replay bug-report.sieve
 
 A tool an agent drives in a loop cannot hang. Every stage has a deadline, and
 past its budget plus a grace a watchdog names the stage it reached, kills the
-browser tree, and exits `5` — distinct from a failed run, a usage error, a
-refusal by policy and an unreachable host, so a caller can tell "could not read
-the page" from "sieve broke".
+browser tree, and exits `5`. That code is distinct from a failed run, a usage
+error, a refusal by policy and an unreachable host, so a caller can tell "could
+not read the page" from "sieve broke".
 
 ---
 
@@ -334,8 +334,8 @@ sieve bench ./artifacts/example.com --questions q.yaml --coverage-only
 sieve bench https://example.com --stability
 ```
 
-The same model, prompt and budget answer each question twice — once from the raw
-page, once from the artifact — and both are graded against hand-written ground
+The same model, prompt and budget answer each question twice, once from the raw
+page and once from the artifact, and both are graded against hand-written ground
 truth. Token counts come from the API's own accounting, so they are measurements
 rather than estimates. `--regrade` re-grades a sample to measure how far the
 grader agrees with itself, which is the error bar on every accuracy figure.
@@ -348,7 +348,7 @@ LLM_BASE_URL=https://api.groq.com/openai/v1 LLM_API_KEY=... sieve bench ...
 
 The harness refuses to report a comparison it could not measure. A condition
 that answered nothing, or a run where the grader never succeeded, is reported as
-unmeasured rather than as a score of zero — because a control that collapses
+unmeasured rather than as a score of zero, because a control that collapses
 would otherwise hand the artifact a large apparent win.
 
 ---
@@ -422,7 +422,7 @@ See [CONTRIBUTING.md](CONTRIBUTING.md). Two things worth knowing up front:
 - **Library detectors live in a data file.** `internal/render/fingerprints.json`
   takes a pull request with a fixture; adding one needs no Go and no release.
 - **Golden files catch what tests cannot.** Extraction regressions are silent.
-  `go test ./internal/graph -run TestGolden -update` accepts a change — read the
+  `go test ./internal/graph -run TestGolden -update` accepts a change. Read the
   diff before you do.
 
 ## Licence
