@@ -81,6 +81,23 @@ the read failed matters more than the tokens.
 All three miss one thing on that page: `Pear makes you appear`, the headline
 split one letter per element for animation. sieve reassembles it.
 
+### How much of that row to believe
+
+sieve's figure on this page is noisy and the others are not. Two runs of the
+same build against the same URL, minutes apart, scored 42 of 45 and 35 of 45.
+The page cancels native scrolling, drives itself with wheel events and animates
+continuously, so how far the sweep gets varies between runs; the cheap readers
+take one fetch and have nothing to vary.
+
+That spread is wider than most of the differences reported in this document, so
+a single run against pear.no cannot separate one tool from another. Treat the
+row above as "the cheap readers reliably get this page and sieve usually gets
+most of it", and nothing finer. The honest fix is repeated runs with the spread
+reported, which has not been done.
+
+It does not touch the igloo.inc result. Forty of forty against zero of forty is
+not a margin any amount of variance closes.
+
 ---
 
 ## Reading failure is reported rather than implied
