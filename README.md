@@ -299,6 +299,26 @@ Output defaults to JSON rather than Markdown. Markdown is friendlier on disk,
 but tool output lands unmediated in a context window and Markdown has no
 structural marking a model reliably treats as data.
 
+### As a Claude Code hook
+
+`WebFetch` has no JavaScript engine, so on a React or Next.js page it returns the
+pre-render shell: a valid 200 with no content and no signal that anything went
+wrong. This hook notices and reads the page properly, in the same turn.
+
+```json
+{
+  "hooks": {
+    "PostToolUse": [{
+      "matcher": "WebFetch",
+      "hooks": [{"type": "command", "command": "sieve hook", "timeout": 60}]
+    }]
+  }
+}
+```
+
+It fires only when the fetch failed, never fails the turn, and says why it
+fired. See [docs/HOOK.md](docs/HOOK.md).
+
 ### Command line
 
 ```sh

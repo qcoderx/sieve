@@ -39,6 +39,8 @@ func Run(args []string, stdout, stderr io.Writer) int {
 		return runBench(rest, stdout, stderr)
 	case "serve":
 		return runServe(rest, stdout, stderr)
+	case "hook":
+		return runHook(rest, stdout, stderr)
 	case "mcp":
 		return runMCP(rest, stdout, stderr)
 	case "version", "--version", "-v":
@@ -66,6 +68,7 @@ Commands:
   doctor [url]      Diagnose the environment and, optionally, one page
   bench <dir>       Run a question set against the artifact and the raw page
   serve <dir>       Serve artifacts with content negotiation
+  hook              Claude Code hook: read a page WebFetch could not
   mcp               Run the MCP server on stdio
   version           Print the version
 
