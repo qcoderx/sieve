@@ -328,6 +328,7 @@ sieve distill https://example.com --max-tier fetch      # forbid it
 sieve distill https://example.com --snapshot ./traces   # record for replay
 sieve distill https://example.com --timeout 90s         # slow, scroll-jacked pages
 
+sieve site https://docs.example.com --include docs --max-pages 20
 sieve doctor https://example.com    # why did it choose that tier?
 sieve replay ./traces/example.com.sieve
 sieve serve ./artifacts
@@ -341,6 +342,11 @@ reads) and `index.html`.
 
 Section ids are derived from heading text, so they survive the page changing and
 can be held across calls. Block ids are positional and cannot.
+
+`sieve site` reads a documentation site across pages and writes one `site.json`
+naming every page, its outcome and what it would cost to open. On the Kubernetes
+docs that manifest is **353 tokens indexing 125,842** — the point is to choose a
+page before paying for one. Same origin, bounded, obeys robots.txt.
 
 **[docs/ARTIFACT.md](docs/ARTIFACT.md) is the format contract.** Schema 1.x adds
 fields and never removes or repurposes them, so it is safe to build against.
@@ -370,6 +376,17 @@ The harness refuses to report a comparison it could not measure. A condition
 that answered nothing, or a run where the grader never succeeded, is reported as
 unmeasured rather than as a score of zero, because a control that collapses
 would otherwise hand the artifact a large apparent win.
+
+---
+
+## Caching
+
+The MCP server reuses a completed artifact for 30 minutes, and never reuses one
+that is still rendering or that came back incomplete. Across sessions the
+`content_hash` is what matters: it covers the normalised semantic graph, not the
+bytes, so re-distilling an unchanged page produces the same hash and a differing
+hash means the content differs. WebFetch caches by URL for 15 minutes and cannot
+tell you whether anything changed. See [docs/CACHING.md](docs/CACHING.md).
 
 ---
 
