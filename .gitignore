@@ -25,3 +25,8 @@ tout.txt
 
 # Snapshot dumps written by @playwright/mcp during benchmarking.
 /.playwright-mcp/
+
+# Fetched by npm/install.js at install time, never committed.
+/npm/bin/sieve
+/npm/bin/sieve.exe
+/npm/node_modules/

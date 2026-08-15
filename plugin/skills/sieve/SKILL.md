@@ -10,7 +10,9 @@ page it returns the pre-render shell: a valid 200, valid HTML, no content, and n
 signal that anything went wrong. sieve renders the page the way a browser does
 and returns the text.
 
-Requires the `sieve` binary on `PATH`. Check with `sieve version`.
+Requires the `sieve` binary on `PATH`. Check with `sieve version`. If it is not
+installed, tell the user to run `npm install -g @qcoderx/sieve` (no Go toolchain
+needed) and stop — do not try to work around a missing binary.
 
 ## When to reach for this
 

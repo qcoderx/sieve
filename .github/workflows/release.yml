@@ -1,0 +1,70 @@
+# Prebuilt binaries, so installing sieve does not require a Go toolchain.
+#
+# Asking a Claude Code user to install Go to try a plugin is asking most of them
+# not to try it. sieve is pure Go with cgo disabled, so one machine can build
+# every target it supports; there is no reason to make anyone else build it.
+#
+# The archive names are a contract: npm/install.js derives them from the running
+# platform, so renaming one here breaks installation there.
+
+name: release
+
+on:
+  push:
+    tags: ["v*"]
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-go@v5
+        with:
+          go-version-file: go.mod
+          cache: true
+
+      # A release that ships a broken binary is worse than a late one.
+      - name: Test
+        run: go test ./...
+        env:
+          SIEVE_SKIP_BROWSER: "1"
+
+      - name: Build every target
+        run: |
+          set -eu
+          version="${GITHUB_REF_NAME#v}"
+          mkdir -p dist
+          for target in \
+            darwin/arm64 darwin/amd64 \
+            linux/amd64 linux/arm64 \
+            windows/amd64 windows/arm64
+          do
+            os="${target%/*}"; arch="${target#*/}"
+            ext=""; [ "$os" = "windows" ] && ext=".exe"
+            out="dist/sieve${ext}"
+            CGO_ENABLED=0 GOOS="$os" GOARCH="$arch" go build \
+              -trimpath \
+              -ldflags "-s -w -X github.com/qcoderx/sieve/internal/render.Version=${version}" \
+              -o "$out" ./cmd/sieve
+            # tar.gz everywhere except Windows, which cannot be relied on to
+            # have tar in the shell a user is installing from.
+            if [ "$os" = "windows" ]; then
+              (cd dist && zip -q "sieve_${version}_${os}_${arch}.zip" "sieve.exe" && rm sieve.exe)
+            else
+              (cd dist && tar czf "sieve_${version}_${os}_${arch}.tar.gz" sieve && rm sieve)
+            fi
+          done
+          (cd dist && sha256sum * > checksums.txt)
+          ls -la dist
+
+      - name: Publish
+        uses: softprops/action-gh-release@v2
+        with:
+          files: dist/*
+          generate_release_notes: true
+          fail_on_unmatched_files: true
