@@ -1,0 +1,178 @@
+# Question set for cuberto.com.
+#
+# A heavily animated agency site with a great deal of real prose behind the
+# animation: five service descriptions, a client-work list where each entry is a
+# sentence rather than a title, and a block of testimonials. It is the case
+# where an extractor can look successful while losing most of the page, because
+# the headline and the first service block come back easily and the rest arrives
+# only as the visitor scrolls.
+#
+# Ground truth was read from the served HTML:
+#
+#   curl -sL https://cuberto.com | python -c "...strip tags..."
+#
+# The work descriptions are used as facts in preference to client names. The
+# names are the part most likely to rotate; the sentences describing each
+# engagement are the page's own prose and are what a reader is actually there
+# for.
+
+name: Cuberto (animated agency site, prose behind the motion)
+url: https://cuberto.com
+
+questions:
+  # --- Factual retrieval ----------------------------------------------------
+  - id: q01
+    band: factual
+    ask: What kind of company is Cuberto?
+    expect: A digital design and development agency.
+    facts:
+      - digital design
+      - development agency
+
+  - id: q02
+    band: factual
+    ask: What does the agency say it builds, and for whom?
+    expect: Digital products, brands and websites for companies ready to move
+      beyond the ordinary.
+    facts:
+      - digital products, brands and websites
+      - beyond the ordinary
+
+  - id: q03
+    band: factual
+    ask: Since when has the agency been working, and with what kinds of client?
+    expect: Since 2010, with startups, scale-ups and global companies.
+    facts:
+      - Since 2010
+      - startups, scale-ups
+
+  # --- The five services, which are the bulk of the page --------------------
+  - id: q04
+    band: factual
+    ask: What does the agency say about digital product design?
+    expect: It designs digital products from early concepts to scalable systems,
+      combining product strategy, UX and interface design.
+    facts:
+      - early concepts
+      - scalable systems
+      - product strategy
+
+  - id: q05
+    band: factual
+    ask: What does it say about web design and development?
+    expect: It creates marketing websites that explain products clearly,
+      strengthen brands and support business growth.
+    facts:
+      - marketing websites
+      - explain products clearly
+      - business growth
+
+  - id: q06
+    band: factual
+    ask: What does the UX research service involve?
+    expect: Uncovering how people use digital products and where their
+      experience breaks down, through research and user flows.
+    facts:
+      - how people use digital products
+      - experience breaks down
+
+  - id: q07
+    band: factual
+    ask: What does the branding service produce?
+    expect: Visual identities that give companies a distinct and consistent
+      presence, from typography and colour onwards.
+    facts:
+      - visual identities
+      - distinct and consistent
+
+  - id: q08
+    band: factual
+    ask: What does creative development cover?
+    expect: Bringing ambitious digital concepts to life through motion, 3D and
+      interactive development.
+    facts:
+      - motion, 3D
+      - interactive development
+
+  # --- The work list --------------------------------------------------------
+  - id: q09
+    band: factual
+    ask: Describe the wine project.
+    expect: A connected ecosystem where discovering, learning and buying wine
+      feels effortless.
+    facts:
+      - connected ecosystem
+      - buying wine feels effortless
+
+  - id: q10
+    band: factual
+    ask: What did the payroll project bring together?
+    expect: Payroll, HR and IT in one seamless experience.
+    facts:
+      - payroll, HR and IT
+      - seamless experience
+
+  - id: q11
+    band: factual
+    ask: What was built for one of the world's technology leaders?
+    expect: A scalable design foundation.
+    facts:
+      - scalable design foundation
+      - technology leaders
+
+  - id: q12
+    band: factual
+    ask: What was done for the artists' project?
+    expect: Bringing the creativity of millions of artists into an immersive web
+      experience.
+    facts:
+      - millions of artists
+      - immersive web experience
+
+  - id: q13
+    band: factual
+    ask: What was built in real estate?
+    expect: A complete real estate brand and digital platform from the ground
+      up.
+    facts:
+      - real estate brand
+      - from the ground up
+
+  - id: q14
+    band: factual
+    ask: What was created for a fast-growing capital city?
+    expect: A digital experience worthy of one of the world's fastest-growing
+      capitals.
+    facts:
+      - fastest-growing capitals
+
+  - id: q15
+    band: factual
+    ask: What was done for the B2B product?
+    expect: Reimagining it through branding, storytelling and motion.
+    facts:
+      - branding, storytelling and motion
+
+  # --- Testimonials ---------------------------------------------------------
+  - id: q16
+    band: factual
+    ask: Which client site is named in a testimonial?
+    expect: zelt.app.
+    facts:
+      - zelt.app
+
+  - id: q17
+    band: factual
+    ask: What does that testimonial say about the quality of the work?
+    expect: That it exceeded the client's expectations.
+    facts:
+      - exceeded
+
+  # --- Structural -----------------------------------------------------------
+  - id: q18
+    band: structural
+    ask: What are the main sections of the page?
+    expect: The services, the client work, and the testimonials.
+    facts:
+      - Trusted by remarkable global brands
+      - Trusted by our clients

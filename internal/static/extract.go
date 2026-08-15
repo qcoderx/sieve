@@ -16,6 +16,7 @@ package static
 import (
 	"fmt"
 	"io"
+	"regexp"
 	"strings"
 	"unicode/utf8"
 
@@ -46,6 +47,21 @@ type Signals struct {
 	HTMLBytes int
 	// TextChars is how much readable text static extraction found.
 	TextChars int
+	// MarkupChars is how much text a naive tag-strip finds in the same bytes.
+	//
+	// The two together say whether static extraction is getting the page or
+	// only part of it. TextChars alone cannot: three thousand characters reads
+	// as a substantial page and the escalator was scoring it that way, while a
+	// tag-strip of the same document found nine thousand. cuberto.com lost
+	// every one of its service descriptions that way -- the escalator saw
+	// "substantial text served statically", stayed at tier 0, and returned 25
+	// of 34 ground-truth facts where the browser returns all 34.
+	//
+	// This is a crude count on purpose. It includes text a visitor never sees,
+	// which is exactly why it is a floor for suspicion rather than a target:
+	// the question it answers is "is there plainly more here than we extracted",
+	// and only a large shortfall is worth a browser.
+	MarkupChars int
 	// TextRatio is TextChars over HTMLBytes. A documentation page is text with
 	// a little markup around it; an application shell is markup with no text.
 	TextRatio float64
@@ -189,6 +205,7 @@ func Extract(pageURL string, body io.Reader, sizeHint int) (*Result, error) {
 	if ex.signals.HTMLBytes > 0 {
 		ex.signals.TextRatio = float64(ex.signals.TextChars) / float64(ex.signals.HTMLBytes)
 	}
+	ex.signals.MarkupChars = markupTextChars(string(raw))
 
 	return &Result{
 		Merged:  ex.acc.Result(),
@@ -979,4 +996,40 @@ func (s Signals) IsShell() bool {
 		return false
 	}
 	return s.HydrationBlob || s.ScriptBytes > 0 || s.CanvasElements > 0
+}
+
+// scriptish and anyTag are the whole of the naive strip: remove the elements
+// whose contents are never prose, then remove every remaining tag.
+var (
+	// One pattern per element, because Go's regexp is RE2 and has no
+	// backreferences. A single `<(script|style)...</\1>` does not compile to
+	// what it looks like: the escape is not a backreference, the pattern matches
+	// nothing useful, every script body survives, and a page's JavaScript is
+	// counted as ninety thousand characters of prose.
+	scriptish = []*regexp.Regexp{
+		regexp.MustCompile(`(?is)<script[^>]*>.*?</script>`),
+		regexp.MustCompile(`(?is)<style[^>]*>.*?</style>`),
+		regexp.MustCompile(`(?is)<noscript[^>]*>.*?</noscript>`),
+		regexp.MustCompile(`(?is)<template[^>]*>.*?</template>`),
+	}
+	anyTag  = regexp.MustCompile(`(?s)<[^>]+>`)
+	runOfWS = regexp.MustCompile(`\s+`)
+)
+
+// markupTextChars counts the text a tag-strip would find.
+//
+// Deliberately the dumbest possible reading of the document, because its value
+// is precisely that it shares none of the judgement the real extractor applies.
+// Where the two disagree by a lot, the real extractor is either right and the
+// page is full of text no visitor sees, or wrong and content is being dropped.
+// Either way it is worth opening a browser to find out.
+func markupTextChars(html string) int {
+	if html == "" {
+		return 0
+	}
+	for _, re := range scriptish {
+		html = re.ReplaceAllString(html, " ")
+	}
+	t := anyTag.ReplaceAllString(html, " ")
+	return utf8.RuneCountInString(strings.TrimSpace(runOfWS.ReplaceAllString(t, " ")))
 }

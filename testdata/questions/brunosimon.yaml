@@ -1,0 +1,147 @@
+# Question set for bruno-simon.com.
+#
+# A portfolio you drive a car around. The page is a WebGL world with a physics
+# engine, and most of what a visitor reads is painted into that world rather
+# than laid out as a document -- but the instructions, the controls and the
+# author's own description are in the served HTML, which is what this set is
+# built from.
+#
+# It is here because of what happened when it was measured: Firecrawl, which
+# renders, came back with a single word from a page carrying three thousand
+# characters of readable markup. That is worth having a graded number for rather
+# than an anecdote.
+#
+# Ground truth was read from the served HTML:
+#
+#   curl -sL https://bruno-simon.com | python -c "...strip tags..."
+#
+# The control legend is used heavily because it is the part of the page a
+# visitor actually needs, and because a reader that returns the hero line and
+# nothing else has not read the page.
+
+name: Bruno Simon (drivable WebGL portfolio)
+url: https://bruno-simon.com
+
+questions:
+  # --- Factual retrieval ----------------------------------------------------
+  - id: q01
+    band: factual
+    ask: What does the author call himself?
+    expect: A creative developer, mostly for the web.
+    facts:
+      - creative developer
+      - mostly for the web
+
+  - id: q02
+    band: factual
+    ask: What is this site, and what does it ask the visitor to do?
+    expect: His portfolio, which asks you to drive around to learn about him and
+      discover the secrets of the world.
+    facts:
+      - portfolio
+      - drive around
+      - discover the many secrets
+
+  - id: q03
+    band: factual
+    ask: What does the page ask the visitor not to do?
+    expect: Not to break anything.
+    facts:
+      - don't break anything
+
+  # --- The controls, which are the page's real content ----------------------
+  - id: q04
+    band: factual
+    ask: What input methods does the site support?
+    expect: Mouse and keyboard, and mobile or tablet with joysticks.
+    facts:
+      - Mouse Keyboard
+      - Mobile Tablet
+
+  - id: q05
+    band: factual
+    ask: What does a left click and drag do?
+    expect: Moves the camera and zooms.
+    facts:
+      - LEFT CLICK
+      - Move camera
+
+  - id: q06
+    band: factual
+    ask: How does a visitor interact with the car on a touch device?
+    expect: By tapping on it.
+    facts:
+      - Tap
+      - Interact
+
+  - id: q07
+    band: factual
+    ask: What controls are offered for sound and effects?
+    expect: Toggles for sound and for some effects.
+    facts:
+      - Toggles sound
+      - Toggles some effects
+
+  - id: q08
+    band: factual
+    ask: What does the respawn control do?
+    expect: Teleports you to the closest respawn.
+    facts:
+      - Teleports
+      - closest respawn
+
+  - id: q09
+    band: factual
+    ask: Is there a way to undo what you have knocked over?
+    expect: Yes, a control that resets every object.
+    facts:
+      - Resets every object
+
+  - id: q10
+    band: factual
+    ask: What can a visitor leave behind on the page?
+    expect: A whisper, posted with their own message.
+    facts:
+      - Post a whisper
+      - Your message here
+
+  - id: q11
+    band: factual
+    ask: What does the hydraulics control do?
+    expect: Activates hydraulics on the car.
+    facts:
+      - Activate hydraulics
+
+  - id: q12
+    band: factual
+    ask: Which joysticks are used on a touch device, and for what?
+    expect: A left joystick and a right joystick, with a press action on the
+      left.
+    facts:
+      - Joystick Left
+      - Joystick Right
+
+  # --- Structural -----------------------------------------------------------
+  - id: q13
+    band: structural
+    ask: Does the page offer any option aimed at slower machines?
+    expect: Yes, a setting described as best for performance.
+    facts:
+      - Best for performance
+
+  - id: q14
+    band: structural
+    ask: Is this page's text present in the served HTML?
+    expect: Yes. The world is WebGL, but the description and the control legend
+      are in the document.
+    facts:
+      - creative developer
+      - portfolio
+
+  # --- Actionable -----------------------------------------------------------
+  - id: q15
+    band: actionable
+    ask: How does a visitor move the car forwards and backwards?
+    expect: With the accelerate controls, backward and forward.
+    facts:
+      - Backward accelerate

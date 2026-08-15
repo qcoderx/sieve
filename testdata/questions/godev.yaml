@@ -1,0 +1,168 @@
+# Question set for go.dev.
+#
+# A second ordinary page, and a different shape of ordinary. kubernetes.io is a
+# feature list; this is a marketing page whose substance is in long pull-quotes
+# from named people at named companies. That matters for extraction: quoted
+# testimony is the kind of text a boilerplate filter is most likely to mistake
+# for furniture, because it sits in cards, repeats a visual pattern, and is not
+# body prose.
+#
+# Ground truth was read from the served HTML:
+#
+#   curl -sL https://go.dev | python -c "...strip tags..."
+#
+# The quotes are attributed on the page to roles rather than always to named
+# individuals, so the facts below use the words rather than the attributions,
+# which are the part most likely to be reworded.
+
+name: Go (ordinary page, substance in pull-quotes)
+url: https://go.dev
+
+questions:
+  # --- Factual retrieval ----------------------------------------------------
+  - id: q01
+    band: factual
+    ask: How does the page describe Go in one line?
+    expect: Build simple, secure, scalable systems with Go.
+    facts:
+      - simple, secure, scalable systems
+
+  - id: q02
+    band: factual
+    ask: Who supports Go, and what kind of language is it?
+    expect: An open-source programming language supported by Google.
+    facts:
+      - open-source programming language
+      - supported by Google
+
+  - id: q03
+    band: factual
+    ask: What does the page claim about learning Go and working in teams?
+    expect: It is easy to learn and great for teams.
+    facts:
+      - easy to learn
+      - great for teams
+
+  - id: q04
+    band: factual
+    ask: What does Go provide for concurrency and its library?
+    expect: Built-in concurrency and a robust standard library.
+    facts:
+      - built-in concurrency
+      - robust standard library
+
+  - id: q05
+    band: factual
+    ask: What does the page say about Go's ecosystem?
+    expect: A large ecosystem of partners, communities and tools.
+    facts:
+      - large ecosystem
+      - partners, communities
+
+  # --- The pull-quotes, which are the bulk of the page ----------------------
+  - id: q06
+    band: factual
+    ask: What does one company say about how quickly their team picked Go up?
+    expect: No single team member knew Go at the time, but within a month
+      everyone was writing in it.
+    facts:
+      - no single team member knew Go
+      - within a month
+
+  - id: q07
+    band: factual
+    ask: Which qualities of Go does that same testimonial credit?
+    expect: Native concurrency, garbage collection, safety and speed, and the
+      flexibility and ease of use.
+    facts:
+      - native concurrency
+      - garbage collection
+      - safety+speed
+
+  - id: q08
+    band: factual
+    ask: What does the page say about compile speed and developer focus?
+    expect: A small language that compiles fast makes for a happy developer, and
+      lets the mind focus on the problem rather than the tool.
+    facts:
+      - compiles fast
+      - happy developer
+      - focus on the actual problem
+
+  - id: q09
+    band: factual
+    ask: What is said about the code, cycle length and boilerplate?
+    expect: Code, test and debug cycles are so quick you forget you are not
+      working with an interpreted language, and there is less boilerplate and
+      more business logic.
+    facts:
+      - less boilerplate
+      - more business logic
+
+  - id: q10
+    band: factual
+    ask: What does the page claim about memory footprint and deployment?
+    expect: Services written in Go typically have very small memory footprints,
+      and because code compiles to a single static binary they containerise
+      easily.
+    facts:
+      - small memory footprints
+      - single static binary
+
+  - id: q11
+    band: factual
+    ask: What specific CPU saving does one organisation report?
+    expect: A reduction of approximately 10%.
+    facts:
+      - CPU reduction of approximately 10%
+
+  - id: q12
+    band: factual
+    ask: What does a testimonial say about tooling in a legacy code base?
+    expect: Tooling had always been a problem, but Go has excellent tooling plus
+      built-in testing, benchmarking and profiling frameworks.
+    facts:
+      - excellent tooling
+      - testing, benchmarking
+
+  - id: q13
+    band: factual
+    ask: Which orchestration system is named as a deployment target?
+    expect: Kubernetes.
+    facts:
+      - Kubernetes
+
+  # --- Structural -----------------------------------------------------------
+  - id: q14
+    band: structural
+    ask: What reference material does the site link to for the language itself?
+    expect: The official Go language specification, the standard library
+      reference, and release notes.
+    facts:
+      - language specification
+      - standard library
+
+  - id: q15
+    band: structural
+    ask: What does the page say about how modules are downloaded and verified?
+    expect: The go command downloads and authenticates modules using the Go
+      module mirror and Go checksum database.
+    facts:
+      - module mirror
+      - checksum database
+
+  # --- Actionable -----------------------------------------------------------
+  - id: q16
+    band: actionable
+    ask: What are the two things the page invites a new reader to do?
+    expect: Get started with the guide, or download Go.
+    facts:
+      - Get Started
+      - download Go
+
+  - id: q17
+    band: actionable
+    ask: Does the page offer a way to try Go without installing it?
+    expect: Yes, an editor on the page you can type into.
+    facts:
+      - start typing

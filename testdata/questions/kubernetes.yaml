@@ -1,0 +1,178 @@
+# Question set for kubernetes.io.
+#
+# The control case. This is an ordinary marketing-and-docs page: the prose is in
+# the served HTML, there is no canvas, nothing is drawn into a scene, and a
+# plain fetch reads it perfectly well. sieve should have no advantage here, and
+# a benchmark made only of pages sieve is good at is not a benchmark.
+#
+# What it does test is whether escalation is working. sieve should answer this
+# at the fetch tier in under a second; if it reaches for a browser, that is a
+# defect the coverage number will not show.
+#
+# Ground truth was read from the served HTML:
+#
+#   curl -sL https://kubernetes.io | python -c "...strip tags..."
+#
+# Facts drawn from the feature list and the hero copy, both of which are stable.
+# The conference dates and the featured book change and are deliberately not
+# used.
+
+name: Kubernetes (ordinary documentation page, text in the HTML)
+url: https://kubernetes.io
+
+questions:
+  # --- Factual retrieval ----------------------------------------------------
+  - id: q01
+    band: factual
+    ask: What is Kubernetes, in the project's own words?
+    expect: An open source system for automating deployment, scaling and
+      management of containerized applications.
+    facts:
+      - open source system
+      - automating deployment, scaling
+      - containerized applications
+
+  - id: q02
+    band: factual
+    ask: What is Kubernetes abbreviated to?
+    expect: K8s.
+    facts:
+      - also known as K8s
+
+  - id: q03
+    band: factual
+    ask: What does the page say Kubernetes does with containers?
+    expect: It groups the containers that make up an application into logical
+      units for easy management and discovery.
+    facts:
+      - groups containers
+      - logical units
+      - management and discovery
+
+  - id: q04
+    band: factual
+    ask: What experience does the project say Kubernetes is built on?
+    expect: Fifteen years of running production workloads at Google, combined
+      with best-of-breed ideas and practices from the community.
+    facts:
+      - 15 years
+      - production workloads at Google
+      - best-of-breed ideas
+
+  - id: q05
+    band: factual
+    ask: What scale does the page claim Kubernetes was designed for?
+    expect: The same principles that let Google run billions of containers a
+      week.
+    facts:
+      - billions of containers a week
+
+  - id: q06
+    band: factual
+    ask: What kinds of infrastructure can Kubernetes run on?
+    expect: On-premises, hybrid, or public cloud infrastructure.
+    facts:
+      - on-premises
+      - hybrid
+      - public cloud
+
+  # --- The feature list, which is the substance of the page -----------------
+  - id: q07
+    band: factual
+    ask: What does Kubernetes do about rollouts?
+    expect: It progressively rolls out changes to an application or its
+      configuration while monitoring application health.
+    facts:
+      - progressively rolls out changes
+      - monitoring application health
+
+  - id: q08
+    band: factual
+    ask: How does Kubernetes handle service discovery?
+    expect: Pods are given their own IP addresses and a single DNS name for a
+      set of Pods, so an application does not need to use an unfamiliar
+      discovery mechanism.
+    facts:
+      - service discovery
+      - load balancing
+
+  - id: q09
+    band: factual
+    ask: What does the page say about storage?
+    expect: It automatically mounts the storage system of your choice, whether
+      local storage, a public cloud provider, or a network storage system.
+    facts:
+      - automatically mount the storage system
+      - local storage
+      - public cloud provider
+
+  - id: q10
+    band: factual
+    ask: What does Kubernetes offer for secrets and configuration?
+    expect: Deploying and updating secrets and application configuration without
+      rebuilding the image and without exposing secrets in the stack
+      configuration.
+    facts:
+      - Secret and configuration management
+      - without rebuilding your image
+
+  - id: q11
+    band: factual
+    ask: How does Kubernetes place containers on machines?
+    expect: Automatically, based on their resource requirements and other
+      constraints, without sacrificing availability.
+    facts:
+      - resource requirements
+      - other constraints
+
+  - id: q12
+    band: factual
+    ask: What does Kubernetes do when a container crashes?
+    expect: It restarts containers that crash, replaces entire Pods where
+      needed, and reattaches storage in response.
+    facts:
+      - restarts containers that crash
+      - replaces entire Pods
+
+  - id: q13
+    band: factual
+    ask: How can an application be scaled?
+    expect: Up and down with a simple command, with a UI, or automatically based
+      on CPU usage.
+    facts:
+      - simple command
+      - automatically based on CPU usage
+
+  - id: q14
+    band: factual
+    ask: What does the page say about batch workloads?
+    expect: Kubernetes can manage batch and CI workloads, replacing containers
+      that fail.
+    facts:
+      - batch and CI workloads
+      - replacing containers that fail
+
+  # --- Structural -----------------------------------------------------------
+  - id: q15
+    band: structural
+    ask: What is the page's headline?
+    expect: Production-Grade Container Orchestration.
+    facts:
+      - Production-Grade Container Orchestration
+
+  - id: q16
+    band: structural
+    ask: Is this page's text present in the served HTML, or produced some other
+      way?
+    expect: It is in the served HTML; the page needs no JavaScript to be read.
+    facts:
+      - Kubernetes
+      - containerized applications
+
+  # --- Actionable -----------------------------------------------------------
+  - id: q17
+    band: actionable
+    ask: Where does the page direct a reader who wants to download Kubernetes?
+    expect: To the download section of the site.
+    facts:
+      - download Kubernetes

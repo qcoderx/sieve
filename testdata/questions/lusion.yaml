@@ -1,0 +1,150 @@
+# Question set for lusion.co.
+#
+# A 3D studio site whose text is in the served HTML but whose page is driven by
+# scroll and WebGL. That combination is the interesting one: nothing here is
+# drawn into a scene the way igloo.inc draws its words, so a plain fetch can
+# read it in principle, yet in practice the readers that render tend to return
+# far less of it than the markup contains.
+#
+# Ground truth was read from the served HTML:
+#
+#   curl -sL https://www.lusion.co | python -c "...strip tags..."
+#
+# The project list is the substance and is stable. The discipline tags beside
+# each project ("web • design • development • 3d") are used as facts because
+# they are the page's own vocabulary and a reader that drops them has lost the
+# structure of the work section.
+
+name: Lusion (3D studio, scroll-driven, text in the HTML)
+url: https://www.lusion.co
+
+questions:
+  # --- Factual retrieval ----------------------------------------------------
+  - id: q01
+    band: factual
+    ask: How does Lusion describe itself?
+    expect: An award-winning 3D and interactive web studio.
+    facts:
+      - Award Winning
+      - 3D and Interactive Web Studio
+
+  - id: q02
+    band: factual
+    ask: What does the studio say it creates, and to what end?
+    expect: 3D visual storytelling and interactive web experiences that help
+      brands stand out.
+    facts:
+      - visual storytelling
+      - interactive web experiences
+      - brands stand out
+
+  - id: q03
+    band: factual
+    ask: Which disciplines does the studio say it combines?
+    expect: Design, motion, 3D and development.
+    facts:
+      - design, motion, 3D
+      - development
+
+  - id: q04
+    band: factual
+    ask: Who does the studio say its featured work was made for?
+    expect: Ambitious brands and forward-thinking teams.
+    facts:
+      - ambitious brands
+      - forward thinking teams
+
+  # --- The project list -----------------------------------------------------
+  - id: q05
+    band: factual
+    ask: Which Porsche project is featured?
+    expect: 'Porsche: Dream Machine.'
+    facts:
+      - Porsche
+      - Dream Machine
+
+  - id: q06
+    band: factual
+    ask: Which Meta project is featured?
+    expect: 'Meta: Spatial Fusion.'
+    facts:
+      - Meta
+      - Spatial Fusion
+
+  - id: q07
+    band: factual
+    ask: What is Spaace?
+    expect: An NFT marketplace.
+    facts:
+      - Spaace
+      - NFT Marketplace
+
+  - id: q08
+    band: factual
+    ask: Name two other featured projects.
+    expect: Synthetic Human and Choo Choo World.
+    facts:
+      - Synthetic Human
+      - Choo Choo World
+
+  - id: q09
+    band: factual
+    ask: What disciplines are listed against most of the featured projects?
+    expect: Web, design, development and 3D, with animation on several.
+    facts:
+      - development
+      - animation
+
+  - id: q10
+    band: factual
+    ask: Which project is tagged with web3?
+    expect: 'Meta: Spatial Fusion.'
+    facts:
+      - web3
+
+  - id: q11
+    band: factual
+    ask: Which project is tagged as game design?
+    expect: Choo Choo World.
+    facts:
+      - game design
+
+  - id: q12
+    band: factual
+    ask: Which project is described with 3D illustration and mograph rather than
+      web development?
+    expect: The one tagged concept, 3D illustration, mograph and video.
+    facts:
+      - 3D illustration
+      - mograph
+
+  # --- Structural -----------------------------------------------------------
+  - id: q13
+    band: structural
+    ask: What are the main sections of the page?
+    expect: An introduction, Brought to Life, and Featured Work.
+    facts:
+      - Brought to Life
+      - Featured Work
+
+  - id: q14
+    band: structural
+    ask: How does the page invite a visitor to move through it?
+    expect: 'By scrolling — the page says "scroll to explore".'
+    facts:
+      - scroll to explore
+
+  # --- Actionable -----------------------------------------------------------
+  - id: q15
+    band: actionable
+    ask: What can a visitor sign up to?
+    expect: The studio's newsletter.
+    facts:
+      - newsletter
+
+  - id: q16
+    band: actionable
+    ask: What does the page say the featured work is a selection of?
+    expect: Immersive digital experiences.
+    facts:
+      - immersive digital experiences

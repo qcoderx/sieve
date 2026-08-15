@@ -149,6 +149,18 @@ type Factor struct {
 	Note   string  `json:"note,omitempty"`
 }
 
+// staticShortfallRatio and staticShortfallChars bound when the gap between what
+// static extraction read and what the markup plainly holds is worth a browser.
+//
+// Half and two thousand characters, both chosen to fire on the case that
+// prompted them and not on ordinary furniture: cuberto.com reads 3,335 of
+// 9,236, a ratio of 0.36 and a shortfall of nearly six thousand. A page whose
+// extractor drops a navigation bar and a cookie notice is nowhere near either.
+const (
+	staticShortfallRatio = 0.5
+	staticShortfallChars = 2000
+)
+
 // Score judges a page from its served bytes.
 //
 // libWeight is the strongest animation/scroll library signal found, which is
@@ -178,6 +190,38 @@ func Score(sig static.Signals, libWeight float64, libName string, th Thresholds)
 		add("text_volume", float64(sig.TextChars), 0.35, "sparse but plausibly complete")
 	default:
 		add("text_volume", float64(sig.TextChars), 0.35, "substantial text served statically")
+	}
+
+	shortfallScore := 0.0
+
+	// 1b. What the extractor got against what is plainly there.
+	//
+	//    Text volume alone says nothing about what was missed. cuberto.com
+	//    serves three thousand characters that static extraction can read and
+	//    nine thousand that a tag-strip can see, and the scorer read the first
+	//    number as "substantial text served statically", stayed at tier 0, and
+	//    returned twenty-five of thirty-four ground-truth facts. The browser
+	//    returns all thirty-four. Nothing in the old signal set could tell that
+	//    page from one where three thousand characters is the whole document.
+	//
+	//    The comparison is crude on both sides, which is the point: the naive
+	//    count shares none of the extractor's judgement, so a large gap means
+	//    either that judgement is discarding a great deal, or the page carries
+	//    a great deal no visitor sees. Both are reasons to look with a browser.
+	//
+	//    Only a large gap counts. Every page has some furniture the extractor
+	//    drops on purpose, and a rule that fired on that would send the whole
+	//    web to the browser.
+	if sig.MarkupChars > 0 && sig.TextChars > 0 {
+		got := float64(sig.TextChars) / float64(sig.MarkupChars)
+		missing := sig.MarkupChars - sig.TextChars
+		if got < staticShortfallRatio && missing >= staticShortfallChars {
+			shortfallScore = 1.0
+			add("static_shortfall", got, 0.30, fmt.Sprintf(
+				"static extraction read %d characters where the markup plainly holds %d; "+
+					"a browser is the only way to find out which is right",
+				sig.TextChars, sig.MarkupChars))
+		}
 	}
 
 	// 2. Text against markup. A documentation page is text with a little markup
@@ -277,13 +321,28 @@ func Score(sig static.Signals, libWeight float64, libName string, th Thresholds)
 
 	score := textScore*0.35 + ratioScore*0.2 + structScore*0.15 +
 		declaredScore*0.1 + scriptScore*0.1 + canvasScore*0.1 +
-		opaqueScore*0.08 + libWeight*0.2
+		opaqueScore*0.08 + libWeight*0.2 + shortfallScore*0.30
 	if score > 1 {
 		score = 1
 	}
 	score = round(score, 3)
 
 	d := Decision{Score: score, Factors: factors}
+
+	// A large shortfall escalates on its own, rather than being averaged.
+	//
+	// The other signals are circumstantial: a hydration blob, a canvas element
+	// and a low text ratio each suggest a page might need a browser. This one
+	// is direct evidence that the read that just happened was incomplete --
+	// the extractor returned a third of the text the markup plainly holds --
+	// and diluting direct evidence with weighted guesses is how cuberto.com
+	// scored 0.340 against a 0.35 bar and lost nine facts to a rounding
+	// margin. Evidence of a bad read is not a vote.
+	if shortfallScore > 0 && score < th.EscalateAbove {
+		score = th.EscalateAbove
+		d.Score = round(score, 3)
+	}
+
 	switch {
 	case score >= th.RecoverAbove && sig.CanvasElements > 0:
 		d.Tier = TierRecover

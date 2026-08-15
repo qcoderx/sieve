@@ -169,3 +169,61 @@ func indexOf(s, sub string) int {
 	}
 	return -1
 }
+
+// TestStaticShortfallEscalates covers a page that looks readable and is not.
+//
+// cuberto.com serves 3,335 characters that static extraction can read and 9,236
+// that a tag-strip can see. The scorer read the first number as "substantial
+// text served statically", stayed at tier 0, and returned 25 of 34 ground-truth
+// facts; the browser returns all of them. Nothing in the old signal set could
+// tell that page from one where three thousand characters is the whole
+// document, because text volume alone says nothing about what was missed.
+func TestStaticShortfallEscalates(t *testing.T) {
+	base := static.Signals{
+		HTMLBytes: 153806, TextChars: 3335, TextRatio: 0.0217,
+		Headings: 14, Paragraphs: 6, Landmarks: 59, Links: 35,
+	}
+	th := DefaultThresholds()
+
+	// Without the comparison, this page reads as fine and stays put.
+	blind := base
+	blind.MarkupChars = 0
+	if d := Score(blind, 0, "", th); d.Tier != TierFetch {
+		t.Fatalf("fixture no longer reproduces the case: tier %q at %.3f", d.Tier, d.Score)
+	}
+
+	// With it, the gap is large enough to be worth a browser.
+	seen := base
+	seen.MarkupChars = 9236
+	d := Score(seen, 0, "", th)
+	if d.Tier == TierFetch {
+		t.Errorf("static read %d of %d characters and the page still stayed at tier 0 "+
+			"(score %.3f); a third of the visible text was being dropped silently",
+			seen.TextChars, seen.MarkupChars, d.Score)
+	}
+	var found bool
+	for _, f := range d.Factors {
+		if f.Name == "static_shortfall" {
+			found = true
+		}
+	}
+	if !found {
+		t.Error("the decision does not record why it escalated")
+	}
+}
+
+// TestOrdinaryPagesDoNotEscalateOnFurniture: every page drops some furniture on
+// purpose, and a rule that fired on that would send the whole web to a browser.
+func TestOrdinaryPagesDoNotEscalateOnFurniture(t *testing.T) {
+	th := DefaultThresholds()
+	// A documentation page: plenty of text, a normal amount of chrome the
+	// extractor discards.
+	sig := static.Signals{
+		HTMLBytes: 42000, TextChars: 7000, MarkupChars: 8200, TextRatio: 0.166,
+		Headings: 20, Paragraphs: 40, Landmarks: 6, Links: 90,
+	}
+	if d := Score(sig, 0, "", th); d.Tier != TierFetch {
+		t.Errorf("an ordinary page escalated to %q at %.3f; dropping 1,200 characters "+
+			"of navigation is not evidence of a broken read", d.Tier, d.Score)
+	}
+}
