@@ -1,0 +1,18 @@
+{
+  "$schema": "https://json.schemastore.org/claude-code-marketplace.json",
+  "name": "sieve",
+  "version": "1.0.0",
+  "description": "sieve: browser-grade page reading for agents, as a Claude Code plugin",
+  "owner": {
+    "name": "Quadri Lasisi",
+    "url": "https://github.com/qcoderx/sieve"
+  },
+  "plugins": [
+    {
+      "name": "sieve",
+      "description": "Read pages WebFetch cannot: WebGL, canvas, scroll-animated and single-page apps. Adds a skill, a WebFetch fallback hook, and the sieve MCP server.",
+      "source": "./plugin",
+      "category": "web"
+    }
+  ]
+}

@@ -1,0 +1,17 @@
+{
+  "hooks": {
+    "PostToolUse": [
+      {
+        "matcher": "WebFetch",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "sieve hook",
+            "timeout": 60,
+            "statusMessage": "WebFetch got a shell; reading the page with sieve"
+          }
+        ]
+      }
+    ]
+  }
+}

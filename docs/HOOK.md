@@ -13,6 +13,10 @@ content back in the same turn.
 
 ## Install
 
+The easiest way is the plugin, which brings the hook, the skill and the MCP
+server together — see [INSTALL.md](../INSTALL.md). To wire only the hook by
+hand:
+
 ```json
 {
   "hooks": {
