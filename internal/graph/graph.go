@@ -354,8 +354,8 @@ type Audit struct {
 	GraphRetention float64 `json:"graph_retention"`
 	// ObservedChars and EmittedChars are the raw terms, so the ratio can be
 	// checked rather than trusted.
-	ObservedChars int `json:"observed_chars"`
-	EmittedChars  int `json:"emitted_chars"`
+	ObservedChars int `json:"observed_chars,omitempty"`
+	EmittedChars  int `json:"emitted_chars,omitempty"`
 
 	// OrderConfidence is how much to trust the reading order.
 	OrderConfidence Confidence `json:"order_confidence"`
@@ -363,17 +363,17 @@ type Audit struct {
 	// OrderBasis is how the order was computed: "geometry" when document
 	// coordinates were meaningful, "checkpoint" when the page scrolled by
 	// transform and coordinates were not.
-	OrderBasis string `json:"order_basis"`
+	OrderBasis string `json:"order_basis,omitempty"`
 	// OrderAgreement is how much the geometric ordering and the
 	// first-appearance ordering agree. Both are computed anyway, so comparing
 	// them is nearly free, and divergence is exactly where reading order goes
 	// wrong.
-	OrderAgreement float64 `json:"order_agreement"`
+	OrderAgreement float64 `json:"order_agreement,omitempty"`
 
 	// HeadingSeparation measures how cleanly the type scale separated into
 	// levels. A clean gap between size clusters means the heading inference had
 	// something real to work with; an overlapping continuum means it guessed.
-	HeadingSeparation float64    `json:"heading_separation"`
+	HeadingSeparation float64    `json:"heading_separation,omitempty"`
 	HeadingConfidence Confidence `json:"heading_confidence"`
 
 	// Dropped counts the runs that were captured but did not become blocks,
