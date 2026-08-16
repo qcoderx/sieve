@@ -8,6 +8,10 @@
 #
 # vhs: https://github.com/charmbracelet/vhs  (go install github.com/charmbracelet/vhs@latest)
 #
+# Every Sleep carries an explicit unit. A bare number is read as seconds, so
+# `Sleep 1200` written meaning "1.2 seconds" is twenty minutes of vhs sitting
+# at a blank prompt with no indication anything is wrong.
+#
 # The sequence is chosen to make one point in under fifteen seconds: WebFetch
 # gets nothing from this page, and sieve gets the site. Everything else is cut.
 
@@ -25,31 +29,31 @@ Set PlaybackSpeed 1.0
 # --- What a plain fetch sees -------------------------------------------------
 Type "# igloo.inc serves an empty <body>. Everything is drawn in WebGL."
 Enter
-Sleep 1200
+Sleep 1200ms
 
 Type "curl -s https://igloo.inc | tr -d '[:space:]' | wc -c"
 Enter
-Sleep 2500
+Sleep 2500ms
 
 Type "# Fourteen characters. No words at all. This is what WebFetch gets."
 Enter
-Sleep 1800
+Sleep 1800ms
 
 Ctrl+L
 
 # --- What sieve sees ---------------------------------------------------------
 Type "sieve distill https://igloo.inc"
 Enter
-Sleep 15000
+Sleep 15000ms
 
 Type "# 23 blocks, read out of the 3D scene. 40 of 40 ground-truth facts."
 Enter
-Sleep 2000
+Sleep 2000ms
 
 Ctrl+L
 
 Type "head -24 artifacts/igloo.inc/index.md"
 Enter
-Sleep 5000
+Sleep 5000ms
 
-Sleep 2500
+Sleep 2500ms
