@@ -30,3 +30,7 @@ tout.txt
 /npm/bin/sieve
 /npm/bin/sieve.exe
 /npm/node_modules/
+
+# Scratch space for recording the demo: a Linux sieve binary built for WSL,
+# and whatever vhs leaves behind. Not part of the build.
+.demo/
