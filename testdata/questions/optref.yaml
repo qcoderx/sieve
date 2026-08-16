@@ -154,11 +154,22 @@ questions:
       - seconds only
       - milliseconds
 
+  # A contact address is short, linked, and labelled with itself, which is the
+  # same shape as a menu item and was removed as one. It is also frequently the
+  # single thing a reader came to the page for.
+  - id: q17b
+    band: factual
+    ask: How do you ask a question about these options?
+    expect: By email to options@example.org, or by telephone on +44 1234 567890.
+    facts:
+      - options@example.org
+      - +44 1234 567890
+
   # --- Structural -----------------------------------------------------------
   - id: q18
     band: structural
     ask: What are the sections of this page?
-    expect: Command-line options, environment variables, and notes.
+    expect: Command-line options, environment variables, notes and getting help.
     facts:
       - Command-line options
       - Environment variables

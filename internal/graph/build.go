@@ -440,7 +440,15 @@ func pruneNonContent(blocks []Block, actions []Action, dropStats map[string]*Dro
 		//
 		// Menus are not typeset as code. The exemption is that narrow on
 		// purpose: <code> inside a link is an author naming an identifier.
-		if b.Href != "" && b.Type != TypeCode &&
+		//
+		// A mailto: or tel: link is exempt for a related reason. It does not
+		// navigate anywhere, so it is not a menu item in the first place, and
+		// its label is almost always the datum rather than a word standing in
+		// for one: <a href="mailto:hello@example.com">hello@example.com</a>.
+		// That is short, linked, and matches its own collected label, so the
+		// rule removed it and took the contact address with it -- on a page
+		// whose only contact detail it was.
+		if b.Href != "" && b.Type != TypeCode && !isContactHref(b.Href) &&
 			utf8.RuneCountInString(b.Text) <= maxNavLabelRunes &&
 			labels[dedupeKey(b.Text)] {
 			continue
@@ -465,6 +473,15 @@ func pruneNonContent(blocks []Block, actions []Action, dropStats map[string]*Dro
 // maxNavLabelRunes is the length below which a standalone link is a menu item
 // rather than a sentence that happens to be linked.
 const maxNavLabelRunes = 40
+
+// isContactHref reports whether a link is a way to reach someone rather than a
+// way to go somewhere. Those are the page's contact details, and the label is
+// the detail.
+func isContactHref(href string) bool {
+	h := strings.ToLower(strings.TrimSpace(href))
+	return strings.HasPrefix(h, "mailto:") || strings.HasPrefix(h, "tel:") ||
+		strings.HasPrefix(h, "sms:")
+}
 
 // maxTemplateLabelRunes and minTemplateRepeats define the template-label rule:
 // short, and repeated often enough that it is plainly furniture rather than

@@ -1,0 +1,188 @@
+# Hard band: a scroll-hijacked site by the people who wrote the scroll hijacker.
+#
+# locomotive.ca runs Locomotive Scroll, which is to say the page does not scroll;
+# it transforms its own content in response to wheel events. Content arrives by
+# scrolling rather than by loading, and headings are shattered into one element
+# per fragment so each can be tweened -- the served markup carries
+# "Digital-First", "Digital-First Design" and "Digital-First Agency" as separate
+# runs of the same heading, twice over.
+#
+# That combination is what the sweep exists for, and it is also why the naive
+# comparison here is unfair in sieve's favour unless stated: a reader that takes
+# the served bytes and strips tags gets every fragment as a separate line and
+# no way to tell a duplicate from a repetition the designer intended.
+#
+# Ground truth read from the served HTML, not from an artifact:
+#
+#   curl -s https://www.locomotive.ca | sed -e 's/<[^>]*>//g'
+#
+#   sieve distill https://www.locomotive.ca -out ./artifacts
+#   sieve bench ./artifacts/locomotive.ca \
+#     --questions testdata/questions/locomotive.yaml -coverage-only
+
+name: Locomotive
+url: https://www.locomotive.ca
+
+questions:
+  # --- Factual retrieval ----------------------------------------------------
+  - id: q01
+    band: factual
+    ask: What kind of agency is this and where is it?
+    expect: A digital-first design agency based in Montreal, Quebec, Canada.
+    facts:
+      - Montreal
+      - design agency
+
+  - id: q02
+    band: factual
+    ask: How does the studio describe its people?
+    expect: A small group of creative thinkers.
+    facts:
+      - small group of creative thinkers
+
+  - id: q03
+    band: factual
+    ask: What does the studio say design and code are?
+    expect: Only tools of expression; what sets the work apart is people.
+    facts:
+      - only tools of expression
+      - is people
+
+  - id: q04
+    band: factual
+    ask: What does the studio craft?
+    expect: Bespoke digital-first brand identities and experiences, tailor-made
+      for the client and their audience.
+    facts:
+      - bespoke
+      - brand identities
+      - tailor-made
+
+  - id: q05
+    band: factual
+    ask: How long has Locomotive been working?
+    expect: Over the past 15 years.
+    facts:
+      - 15 years
+
+  - id: q06
+    band: factual
+    ask: What does the studio cover, end to end?
+    expect: From strategy to deployment and maintenance, described as the
+      ultimate digital one-stop shop.
+    facts:
+      - strategy to deployment
+      - one-stop shop
+
+  - id: q07
+    band: factual
+    ask: What has Locomotive become a go-to for?
+    expect: Meaningful, innovative, results-driven digital experiences, web
+      design and branding.
+    facts:
+      - results-driven
+      - web design and branding
+
+  - id: q08
+    band: factual
+    ask: Name three featured clients.
+    expect: Wolverine Worldwide, The Drake Hotel and Scout Motors.
+    facts:
+      - Wolverine Worldwide
+      - Drake Hotel
+      - Scout Motors
+
+  - id: q09
+    band: factual
+    ask: What is the studio's phone number?
+    expect: +1 514 524 5678.
+    facts:
+      - 514 524 5678
+
+  - id: q10
+    band: factual
+    ask: What street is named on the page?
+    expect: Jean-Talon Est.
+    facts:
+      - Jean-Talon
+
+  - id: q11
+    band: factual
+    ask: Is the studio hiring?
+    expect: Yes; it says it is always looking for top shelf talent.
+    facts:
+      - top shelf talent
+
+  - id: q12
+    band: factual
+    ask: What open-source project of theirs is named on the page?
+    expect: Locomotive Scroll.
+    facts:
+      - Locomotive Scroll
+
+  - id: q13
+    band: factual
+    ask: Name two journal or article titles listed.
+    expect: For example "Should I use Locomotive Scroll on my project?" and "Why
+      don't we use front-end frameworks at Locomotive?".
+    facts:
+      - Should I use Locomotive Scroll on my project
+      - front-end frameworks
+
+  - id: q14
+    band: factual
+    ask: Which article about workplaces is listed?
+    expect: The revolution of the workspace as we know it.
+    facts:
+      - revolution of the workspace
+
+  - id: q15
+    band: factual
+    ask: Where were the annual trips in 2024 and 2022?
+    expect: Jamaica in 2024 and Playa del Carmen in 2022.
+    facts:
+      - 2024
+      - Jamaica
+      - Playa del Carmen
+
+  - id: q16
+    band: factual
+    ask: What merchandise is offered?
+    expect: A "Pros de l'internet" white T-shirt and sand hat.
+    facts:
+      - Pros de l'internet
+      - Sand Hat
+
+  # --- Structural -----------------------------------------------------------
+  - id: q17
+    band: structural
+    ask: What is the main heading of the site?
+    expect: Digital-first design agency, based in Montreal, Canada.
+    facts:
+      - Digital-First
+      - Based in Montreal
+
+  - id: q18
+    band: structural
+    ask: What sections does the home page have?
+    expect: Featured work, an about statement, a journal or articles list,
+      annual trips, and gear.
+    facts:
+      - Featured work
+      - Annual trips
+
+  # --- Actionable -----------------------------------------------------------
+  - id: q19
+    band: actionable
+    ask: Someone wants to see the full portfolio rather than the highlights.
+      What does the page offer?
+    expect: A "See all projects" link.
+    facts:
+      - See all projects
+
+  - id: q20
+    band: actionable
+    ask: Someone wants to be contacted with news. What does the page offer?
+    expect: A newsletter, in exchange for an email address.
+    facts:
+      - newsletter

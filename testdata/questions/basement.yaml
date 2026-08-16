@@ -1,0 +1,190 @@
+# Hard band: a WebGL studio site where the content is real but the page is not.
+#
+# basement.studio ships two hundred kilobytes of markup around under three
+# thousand characters of prose, drives the whole thing through a 3D scene, and
+# reveals its sections on scroll. The words are in the served bytes, which makes
+# this a different hard case from igloo.inc: nothing here is unreadable in
+# principle, it is a question of whether a reader gets the prose or the shell.
+#
+# Ground truth read from the served HTML, not from an artifact:
+#
+#   curl -s https://basement.studio | sed -e 's/<[^>]*>//g'
+#
+#   sieve distill https://basement.studio -out ./artifacts
+#   sieve bench ./artifacts/basement.studio \
+#     --questions testdata/questions/basement.yaml -coverage-only
+
+name: basement.studio
+url: https://basement.studio
+
+questions:
+  # --- Factual retrieval ----------------------------------------------------
+  - id: q01
+    band: factual
+    ask: What kind of studio is this?
+    expect: A digital studio and branding powerhouse.
+    facts:
+      - digital studio
+      - branding
+
+  - id: q02
+    band: factual
+    ask: Who does the studio partner with?
+    expect: The world's most ambitious startups, scale-ups and brands.
+    facts:
+      - startups
+      - scale-ups
+
+  - id: q03
+    band: factual
+    ask: Through what convergence does the studio say it unlocks growth?
+    expect: The convergence of creativity, design and technology.
+    facts:
+      - creativity, design, and technology
+
+  - id: q04
+    band: factual
+    ask: What does the studio say about the Vercel partnership?
+    expect: It means pushing the limits of performance and innovation, crafting
+      a digital ecosystem built for speed, precision and impact.
+    facts:
+      - Vercel
+      - speed, precision, and impact
+
+  - id: q05
+    band: factual
+    ask: What was the outcome of the Daylight project?
+    expect: A high-performance, story-driven website that sold out inventory in
+      hours.
+    facts:
+      - Daylight
+      - sold out inventory in hours
+
+  - id: q06
+    band: factual
+    ask: What did the studio do for KidSuper?
+    expect: Elevated the brand into a dynamic showcase, bridging art, technology
+      and culture.
+    facts:
+      - KidSuper
+      - art, technology, and culture
+
+  - id: q07
+    band: factual
+    ask: What did the MrBeast project need?
+    expect: 'A storefront built for millions: high-performance, wildly engaging
+      and as dynamic as a MrBeast video.'
+    facts:
+      - MrBeast
+      - storefront built for millions
+
+  - id: q08
+    band: factual
+    ask: What does the studio say about shortcuts?
+    expect: No shortcuts, just bold, precision-engineered work.
+    facts:
+      - No shortcuts
+      - precision-engineered
+
+  - id: q09
+    band: factual
+    ask: What does the Websites and Features service cover?
+    expect: From pre-launch landing pages to complete website redesigns.
+    facts:
+      - pre-launch landing pages
+      - website redesigns
+
+  - id: q10
+    band: factual
+    ask: What does the branding service cover?
+    expect: From lean identities for early startups to comprehensive brand
+      platforms for industry leaders, crafting scalable brand systems.
+    facts:
+      - lean identities
+      - scalable brand systems
+
+  - id: q11
+    band: factual
+    ask: What does IRL Experience Design cover?
+    expect: From annual summits to local meetups, designing in-real-life events.
+    facts:
+      - annual summits
+      - local meetups
+
+  - id: q12
+    band: factual
+    ask: What does Marketing Execution cover?
+    expect: From brand to product marketing, creating assets that drive
+      awareness, demand and conversions.
+    facts:
+      - awareness, demand, and conversions
+
+  - id: q13
+    band: factual
+    ask: What sub-capabilities are listed under the websites service?
+    expect: Product strategy, 3D and motion design, and visual branding.
+    facts:
+      - Product Strategy
+      - 3D & Motion Design
+
+  - id: q14
+    band: factual
+    ask: What sub-capabilities are listed under marketing?
+    expect: Omni-channel campaign content, growth experiments and sales
+      materials.
+    facts:
+      - Growth Experiments
+      - Sales Materials
+
+  - id: q15
+    band: factual
+    ask: How do you contact the studio?
+    expect: hello@basement.studio.
+    facts:
+      - hello@basement.studio
+
+  - id: q16
+    band: factual
+    ask: What is the studio's tagline?
+    expect: We make cool shit that performs.
+    facts:
+      - cool shit that performs
+
+  # --- Structural -----------------------------------------------------------
+  - id: q17
+    band: structural
+    ask: What are the four services offered?
+    expect: Websites and features, visual branding, IRL experience design, and
+      marketing execution.
+    facts:
+      - Websites & Features
+      - Visual Branding
+      - IRL Experience Design
+      - Marketing Execution
+
+  - id: q18
+    band: structural
+    ask: What sections does the page have?
+    expect: An introduction, trusted by visionaries, featured projects, services
+      and a contact section.
+    facts:
+      - Trusted by Visionaries
+      - Featured Projects
+
+  # --- Actionable -----------------------------------------------------------
+  - id: q19
+    band: actionable
+    ask: Someone wants to hear from the studio periodically. What is offered?
+    expect: A newsletter.
+    facts:
+      - newsletter
+
+  - id: q20
+    band: actionable
+    ask: A startup wants a brand identity but is very early. Does the studio
+      take that work?
+    expect: Yes; it offers lean identities for early startups through to full
+      brand platforms.
+    facts:
+      - lean identities
+      - early startups
