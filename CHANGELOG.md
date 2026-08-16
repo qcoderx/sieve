@@ -55,6 +55,21 @@ page reaches it, and how honestly the artifact reports what it left out.
 - `sieve site` for reading across the pages of one documentation site, and
   `sieve hook` for reading the page a WebFetch could not.
 
+### Known issues
+
+- **Content that fades in can be missed, about one run in six.** A page that
+  reveals sections on scroll with a short opacity transition can be
+  photographed mid-fade, below the visible-opacity threshold, and the section
+  is then dropped. The `immersive` fixture reproduces it at 30 of 45 facts
+  instead of 39. The offline corpus retries a row once and says so in its
+  output when it does, which keeps the build meaningful without pretending the
+  race is fixed.
+- **Pages whose text is entirely non-DOM are slow.** On `igloo.inc` the sweep
+  spends up to twelve seconds in settle waits being patient about text that
+  cannot arrive, because every word is geometry. The guard that would cut those
+  waits is conditional on having seen text, which never happens there. Reading
+  the page is correct and takes 15 to 40 seconds.
+
 ### Changed
 
 - **The artifact now reports every exclusion it makes.** Three of the prune's
