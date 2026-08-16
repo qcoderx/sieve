@@ -1,0 +1,182 @@
+# Medium band: reference documentation on a client-rendered docs site.
+#
+# The prose is real and the surrounding application is substantial: a sidebar
+# navigation tree, a table of contents, and a good deal of chrome. This is the
+# ordinary shape of documentation, and the row is here because it is where sieve
+# should win on margin rather than categorically -- by carrying the document and
+# not the furniture around it.
+#
+# Ground truth read from the served HTML, not from an artifact:
+#
+#   curl -s https://caddyserver.com/docs/caddyfile/concepts | sed -e 's/<[^>]*>//g'
+#
+#   sieve distill https://caddyserver.com/docs/caddyfile/concepts -out ./artifacts
+#   sieve bench ./artifacts/caddyserver.com-docs-caddyfile-concepts \
+#     --questions testdata/questions/caddyfile.yaml -coverage-only
+
+name: Caddyfile Concepts
+url: https://caddyserver.com/docs/caddyfile/concepts
+
+questions:
+  # --- Factual retrieval ----------------------------------------------------
+  - id: q01
+    band: factual
+    ask: What does a Caddyfile consist of?
+    expect: At least one or more site blocks, each starting with one or more
+      addresses.
+    facts:
+      - one or more site blocks
+
+  - id: q02
+    band: factual
+    ask: Is there inheritance between site blocks?
+    expect: No; there is no global scope or inheritance across site blocks.
+    facts:
+      - no global scope or inheritance
+
+  - id: q03
+    band: factual
+    ask: When are curly braces optional?
+    expect: When there is only one site block, the braces and indentation are
+      optional.
+    facts:
+      - only one site block
+      - optional
+
+  - id: q04
+    band: factual
+    ask: Where must the opening curly brace go?
+    expect: At the end of its line, preceded by a space.
+    facts:
+      - end of its line
+      - preceded by a space
+
+  - id: q05
+    band: factual
+    ask: What is a directive?
+    expect: The first word on a line in a site block, a functional keyword that
+      customises how the site is served.
+    facts:
+      - first word on a line
+
+  - id: q06
+    band: factual
+    ask: What happens if a request matches multiple site blocks?
+    expect: The site block with the most specific matching address is chosen,
+      and requests do not cascade.
+    facts:
+      - most specific matching address
+
+  - id: q07
+    band: factual
+    ask: Can directives be used inside other directive blocks?
+    expect: Not unless documented; the exception is blocks specifically designed
+      to group directives.
+    facts:
+      - cannot be used within other directive blocks
+
+  - id: q08
+    band: factual
+    ask: Does the order of HTTP handler directives matter?
+    expect: No; when the Caddyfile is adapted they are sorted according to a
+      default order, so order of appearance does not matter except in a route.
+    facts:
+      - sorted
+      - order of appearance
+
+  - id: q09
+    band: factual
+    ask: Why is whitespace significant in a Caddyfile?
+    expect: The file is lexed into tokens before parsing, and tokens are
+      separated by whitespace.
+    facts:
+      - lexed into tokens
+      - separated by whitespace
+
+  - id: q10
+    band: factual
+    ask: How do you give a single argument a value containing whitespace?
+    expect: Quote it.
+    facts:
+      - quoted
+
+  - id: q11
+    band: factual
+    ask: What can be used instead of escaping quotes?
+    expect: Backticks to enclose tokens.
+    facts:
+      - backticks
+
+  - id: q12
+    band: factual
+    ask: How are characters treated inside quoted tokens?
+    expect: Literally, including spaces, tabs and newlines, so multi-line tokens
+      are possible.
+    facts:
+      - treated literally
+      - Multi-line tokens
+
+  - id: q13
+    band: factual
+    ask: What are the rules for heredoc markers?
+    expect: The opening marker is followed by any text, uppercase recommended,
+      and the closing marker must be the same text.
+    facts:
+      - heredoc
+      - uppercase letters recommended
+
+  - id: q14
+    band: factual
+    ask: What does indenting the closing heredoc marker do?
+    expect: Strips that much indentation from every line of text.
+    facts:
+      - indentation stripped
+
+  - id: q15
+    band: factual
+    ask: What is the global options block, and where must it go?
+    expect: A special block with no keys, which if present must be the very
+      first block in the config.
+    facts:
+      - no keys
+      - very first block
+
+  - id: q16
+    band: factual
+    ask: What can be set inside the global options block?
+    expect: Only global options; site-specific directives cannot be used there.
+    facts:
+      - only global options can be set
+
+  - id: q17
+    band: factual
+    ask: When is automatic HTTPS enabled?
+    expect: When the site's address contains a hostname or IP address, purely
+      implicitly, so it never overrides an explicit setting.
+    facts:
+      - hostname or IP address
+      - never overrides
+
+  - id: q18
+    band: factual
+    ask: What does specifying a hostname mean for matching?
+    expect: Only requests with a matching Host header will be honoured.
+    facts:
+      - matching
+
+  - id: q19
+    band: factual
+    ask: What does a wildcard represent in an address?
+    expect: Precisely one label of the hostname.
+    facts:
+      - precisely one label
+
+  # --- Actionable -----------------------------------------------------------
+  - id: q20
+    band: actionable
+    ask: Someone's directive argument containing a space is being read as two
+      arguments. What should they do?
+    expect: Quote it, or enclose it in backticks.
+    facts:
+      - quoted
+      - backticks

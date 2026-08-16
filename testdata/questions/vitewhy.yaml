@@ -1,0 +1,217 @@
+# Medium band: a documentation page inside a client-rendered site.
+#
+# The page also carries a line offering a machine-readable version at
+# /guide/why.md, which is worth noting rather than hiding: on a site that
+# publishes Markdown alongside its HTML, the right thing for an agent to do is
+# fetch that, and sieve is unnecessary. The row is still here because most sites
+# do not, and because a corpus that quietly excluded the cases where a simpler
+# answer exists would be measuring something other than the real web.
+#
+# Ground truth read from the served HTML, not from an artifact:
+#
+#   curl -s https://vite.dev/guide/why | sed -e 's/<[^>]*>//g'
+#
+#   sieve distill https://vite.dev/guide/why -out ./artifacts
+#   sieve bench ./artifacts/vite.dev-guide-why \
+#     --questions testdata/questions/vitewhy.yaml -coverage-only
+
+name: Vite, Why Vite
+url: https://vite.dev/guide/why
+
+questions:
+  # --- Factual retrieval ----------------------------------------------------
+  - id: q01
+    band: factual
+    ask: What had browsers just gained support for when Vite was created?
+    expect: ES modules, a way to load JavaScript files directly without bundling
+      them first.
+    facts:
+      - ESM
+      - without needing a tool to bundle
+
+  - id: q02
+    band: factual
+    ask: What did traditional build tools do, and what was the cost?
+    expect: They processed the entire application upfront before anything could
+      be shown, so the larger the app the longer the wait.
+    facts:
+      - entire application upfront
+      - larger the app
+
+  - id: q03
+    band: factual
+    ask: How did Vite split the work?
+    expect: Into dependencies, pre-bundled once with fast native tooling, and
+      source code, served on demand over native ESM.
+    facts:
+      - dependencies
+      - on-demand
+      - native ESM
+
+  - id: q04
+    band: factual
+    ask: What was the effect on dev server startup?
+    expect: Nearly instant, regardless of application size.
+    facts:
+      - nearly instant
+      - regardless of application size
+
+  - id: q05
+    band: factual
+    ask: What happens when you edit a file?
+    expect: Hot module replacement over native ESM updates just that module,
+      without a full page reload or a rebuild.
+    facts:
+      - HMR
+      - without a full page reload
+
+  - id: q06
+    band: factual
+    ask: What is the difference between a bundle-based and an ESM-based dev
+      server?
+    expect: A bundle-based server bundles the whole application before serving
+      it; an ESM-based server serves modules on demand as the browser requests
+      them.
+    facts:
+      - bundled before it can be served
+      - as the browser requests them
+
+  - id: q07
+    band: factual
+    ask: Which earlier tools does the page credit?
+    expect: One that pioneered unbundled development and inspired dependency
+      pre-bundling, one by the Preact team that inspired the universal plugin
+      API, and one that influenced Vite 1.0's server architecture.
+    facts:
+      - pioneered unbundled development
+      - Preact team
+
+  - id: q08
+    band: factual
+    ask: Why is unbundled ESM not shipped in production?
+    expect: It is inefficient because of additional network round trips from
+      nested imports.
+    facts:
+      - network round trips
+
+  - id: q09
+    band: factual
+    ask: What made framework integration natural?
+    expect: The plugin API, based on Rollup's conventions, so frameworks did not
+      have to work around Vite's internals.
+    facts:
+      - Rollup
+
+  - id: q10
+    band: factual
+    ask: What does the Vite team run to protect the ecosystem?
+    expect: Ecosystem CI, which tests major ecosystem projects against every
+      Vite change.
+    facts:
+      - tests major ecosystem projects
+      - every Vite change
+
+  - id: q11
+    band: factual
+    ask: What is said about ecosystem health?
+    expect: It is not an afterthought; it is part of the release process.
+    facts:
+      - not an afterthought
+      - part of the release process
+
+  - id: q12
+    band: factual
+    ask: Which two tools did Vite originally rely on, and for what?
+    expect: One for fast compilation during development and one for thorough
+      optimization in production builds.
+    facts:
+      - fast compilation during development
+      - thorough optimization
+
+  - id: q13
+    band: factual
+    ask: What problem did maintaining two pipelines cause?
+    expect: Inconsistencies, including different transformation behaviour
+      between dev and build.
+    facts:
+      - inconsistencies
+
+  - id: q14
+    band: factual
+    ask: What is Rolldown and what is it written in?
+    expect: A single bundler unifying both pipelines, written in Rust for native
+      speed and compatible with the existing plugin API.
+    facts:
+      - Rust
+      - same plugin API
+
+  - id: q15
+    band: factual
+    ask: What is Oxc used for?
+    expect: Parsing, transforming and minifying.
+    facts:
+      - parsing, transforming, and minifying
+
+  - id: q16
+    band: factual
+    ask: How was the migration handled?
+    expect: A separate package shipped first so early adopters could validate
+      the change, ecosystem CI caught compatibility issues early, and a
+      compatibility layer preserved existing behaviour.
+    facts:
+      - early adopters
+      - compatibility layer
+
+  - id: q17
+    band: factual
+    ask: What does the Environment API let frameworks do?
+    expect: Define custom environments such as edge runtimes and service
+      workers, rather than only client and SSR, each with their own module
+      resolution.
+    facts:
+      - edge runtimes
+      - service workers
+
+  - id: q18
+    band: factual
+    ask: What is Vite's stated goal?
+    expect: Not to be the final tool, but one that keeps evolving with the web
+      platform and with the developers building on it.
+    facts:
+      - not to be the final tool
+      - keeps evolving
+
+  # --- Structural -----------------------------------------------------------
+  #
+  # This page carries a line reading "Are you an LLM? You can read better
+  # optimized documentation at /guide/why.md", and it is deliberately not graded
+  # here, because sieve does not return it and should not.
+  #
+  # The markup is <div style="display:none" hidden aria-hidden="true"
+  # data-nosnippet>: text invisible to every human reader and addressed only to
+  # a machine. That is the exact shape of the eight payloads in the adversarial
+  # fixture, and sieve cannot distinguish a helpful hidden instruction to an AI
+  # from a hostile one -- the whole argument for quarantining that channel is
+  # that the distinction is not visible from inside the page.
+  #
+  # It was written as a graded fact first, and the artifact was right and the
+  # question was wrong. Leaving the reasoning here is more useful than deleting
+  # it, because the next person to notice the missing line will otherwise file
+  # it as a bug.
+  - id: q19
+    band: structural
+    ask: What is the title and subject of this page?
+    expect: Why Vite, explaining the reasoning behind Vite's architecture.
+    facts:
+      - Why Vite
+
+  # --- Actionable -----------------------------------------------------------
+  - id: q20
+    band: actionable
+    ask: Someone asks why their production build still bundles when Vite is
+      "unbundled". What does the page say?
+    expect: Unbundled ESM is for development; bundling is still necessary for
+      optimized production builds because of network round trips.
+    facts:
+      - bundling is still necessary
+      - network round trips
