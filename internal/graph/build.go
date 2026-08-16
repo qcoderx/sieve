@@ -420,7 +420,28 @@ func pruneNonContent(blocks []Block, actions []Action, dropStats map[string]*Dro
 		if b.Type != TypeImage && utf8.RuneCountInString(b.Text) < 2 {
 			continue
 		}
-		if b.Href != "" && utf8.RuneCountInString(b.Text) <= maxNavLabelRunes &&
+		// A short linked run is usually a menu item. It is not one when the
+		// author set it as code.
+		//
+		// Reference documentation names the thing it is about and links that
+		// name to its own page: <p><a href="..."><code>-c, --cookie-jar</code>
+		// </a></p>, followed by the paragraph explaining it. Every one of those
+		// is short, linked, and matches a collected link label, so every one of
+		// them was dropped -- which left the definitions in the artifact with
+		// every term removed. Four consecutive paragraphs of curl's cookie
+		// documentation arrived as "Tell libcurl to activate the cookie engine
+		// and read the initial set of cookies from the given file. Read-only."
+		// with nothing anywhere saying which option that was about.
+		//
+		// That is worse than dropping both halves. An agent reading a
+		// definition with no term does not know something is missing; it has a
+		// fluent sentence about an unnamed option, and the obvious way to use
+		// it is to guess which one.
+		//
+		// Menus are not typeset as code. The exemption is that narrow on
+		// purpose: <code> inside a link is an author naming an identifier.
+		if b.Href != "" && b.Type != TypeCode &&
+			utf8.RuneCountInString(b.Text) <= maxNavLabelRunes &&
 			labels[dedupeKey(b.Text)] {
 			continue
 		}

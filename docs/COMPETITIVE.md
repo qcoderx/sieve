@@ -171,7 +171,7 @@ So there is a second tier underneath it, and it runs offline:
 go test ./internal/bench -run TestOfflineCorpus -v
 ```
 
-Three pages ship in this repository under this project's own licence, each with
+Four pages ship in this repository under this project's own licence, each with
 its ground truth beside it in `testdata/questions/`:
 
 | fixture | what it is | coverage | tier reached |
@@ -179,6 +179,7 @@ its ground truth beside it in `testdata/questions/`:
 | `immersive` | words drawn as glyph geometry in a three.js scene, empty `<body>` | 0.867 | render |
 | `adversarial` | real prose threaded through eight injection channels | 1.000 | render |
 | `disclosure` | everything worth knowing behind a control you must press | 1.000 | sweep |
+| `reference` | API documentation: every term a short linked `<code>` run | 1.000 | fetch |
 
 No network, no third party's content, no link rot, and reproducible by anyone
 forever. The floors are recorded in the test, set just under the measured score,

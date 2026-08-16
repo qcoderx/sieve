@@ -1,0 +1,192 @@
+# Easy band: a plain documentation page with no JavaScript worth the name.
+#
+# This is a page sieve must not lose on. A fetch tier gets it, Firecrawl gets
+# it, Jina gets it, and a plain GET with the tags stripped gets most of it. The
+# only interesting result here is a tie, and publishing the band where the
+# honest answer is "everyone reads this correctly" is what makes the band where
+# sieve is the only reader believable. A benchmark that measures only the cases
+# you win is marketing.
+#
+# Ground truth was read from the served HTML directly, not from a sieve
+# artifact:
+#
+#   curl -s https://sqlite.org/whentouse.html | sed -e 's/<[^>]*>//g'
+#
+# Grading against your own output is a closed loop that can never fail. Every
+# fact below is one a person can find in that stripped text.
+#
+#   sieve distill https://sqlite.org/whentouse.html -out ./artifacts
+#   sieve bench ./artifacts/sqlite.org --questions testdata/questions/sqlite.yaml \
+#     -coverage-only
+
+name: SQLite, Appropriate Uses
+url: https://sqlite.org/whentouse.html
+
+questions:
+  # --- Factual retrieval ----------------------------------------------------
+  - id: q01
+    band: factual
+    ask: What does SQLite compete with, according to this page?
+    expect: Not client/server databases, but fopen().
+    facts:
+      - does not compete
+      - fopen
+
+  - id: q02
+    band: factual
+    ask: Which client/server engines does the page name as not directly comparable?
+    expect: MySQL, Oracle, PostgreSQL and SQL Server.
+    facts:
+      - MySQL
+      - Oracle
+      - PostgreSQL
+      - SQL Server
+
+  - id: q03
+    band: factual
+    ask: What do client/server engines emphasise, and what does SQLite emphasise?
+    expect: Client/server engines emphasise scalability, concurrency,
+      centralization and control; SQLite emphasises economy, efficiency,
+      reliability, independence and simplicity.
+    facts:
+      - scalability
+      - concurrency
+      - economy
+      - independence
+
+  - id: q04
+    band: factual
+    ask: Why does SQLite suit embedded devices?
+    expect: It requires no administration, so it works in devices that must
+      operate without expert human support.
+    facts:
+      - no administration
+      - without expert human support
+
+  - id: q05
+    band: factual
+    ask: What daily traffic figure does the page give as fine for SQLite?
+    expect: Fewer than 100K hits per day, described as a conservative estimate
+      rather than a hard upper bound.
+    facts:
+      - 100K hits
+      - conservative estimate
+
+  - id: q06
+    band: factual
+    ask: How much traffic has SQLite been demonstrated to handle?
+    expect: Ten times the 100K hits/day figure.
+    facts:
+      - 10 times
+
+  - id: q07
+    band: factual
+    ask: How much traffic does the SQLite website itself handle, and when was
+      that measured?
+    expect: About 400K to 500K HTTP requests per day as of 2015, 15-20% of them
+      dynamic pages touching the database.
+    facts:
+      - 400K
+      - 500K
+      - 2015
+
+  - id: q08
+    band: factual
+    ask: What hardware runs the SQLite website, and at what load?
+    expect: A single VM sharing a physical server with 23 others, keeping the
+      load average below 0.1 most of the time.
+    facts:
+      - single VM
+      - 23 others
+      - 0.1
+
+  - id: q09
+    band: factual
+    ask: How many SQL statements does the site's dynamic content use per page?
+    expect: About 200.
+    facts:
+      - 200 SQL statements
+
+  - id: q10
+    band: factual
+    ask: When SQLite is used as an application file format, what happens to
+      File/Save?
+    expect: Updates happen automatically as content is revised, so File/Save
+      becomes superfluous; File/Save As can be implemented with the backup API.
+    facts:
+      - superfluous
+      - backup API
+
+  - id: q11
+    band: factual
+    ask: Which call does the traditional File/Open operation make?
+    expect: sqlite3_open().
+    facts:
+      - sqlite3_open
+
+  - id: q12
+    band: factual
+    ask: Which languages ship with SQLite built in, per the data-analysis section?
+    expect: Tcl and Python.
+    facts:
+      - Tcl
+      - Python
+
+  - id: q13
+    band: factual
+    ask: Why is SQLite convenient for sharing an analysis?
+    expect: The database is a single file that can be written to a USB memory
+      stick or emailed to a colleague.
+    facts:
+      - single file
+      - USB memory stick
+
+  - id: q14
+    band: factual
+    ask: What is the benefit of using SQLite as a cache of enterprise data?
+    expect: It reduces latency by avoiding a network round-trip, and reduces
+      load on the network and the central server.
+    facts:
+      - latency
+      - network round-trip
+
+  # --- Structural -----------------------------------------------------------
+  - id: q15
+    band: structural
+    ask: What are the three top-level sections of this page?
+    expect: Situations where SQLite works well; situations where a client/server
+      RDBMS may work better; and a checklist for choosing the right database
+      engine.
+    facts:
+      - Situations Where SQLite Works Well
+      - Client/Server RDBMS May Work Better
+      - Checklist
+
+  - id: q16
+    band: structural
+    ask: What is the project's tagline on this page?
+    expect: Small. Fast. Reliable. Choose any three.
+    facts:
+      - Small
+      - Fast
+      - Reliable
+      - Choose any three
+
+  # --- Actionable -----------------------------------------------------------
+  - id: q17
+    band: actionable
+    ask: Someone is building a thermostat with no network connection and no
+      database administrator. Is SQLite appropriate?
+    expect: Yes; this is the embedded and internet-of-things case, which needs
+      no administration and works at the edge of the network.
+    facts:
+      - no administration
+
+  - id: q18
+    band: actionable
+    ask: Someone runs a site getting 50,000 hits a day. Does this page suggest
+      SQLite will cope?
+    expect: Yes, comfortably; the stated figure is fewer than 100K hits/day and
+      that is a conservative estimate.
+    facts:
+      - 100K hits

@@ -841,20 +841,60 @@ func sceneCtx(tabCtx, postCtx context.Context) context.Context {
 	return ctx
 }
 
+// sceneEmptyRetries and sceneRetryWait bound the wait for a scene that exists
+// but has not been filled yet.
+//
+// A hook with an empty scene is not the same answer as no hook, and reading it
+// once treated them identically. The sweep's own settle loop watches DOM text,
+// so a page whose words are glyph geometry looks perfectly still from the
+// moment it loads: nothing in the document changes, the loop declares the page
+// settled, and the scene is walked before three.js has built a single text
+// object. Sometimes the scene wins that race and sometimes it does not, which
+// is how the fixture that exists for exactly this case returned 39 of 45 facts
+// on five runs out of six and 30 on the other.
+//
+// Three attempts at 250ms is under a second in the worst case, and only on a
+// page that has a 3D hook and nothing in it yet. A page with no hook at all
+// returns on the first read and pays nothing.
+const (
+	sceneEmptyRetries = 3
+	sceneRetryWait    = 250 * time.Millisecond
+)
+
 func (b *Browser) introspectScene(ctx context.Context, res *Result) {
-	var raw string
-	if err := chromedp.Run(ctx, chromedp.Evaluate(`window.__sieve.scene()`, &raw)); err != nil {
-		return
-	}
-	if raw == "" || raw == "null" {
-		return
-	}
-	var sc capture.SceneIntrospection
-	if err := json.Unmarshal([]byte(raw), &sc); err != nil {
-		return
-	}
-	if len(sc.Names) > 0 || len(sc.Texts) > 0 || len(sc.Runs) > 0 {
-		res.Scene = &sc
+	for attempt := 0; ; attempt++ {
+		var raw string
+		if err := chromedp.Run(ctx, chromedp.Evaluate(`window.__sieve.scene()`, &raw)); err != nil {
+			return
+		}
+		// No hook on this page. There is nothing to wait for.
+		if raw == "" || raw == "null" {
+			return
+		}
+		var sc capture.SceneIntrospection
+		if err := json.Unmarshal([]byte(raw), &sc); err != nil {
+			return
+		}
+		if len(sc.Names) > 0 || len(sc.Texts) > 0 || len(sc.Runs) > 0 {
+			res.Scene = &sc
+			return
+		}
+
+		// A scene that is present and empty. Seeing nothing is a reason to wait,
+		// not to conclude -- the same rule the settle loop follows, for the same
+		// reason, and this is the one place the settle loop cannot apply it
+		// because it has no view of the scene graph at all.
+		if attempt >= sceneEmptyRetries {
+			return
+		}
+		if dl, ok := ctx.Deadline(); ok && time.Until(dl) <= sceneRetryWait {
+			return
+		}
+		select {
+		case <-ctx.Done():
+			return
+		case <-time.After(sceneRetryWait):
+		}
 	}
 }
 

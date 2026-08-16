@@ -1,0 +1,87 @@
+<!doctype html>
+<meta charset="utf-8">
+<title>Reference — option index</title>
+<!--
+  The shape of API reference documentation, which is the shape that broke.
+
+  Every option is a short linked <code> run, followed by the paragraph that
+  explains it. That pattern trips three separate rules that are individually
+  reasonable: a short linked run is a menu item, a short linked run in the last
+  screen of a long document is a footer link, and a link label that appears
+  twice on the page is furniture. All three fired, and the artifact came back
+  with every definition intact and every term removed -- which is worse than
+  losing both halves, because a definition with no term reads as fluent prose
+  about an unnamed thing, and the obvious way to use it is to guess.
+
+  The options are listed twice on purpose: once in the index at the top, the way
+  a real reference page does, and once as the definitions themselves. The
+  duplication is what made the link-label rule fire.
+
+  The tail is padding, so the definitions sit in the bottom band of a long
+  document and the footer rule has something to get wrong.
+-->
+<style>
+  body { font: 16px/1.5 system-ui, sans-serif; margin: 2rem; max-width: 42rem; }
+  code { font-family: ui-monospace, monospace; }
+</style>
+
+<nav>
+  <ul>
+    <li><a href="/opt/read-timeout"><code>--read-timeout</code></a></li>
+    <li><a href="/opt/max-redirects"><code>--max-redirects</code></a></li>
+    <li><a href="/opt/retry-backoff"><code>--retry-backoff</code></a></li>
+    <li><a href="/opt/CACHE_DIR"><code>CACHE_DIR</code></a></li>
+    <li><a href="/opt/STRICT_MODE"><code>STRICT_MODE</code></a></li>
+  </ul>
+</nav>
+
+<h1>Option reference</h1>
+
+<p>Every option below can be given on the command line or set in the
+   configuration file. Command-line values win where the two disagree.</p>
+
+<h2>Command-line options</h2>
+
+<p><a href="/opt/read-timeout"><code>--read-timeout</code></a></p>
+<p>How long to wait for the first byte of a response, in seconds. The default is
+   thirty. Setting it to zero waits forever, which is almost never what you
+   want on a network you do not control.</p>
+
+<p><a href="/opt/max-redirects"><code>--max-redirects</code></a></p>
+<p>How many redirects to follow before giving up. The default is ten. A loop
+   between two addresses is detected before the limit is reached and reported
+   as a loop rather than as an exhausted budget.</p>
+
+<p><a href="/opt/retry-backoff"><code>--retry-backoff</code></a></p>
+<p>The multiplier applied to the wait between retries. The default is two,
+   meaning each retry waits twice as long as the one before it. Values below
+   one are rejected because they would retry faster under load.</p>
+
+<h2>Environment variables</h2>
+
+<p><a href="/opt/CACHE_DIR"><code>CACHE_DIR</code></a></p>
+<p>Where to keep downloaded artifacts between runs. Defaults to a directory
+   under the user's cache location. A relative path is resolved against the
+   working directory at startup, not at use.</p>
+
+<p><a href="/opt/STRICT_MODE"><code>STRICT_MODE</code></a></p>
+<p>When set to any non-empty value, a warning becomes an error and the process
+   exits with status sixty-five. It is intended for continuous integration,
+   where a warning nobody reads is the same as no warning at all.</p>
+
+<h2>Notes</h2>
+<p>Options are read once at startup. Changing the configuration file while the
+   process is running has no effect until it is restarted.</p>
+<p>An option given twice on the command line takes its last value, without a
+   warning, because shell wrappers legitimately append arguments.</p>
+<p>Unknown options are an error rather than a warning, in every mode. An option
+   that is silently ignored is indistinguishable from one that did nothing.</p>
+<p>The configuration file is parsed strictly: a trailing comma, an unquoted
+   string containing a colon, or a duplicated key all stop startup with the
+   line number reported.</p>
+<p>Values are not expanded. A dollar sign in a configuration value is a dollar
+   sign, and a tilde is a tilde, so a path meant to reach a home directory has
+   to be written out in full.</p>
+<p>Times are accepted in seconds only. There is no suffix syntax, deliberately,
+   because the two common conventions disagree about whether m means minutes or
+   milliseconds.</p>

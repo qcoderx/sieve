@@ -1,0 +1,182 @@
+# Easy band: a plain reference page, served complete, no JavaScript required.
+#
+# Another page where the correct result is a tie. It is here because a benchmark
+# that only reports the pages sieve is alone in reading proves nothing about
+# whether sieve is safe to point at an ordinary page, and that is the question
+# most readers actually have.
+#
+# Ground truth read from the served HTML, not from an artifact:
+#
+#   curl -s https://nginx.org/en/docs/beginners_guide.html | sed -e 's/<[^>]*>//g'
+#
+#   sieve distill https://nginx.org/en/docs/beginners_guide.html -out ./artifacts
+#   sieve bench ./artifacts/nginx.org-en-docs-beginners_guide.html \
+#     --questions testdata/questions/nginx.yaml -coverage-only
+
+name: nginx Beginner's Guide
+url: https://nginx.org/en/docs/beginners_guide.html
+
+questions:
+  # --- Factual retrieval ----------------------------------------------------
+  - id: q01
+    band: factual
+    ask: What process model does nginx use?
+    expect: One master process and several worker processes.
+    facts:
+      - one master process
+      - worker processes
+
+  - id: q02
+    band: factual
+    ask: What is the master process for?
+    expect: Reading and evaluating configuration and maintaining worker
+      processes.
+    facts:
+      - read and evaluate configuration
+      - maintain worker processes
+
+  - id: q03
+    band: factual
+    ask: What do worker processes do?
+    expect: The actual processing of requests.
+    facts:
+      - actual processing of requests
+
+  - id: q04
+    band: factual
+    ask: How is the number of worker processes determined?
+    expect: Defined in the configuration file, either fixed or automatically
+      adjusted to the number of available CPU cores.
+    facts:
+      - CPU cores
+
+  - id: q05
+    band: factual
+    ask: Where does the configuration file live by default?
+    expect: In /usr/local/nginx/conf.
+    facts:
+      - /usr/local/nginx/conf
+
+  - id: q06
+    band: factual
+    ask: What command reloads the configuration?
+    expect: nginx -s reload.
+    facts:
+      - nginx -s reload
+
+  - id: q07
+    band: factual
+    ask: What happens when the master process is told to reload configuration?
+    expect: It checks the new file's syntax, and on success starts new workers
+      and asks the old ones to shut down; otherwise it rolls back and carries on
+      with the old configuration.
+    facts:
+      - syntax validity
+      - rolls back
+
+  - id: q08
+    band: factual
+    ask: What do old worker processes do when told to shut down?
+    expect: They stop accepting new connections and keep serving current
+      requests until all are finished, then exit.
+    facts:
+      - stop accepting new connections
+      - until
+
+  - id: q09
+    band: factual
+    ask: Where is the master process ID written by default?
+    expect: In /usr/local/nginx/logs.
+    facts:
+      - /usr/local/nginx/logs
+
+  - id: q10
+    band: factual
+    ask: How would you gracefully shut down nginx if the master process ID is 1628?
+    expect: kill -s QUIT 1628.
+    facts:
+      - kill -s QUIT 1628
+
+  - id: q11
+    band: factual
+    ask: How can you list running nginx processes?
+    expect: ps -ax | grep nginx.
+    facts:
+      - ps -ax
+
+  - id: q12
+    band: factual
+    ask: What are the two kinds of directive?
+    expect: Simple directives and block directives.
+    facts:
+      - simple directives
+      - block directives
+
+  - id: q13
+    band: factual
+    ask: How does a simple directive end?
+    expect: With a semicolon, after a name and parameters separated by spaces.
+    facts:
+      - semicolon
+
+  - id: q14
+    band: factual
+    ask: What is a context?
+    expect: A block directive that can contain other directives inside its
+      braces.
+    facts:
+      - context
+
+  - id: q15
+    band: factual
+    ask: Where do directives outside any context belong?
+    expect: In the main context.
+    facts:
+      - main
+
+  - id: q16
+    band: factual
+    ask: How are comments written?
+    expect: The rest of a line after a # sign.
+    facts:
+      - comment
+
+  # --- Structural -----------------------------------------------------------
+  - id: q17
+    band: structural
+    ask: What tasks does this guide cover?
+    expect: Starting, stopping and reloading configuration; the configuration
+      file's structure; serving static content; setting up a simple proxy
+      server; and setting up FastCGI proxying.
+    facts:
+      - Starting, Stopping, and Reloading Configuration
+      - Serving Static Content
+      - Simple Proxy Server
+      - FastCGI
+
+  - id: q18
+    band: structural
+    ask: What does the guide assume about the reader?
+    expect: That nginx is already installed on their machine.
+    facts:
+      - already installed
+
+  # --- Actionable -----------------------------------------------------------
+  - id: q19
+    band: actionable
+    ask: Someone edited nginx.conf and nothing changed. Why, and what should
+      they do?
+    expect: Changes are not applied until the configuration is reloaded or nginx
+      is restarted; run nginx -s reload.
+    facts:
+      - will not be applied
+      - nginx -s reload
+
+  - id: q20
+    band: actionable
+    ask: Someone needs to stop nginx without cutting off requests already in
+      flight. What does the guide suggest?
+    expect: A graceful shutdown, which waits for worker processes to finish
+      serving current requests, sent with the quit signal.
+    facts:
+      - quit

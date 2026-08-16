@@ -1,0 +1,184 @@
+# Question set for the reference fixture.
+#
+# Every question here pairs a term with the thing said about it, and that
+# pairing is the whole point. Coverage on the definitions alone was already
+# perfect while the artifact was unusable: five paragraphs explaining five
+# options, with all five option names removed by three separate rules that each
+# had a good reason to think a short linked run was furniture.
+#
+# So the facts below deliberately name both halves. A build that keeps the prose
+# and loses the terms scores about half here rather than scoring well, which is
+# what the failure deserved and did not get.
+#
+#   (cd testdata/pages && python -m http.server 8080) &
+#   sieve distill http://localhost:8080/reference/ -allow-private-addresses -out ./artifacts
+#   sieve bench ./artifacts/localhost-8080-reference \
+#     --questions testdata/questions/optref.yaml -coverage-only
+
+name: Option reference (fixture)
+url: http://localhost:8080/reference/
+
+questions:
+  # --- Term and definition together ----------------------------------------
+  - id: q01
+    band: factual
+    ask: Which option sets how long to wait for the first byte, and what is its
+      default?
+    expect: --read-timeout, defaulting to thirty seconds.
+    facts:
+      - --read-timeout
+      - thirty
+
+  - id: q02
+    band: factual
+    ask: What does setting the read timeout to zero do?
+    expect: It waits forever.
+    facts:
+      - zero
+      - forever
+
+  - id: q03
+    band: factual
+    ask: Which option limits redirects, and to how many by default?
+    expect: --max-redirects, defaulting to ten.
+    facts:
+      - --max-redirects
+      - ten
+
+  - id: q04
+    band: factual
+    ask: What happens when two addresses redirect to each other?
+    expect: The loop is detected before the limit is reached and reported as a
+      loop rather than an exhausted budget.
+    facts:
+      - loop
+
+  - id: q05
+    band: factual
+    ask: Which option controls the wait between retries, and what is its default?
+    expect: --retry-backoff, defaulting to two.
+    facts:
+      - --retry-backoff
+      - two
+
+  - id: q06
+    band: factual
+    ask: Why are backoff values below one rejected?
+    expect: They would retry faster under load.
+    facts:
+      - below
+      - under load
+
+  - id: q07
+    band: factual
+    ask: Which variable sets where downloaded artifacts are kept between runs?
+    expect: CACHE_DIR.
+    facts:
+      - CACHE_DIR
+
+  - id: q08
+    band: factual
+    ask: When is a relative CACHE_DIR path resolved?
+    expect: Against the working directory at startup, not at use.
+    facts:
+      - at startup
+
+  - id: q09
+    band: factual
+    ask: Which variable turns warnings into errors, and what exit status results?
+    expect: STRICT_MODE, exiting with status sixty-five.
+    facts:
+      - STRICT_MODE
+      - sixty-five
+
+  - id: q10
+    band: factual
+    ask: What is STRICT_MODE intended for?
+    expect: Continuous integration.
+    facts:
+      - continuous integration
+
+  # --- The rest of the page -------------------------------------------------
+  - id: q11
+    band: factual
+    ask: Which wins when the command line and the configuration file disagree?
+    expect: Command-line values.
+    facts:
+      - Command-line values win
+
+  - id: q12
+    band: factual
+    ask: Does changing the configuration file while running take effect?
+    expect: No; options are read once at startup and it takes a restart.
+    facts:
+      - once at startup
+      - restarted
+
+  - id: q13
+    band: factual
+    ask: What happens if an option is given twice?
+    expect: The last value is taken, without a warning.
+    facts:
+      - last value
+
+  - id: q14
+    band: factual
+    ask: How are unknown options treated?
+    expect: As an error rather than a warning, in every mode.
+    facts:
+      - Unknown options are an error
+
+  - id: q15
+    band: factual
+    ask: What stops startup when parsing the configuration file?
+    expect: A trailing comma, an unquoted string containing a colon, or a
+      duplicated key, with the line number reported.
+    facts:
+      - trailing comma
+      - duplicated key
+      - line number
+
+  - id: q16
+    band: factual
+    ask: Are values expanded?
+    expect: No; a dollar sign is a dollar sign and a tilde is a tilde.
+    facts:
+      - not expanded
+
+  - id: q17
+    band: factual
+    ask: What time units are accepted, and why is there no suffix syntax?
+    expect: Seconds only, because the two common conventions disagree about
+      whether m means minutes or milliseconds.
+    facts:
+      - seconds only
+      - milliseconds
+
+  # --- Structural -----------------------------------------------------------
+  - id: q18
+    band: structural
+    ask: What are the sections of this page?
+    expect: Command-line options, environment variables, and notes.
+    facts:
+      - Command-line options
+      - Environment variables
+      - Notes
+
+  # --- Actionable -----------------------------------------------------------
+  - id: q19
+    band: actionable
+    ask: A CI job should fail on warnings. What should be set?
+    expect: STRICT_MODE to any non-empty value.
+    facts:
+      - STRICT_MODE
+      - non-empty
+
+  - id: q20
+    band: actionable
+    ask: A request hangs forever against an unreliable host. Which option is
+      wrong and what should it be?
+    expect: --read-timeout is probably set to zero, which waits forever; give it
+      a number of seconds.
+    facts:
+      - --read-timeout
+      - forever

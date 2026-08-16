@@ -327,14 +327,31 @@ func assignRegions(cands []*candidate, m *capture.Merged) {
 		// Without landmarks, position is what is left. Text in the first screen
 		// that is short, small and linked is a menu; text in the last screen
 		// that is short and linked is a footer.
+		// Code is never chrome, wherever it sits on the page.
+		//
+		// These two rules read position because there is nothing else left to
+		// read, and on most pages they are right: a short link in the last
+		// screen is a footer link. On reference documentation they are exactly
+		// wrong. curl's cookie page ends with the libcurl section, where every
+		// option is a short linked <code> run near the bottom of a long
+		// document, so all five were filed under "Header and footer" and their
+		// definitions were left in the body with nothing naming them.
+		//
+		// A page's footer is not typeset as code. Neither is its menu. So the
+		// author's own markup outranks the guess made from coordinates, which
+		// is the same principle the block-type tests already follow: a tag
+		// chosen deliberately beats anything inferred.
 		short := utf8.RuneCountInString(c.Text) <= 40
-		if docH > vh && c.BBox.Bottom() > footerBand(docH, vh) && short && c.Href != "" {
-			c.Region = RegionFooter
-			continue
-		}
-		if c.BBox.Y() < vh*0.12 && short && c.Href != "" {
-			c.Region = RegionNav
-			continue
+		code := c.Tag == "code" || c.Tag == "pre" || c.Tag == "samp" || c.Tag == "kbd"
+		if !code {
+			if docH > vh && c.BBox.Bottom() > footerBand(docH, vh) && short && c.Href != "" {
+				c.Region = RegionFooter
+				continue
+			}
+			if c.BBox.Y() < vh*0.12 && short && c.Href != "" {
+				c.Region = RegionNav
+				continue
+			}
 		}
 		c.Region = RegionMain
 	}

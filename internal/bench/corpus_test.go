@@ -71,6 +71,13 @@ func TestOfflineCorpus(t *testing.T) {
 		// A build that stops opening disclosures scores near zero here rather
 		// than slightly worse everywhere.
 		{"disclosure", "/disclosure/", "kilnworks.yaml", 0.95},
+		// The shape of API reference documentation: every term a short linked
+		// <code> run, every definition the paragraph after it. Three separate
+		// rules each read those terms as furniture, and the artifact came back
+		// with all five definitions and none of the names. The facts in this
+		// set name both halves, so keeping the prose and losing the terms
+		// scores about half rather than scoring well.
+		{"reference", "/reference/", "optref.yaml", 0.90},
 	}
 
 	srv := httptest.NewServer(http.FileServer(http.Dir("../../testdata/pages")))
@@ -84,7 +91,7 @@ func TestOfflineCorpus(t *testing.T) {
 	guardCfg.AllowPrivate = true
 	opts.Guard = safety.NewGuard(guardCfg)
 
-	// One Distiller across all three, which is how sieve is actually used and
+	// One Distiller across all four, which is how sieve is actually used and
 	// not merely convenient: running the fixtures on separate Distillers is
 	// what hid TestBrowserOutlivesThePageThatLaunchedIt's bug for as long as it
 	// was hidden.

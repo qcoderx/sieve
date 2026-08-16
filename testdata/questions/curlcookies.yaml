@@ -1,0 +1,201 @@
+# Easy band: a plain reference page with a deep sidebar of links around it.
+#
+# The third page in the band where sieve must not lose. It is slightly harder
+# than the other two and that is why it is here: the document is wrapped in a
+# navigation tree of about thirty links, so a reader that cannot tell chrome
+# from content pays for the whole sidebar and still answers the questions. Token
+# cost is the interesting column on this row, not coverage.
+#
+# Ground truth read from the served HTML, not from an artifact:
+#
+#   curl -s https://curl.se/docs/http-cookies.html | sed -e 's/<[^>]*>//g'
+#
+#   sieve distill https://curl.se/docs/http-cookies.html -out ./artifacts
+#   sieve bench ./artifacts/curl.se-docs-http-cookies.html \
+#     --questions testdata/questions/curlcookies.yaml -coverage-only
+
+name: curl, HTTP Cookies
+url: https://curl.se/docs/http-cookies.html
+
+questions:
+  # --- Factual retrieval ----------------------------------------------------
+  - id: q01
+    band: factual
+    ask: Which headers set and send cookies?
+    expect: Set-Cookie sets them on the client; Cookie sends them to servers.
+    facts:
+      - Set-Cookie
+      - "Cookie:"
+
+  - id: q02
+    band: factual
+    ask: What is a session cookie?
+    expect: One that is forgotten when the session is over, often meaning when
+      the browser quits; other cookies have expiration dates.
+    facts:
+      - session cookies
+      - expiration dates
+
+  - id: q03
+    band: factual
+    ask: Which RFC explains how cookies work in HTTP?
+    expect: RFC 6265.
+    facts:
+      - RFC 6265
+
+  - id: q04
+    band: factual
+    ask: What did the 2016 and 2017 updates add?
+    expect: 2016 added support for prefixes; 2017 deprecated modification of
+      secure cookies from non-secure origins.
+    facts:
+      - 2016
+      - prefixes
+      - 2017
+
+  - id: q05
+    band: factual
+    ask: How does curl treat localhost with regard to secure cookies?
+    expect: It allows and uses cookies marked secure even over plain HTTP for
+      that host, to match how popular browsers behave.
+    facts:
+      - localhost
+      - plain HTTP
+
+  - id: q06
+    band: factual
+    ask: What are super cookies?
+    expect: Cookies set for a top-level or public-suffix domain, which should
+      not be allowed to have cookies at all.
+    facts:
+      - super cookies
+      - top-level domain
+
+  - id: q07
+    band: factual
+    ask: What lets curl detect and discard super cookies, and what happens
+      without it?
+    expect: Public Suffix List support; without PSL support curl has no ability
+      to stop super cookies.
+    facts:
+      - Public Suffix List
+      - no ability
+
+  - id: q08
+    band: factual
+    ask: Where does the on-disk cookie file format come from?
+    expect: Netscape created it so cookies would survive browser restarts; curl
+      adopted it, and modern browsers no longer use it.
+    facts:
+      - Netscape
+      - no longer use it
+
+  - id: q09
+    band: factual
+    ask: What is the cookie jar?
+    expect: The Netscape-format file storing one cookie per line, in curl's
+      terminology.
+    facts:
+      - cookie jar
+
+  - id: q10
+    band: factual
+    ask: How are fields separated in the cookie file, and how many are there?
+    expect: Seven text fields separated by TAB characters.
+    facts:
+      - seven
+      - TAB
+
+  - id: q11
+    band: factual
+    ask: What must a valid cookie line end with?
+    expect: A newline character.
+    facts:
+      - newline
+
+  - id: q12
+    band: factual
+    ask: What are the seven fields?
+    expect: Domain name, include subdomains, path, secure (HTTPS only), expiry
+      in seconds since Jan 1st 1970, name and value.
+    facts:
+      - domain name
+      - include subdomains
+      - name of the cookie
+      - value of the cookie
+
+  - id: q13
+    band: factual
+    ask: How are comments written in a cookie file, and what is the exception?
+    expect: 'Lines starting with # are comments, except lines using the HttpOnly
+      prefix.'
+    facts:
+      - comments
+
+  - id: q14
+    band: factual
+    ask: What does -b do?
+    expect: Tells curl a file to read cookies from and starts the cookie engine;
+      if the argument is not a file it is passed on as a string.
+    facts:
+      - cookie engine
+
+  - id: q15
+    band: factual
+    ask: What does -j, --junk-session-cookies do?
+    expect: Used with -b, it skips all session cookies on load so as to appear
+      to start a new cookie session.
+    facts:
+      - junk-session-cookies
+      - new cookie session
+
+  - id: q16
+    band: factual
+    ask: What does -c, --cookie-jar do?
+    expect: Starts the cookie engine and writes cookies to the given file after
+      the requests.
+    facts:
+      - cookie-jar
+      - after the request
+
+  - id: q17
+    band: factual
+    ask: What is the difference between CURLOPT_COOKIEFILE and CURLOPT_COOKIEJAR?
+    expect: COOKIEFILE reads the initial set of cookies and is read-only;
+      COOKIEJAR saves all known cookies when the easy handle is closed.
+    facts:
+      - CURLOPT_COOKIEFILE
+      - CURLOPT_COOKIEJAR
+      - Read-only
+
+  # --- Structural -----------------------------------------------------------
+  - id: q18
+    band: structural
+    ask: What are the main sections of this document?
+    expect: A cookie overview, cookies saved to disk, the cookie file format,
+      cookies with the curl command line tool, and cookies with libcurl.
+    facts:
+      - Cookie overview
+      - Cookies saved to disk
+      - Cookie file format
+
+  # --- Actionable -----------------------------------------------------------
+  - id: q19
+    band: actionable
+    ask: Someone wants curl to keep cookies across two separate invocations.
+      Which options do they need?
+    expect: -c to write the jar after the first run and -b to read it back on
+      the next.
+    facts:
+      - cookie-jar
+      - cookie engine
+
+  - id: q20
+    band: actionable
+    ask: Someone is worried curl will accept a cookie set for a bare top-level
+      domain. Does it?
+    expect: Not if curl was built with Public Suffix List support, which detects
+      and discards such cookies; without PSL it cannot stop them.
+    facts:
+      - Public Suffix List
+      - discards
