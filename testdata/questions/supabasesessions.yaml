@@ -1,0 +1,191 @@
+# Medium band: a documentation page whose second half is an FAQ in accordions.
+#
+# The concepts are in ordinary prose; the reasoning -- recommended token
+# lifetimes, what reuse detection protects against, why JWTs over server
+# sessions -- is folded into collapsed sections. That is the split this band
+# exists to measure, and it is the shape the folded-content signal was added
+# for: the page is otherwise unremarkable and would never have escalated on any
+# other evidence.
+#
+# Ground truth read from the served HTML, not from an artifact:
+#
+#   curl -s https://supabase.com/docs/guides/auth/sessions | sed -e 's/<[^>]*>//g'
+#
+#   sieve distill https://supabase.com/docs/guides/auth/sessions -out ./artifacts
+#   sieve bench ./artifacts/supabase.com-docs-guides-auth-sessions \
+#     --questions testdata/questions/supabasesessions.yaml -coverage-only
+
+name: Supabase Auth, Sessions
+url: https://supabase.com/docs/guides/auth/sessions
+
+questions:
+  # --- Factual retrieval ----------------------------------------------------
+  - id: q01
+    band: factual
+    ask: When is a session created, and how long does it last by default?
+    expect: When a user signs in; by default it lasts indefinitely, and a user
+      can have an unlimited number of active sessions.
+    facts:
+      - when a user signs in
+      - indefinitely
+
+  - id: q02
+    band: factual
+    ask: What represents a session?
+    expect: An access token in the form of a JWT, and a refresh token which is a
+      unique string.
+    facts:
+      - JWT
+      - refresh token
+
+  - id: q03
+    band: factual
+    ask: How long do access tokens and refresh tokens live?
+    expect: Access tokens are short lived, usually between 5 minutes and 1 hour;
+      refresh tokens never expire but can only be used once.
+    facts:
+      - 5 minutes and 1 hour
+      - never expire
+
+  - id: q04
+    band: factual
+    ask: Name three ways a session can terminate.
+    expect: The user changes their password or performs a security sensitive
+      action, it times out due to inactivity, or it reaches its maximum
+      lifetime.
+    facts:
+      - security sensitive action
+      - inactivity
+      - maximum lifetime
+
+  - id: q05
+    band: factual
+    ask: What are the three ways to limit session lifetime?
+    expect: Time-boxed sessions, an inactivity timeout, and enforcing a single
+      session per user.
+    facts:
+      - Time-boxed sessions
+      - inactivity timeout
+      - single-session
+
+  - id: q06
+    band: factual
+    ask: Which plans is session lifetime limiting available on?
+    expect: Pro Plans and up.
+    facts:
+      - Pro Plans
+
+  - id: q07
+    band: factual
+    ask: Which session is kept when a single session per user is enforced?
+    expect: The most recently active one, from the most recent sign in.
+    facts:
+      - most recent
+
+  - id: q08
+    band: factual
+    ask: When are these settings enforced against existing sessions?
+    expect: Not proactively; the check is enforced whenever a session is next
+      refreshed.
+    facts:
+      - not proactively
+      - refreshed
+
+  - id: q09
+    band: factual
+    ask: When are expired sessions deleted from the database?
+    expect: Progressively, 24 hours after they expire, to avoid high load.
+    facts:
+      - 24 hours
+
+  - id: q10
+    band: factual
+    ask: What access token expiration should most applications use?
+    expect: The default of 1 hour.
+    facts:
+      - 1 hour
+
+  - id: q11
+    band: factual
+    ask: Why are values below 5 minutes discouraged?
+    expect: Refresh tokens are used more often, increasing load on the Auth
+      server; clocks are not absolute and devices can be out of sync; and the
+      client libraries cannot refresh ahead of time.
+    facts:
+      - increases the load
+      - out of sync
+
+  - id: q12
+    band: factual
+    ask: How long should an access token be valid relative to requests?
+    expect: At least as long as the longest running request in the application.
+    facts:
+      - longest running request
+
+  - id: q13
+    band: factual
+    ask: What is the general rule for refresh tokens?
+    expect: A refresh token can only be used once.
+    facts:
+      - only be used once
+
+  - id: q14
+    band: factual
+    ask: What is the reuse interval, and should it be changed?
+    expect: 10 seconds by default, and changing it is not recommended.
+    facts:
+      - 10 seconds
+      - not recommend changing
+
+  - id: q15
+    band: factual
+    ask: Why does the reuse interval exist?
+    expect: For server-side rendering where the same refresh token is reused on
+      server then client, and to allow leeway for bugs or serialization issues.
+    facts:
+      - server-side rendering
+      - leeway
+
+  - id: q16
+    band: factual
+    ask: What happens if a reuse attempt falls outside the exceptions?
+    expect: The whole session is regarded as terminated and all its refresh
+      tokens are revoked.
+    facts:
+      - whole session
+      - terminated
+
+  - id: q17
+    band: factual
+    ask: What is reuse detection guarding against?
+    expect: A refresh token having been stolen from the user.
+    facts:
+      - stolen
+
+  - id: q18
+    band: factual
+    ask: What were traditional sessions, and what is the tradeoff?
+    expect: A unique string in a cookie; if the authentication server or its
+      database is unavailable even briefly, the whole application goes down.
+    facts:
+      - unique string
+      - whole application goes down
+
+  - id: q19
+    band: factual
+    ask: Why does Supabase Auth prefer a JWT-based approach?
+    expect: Session information is encoded in the short-lived access token, and
+      it is better for cost optimization and scaling.
+    facts:
+      - cost optimization
+
+  # --- Actionable -----------------------------------------------------------
+  - id: q20
+    band: actionable
+    ask: A team needs users to re-authenticate periodically for compliance.
+      What does the page suggest?
+    expect: Time-boxed sessions, setting a positive value for the session
+      timebox, available on Pro Plans and up.
+    facts:
+      - Time-boxed sessions
+      - re-authenticate

@@ -1,0 +1,195 @@
+# Medium band: documentation with a large interactive shell around it.
+#
+# The page mixes prose rules with long code samples in a language switcher, and
+# wraps the whole thing in a docs application with a persistent sidebar. The
+# facts below are the prose rules rather than anything from the samples, for the
+# same reason as the Redis row: a code block that appears in eight languages
+# scores the same for a reader that got one of them and a reader that got all
+# eight, which is not a distinction worth paying for in a coverage number.
+#
+# Ground truth read from the served HTML, not from an artifact:
+#
+#   curl -s https://docs.stripe.com/webhooks | sed -e 's/<[^>]*>//g'
+#
+#   sieve distill https://docs.stripe.com/webhooks -out ./artifacts
+#   sieve bench ./artifacts/docs.stripe.com-webhooks \
+#     --questions testdata/questions/stripewebhooks.yaml -coverage-only
+
+name: Stripe, Receive Stripe events in your webhook endpoint
+url: https://docs.stripe.com/webhooks
+
+questions:
+  # --- Factual retrieval ----------------------------------------------------
+  - id: q01
+    band: factual
+    ask: What is the purpose of listening for events on a webhook endpoint?
+    expect: So the integration can automatically trigger reactions to events in
+      the Stripe account.
+    facts:
+      - automatically trigger reactions
+
+  - id: q02
+    band: factual
+    ask: What do you create to receive events?
+    expect: An event destination, to receive events at an HTTPS webhook
+      endpoint.
+    facts:
+      - event destination
+      - HTTPS webhook endpoint
+
+  - id: q03
+    band: factual
+    ask: How does Stripe send webhook events, and in what form?
+    expect: Over HTTPS, as a JSON payload that includes an Event object.
+    facts:
+      - HTTPS
+      - JSON payload
+
+  - id: q04
+    band: factual
+    ask: What kind of events do webhooks help you respond to?
+    expect: Asynchronous ones, such as a customer's bank confirming a payment or
+      a customer disputing a charge.
+    facts:
+      - asynchronous
+      - bank confirms a payment
+
+  - id: q05
+    band: factual
+    ask: What are the steps to start receiving webhook events?
+    expect: Create a webhook endpoint handler to receive event data POST
+      requests, and test it locally using the Stripe CLI.
+    facts:
+      - endpoint handler
+      - POST requests
+      - Stripe CLI
+
+  - id: q06
+    band: factual
+    ask: Can one endpoint handle several event types?
+    expect: Yes; you can register one endpoint for several event types at once,
+      or set up individual endpoints.
+    facts:
+      - several different event types
+      - individual endpoints
+
+  - id: q07
+    band: factual
+    ask: What method must the endpoint function accept?
+    expect: POST.
+    facts:
+      - POST method
+
+  - id: q08
+    band: factual
+    ask: What should the endpoint return, and when?
+    expect: A successful status code quickly, before any complex logic that
+      might cause a timeout.
+    facts:
+      - successful status code
+      - timeout
+
+  - id: q09
+    band: factual
+    ask: What example does the page give of work that must come after the
+      response?
+    expect: Updating a customer's invoice as paid in an accounting system.
+    facts:
+      - invoice as paid
+      - accounting system
+
+  - id: q10
+    band: factual
+    ask: Does Stripe always send events asynchronously?
+    expect: Most event types are sent asynchronously, but for some Stripe waits
+      for a response.
+    facts:
+      - asynchronously
+      - waits for a response
+
+  - id: q11
+    band: factual
+    ask: What is used to verify that a received event really came from Stripe?
+    expect: The endpoint secret, used to verify the signature against the raw
+      body.
+    facts:
+      - endpoint secret
+      - signature
+
+  - id: q12
+    band: factual
+    ask: How do you find the endpoint secret when testing with the CLI?
+    expect: Run stripe listen.
+    facts:
+      - stripe listen
+
+  - id: q13
+    band: factual
+    ask: Where do you find the endpoint secret for an endpoint defined via the
+      API or Dashboard?
+    expect: In the webhook settings for that endpoint in the Dashboard.
+    facts:
+      - webhook settings
+
+  - id: q14
+    band: factual
+    ask: Which handler is used for API v1 resources and which for v2?
+    expect: The snapshot event handler for v1 resources, and the other handler
+      for v2 resources.
+    facts:
+      - API v1 resources
+      - API v2 resources
+
+  - id: q15
+    band: factual
+    ask: When writing snapshot event handler logic, which object definition
+      should you use?
+    expect: The API object definition at the time of the event, from the event's
+      own fields; the latest definition can be retrieved from the API instead.
+    facts:
+      - at the time of the event
+
+  - id: q16
+    band: factual
+    ask: Which cloud destinations can events be sent to directly?
+    expect: An AWS account or an Azure subscription.
+    facts:
+      - AWS
+      - Azure
+
+  - id: q17
+    band: factual
+    ask: What does the page provide to help build an endpoint?
+    expect: An interactive webhook endpoint builder that produces a function in
+      your programming language.
+    facts:
+      - endpoint builder
+
+  # --- Structural -----------------------------------------------------------
+  - id: q18
+    band: structural
+    ask: What related troubleshooting topics does the page link to?
+    expect: Resolving webhook signature verification errors and handling
+      irrecoverable webhook events.
+    facts:
+      - signature verification errors
+      - irrecoverable webhook events
+
+  # --- Actionable -----------------------------------------------------------
+  - id: q19
+    band: actionable
+    ask: A handler is timing out because it does slow work before replying.
+      What does the page say to do?
+    expect: Return a successful status code first, before any complex logic.
+    facts:
+      - successful status code
+      - complex logic
+
+  - id: q20
+    band: actionable
+    ask: Someone is developing locally and has no public URL. What does the page
+      suggest?
+    expect: Test the endpoint handler locally using the Stripe CLI.
+    facts:
+      - locally
+      - Stripe CLI
