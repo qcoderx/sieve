@@ -415,6 +415,43 @@ type Audit struct {
 const DropNonLexical = "no letter or digit in the run: a separator, a progress " +
 	"indicator or decorative glyphs rather than prose"
 
+// The other three exclusions the prune performs. They went unrecorded for far
+// too long, and the cost of that was not theoretical.
+//
+// Three separate content losses -- every term in curl's libcurl reference, the
+// only contact address on basement.studio, and the option names on any API
+// documentation page shaped like them -- were all this rule firing, and all
+// three were invisible in the artifact's own account of itself. The audit said
+// nothing had been dropped except a few decorative glyphs. They were found by
+// writing question sets and noticing the answers were missing, which is a
+// filter that catches roughly what a person happens to ask about.
+//
+// An artifact that reports what it withheld can be checked. One that withholds
+// silently has to be caught by someone asking the right question, and most
+// people will not.
+const (
+	// DropSingleChar is a one-character run: a fragment reassembly could not
+	// place. resend.com produced blocks reading "t", "b" and "s".
+	DropSingleChar = "a single character: a fragment left over from reassembly " +
+		"rather than a run of text"
+
+	// DropNavLabel is a short linked run whose text is also a link label
+	// elsewhere on the page, which is the shape of a menu item.
+	//
+	// This is the one worth reading closely when a fact is missing. It is right
+	// on menus and wrong on reference documentation, where the name of the
+	// thing being documented is short, linked, and looks identical to a menu
+	// item. Code and contact links are exempt for that reason; anything else
+	// short and linked is still assumed to be navigation.
+	DropNavLabel = "a short linked run that repeats a link label elsewhere on the " +
+		"page: usually a menu item, and listed under navigation rather than content"
+
+	// DropTemplateLabel is a short run repeated at least three times, of which
+	// the first occurrence is kept.
+	DropTemplateLabel = "a short line repeated across a card or list template: " +
+		"the first occurrence is kept and the repetitions are not"
+)
+
 type DropCount struct {
 	Reason string `json:"reason"`
 	Runs   int    `json:"runs"`

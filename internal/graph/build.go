@@ -418,6 +418,7 @@ func pruneNonContent(blocks []Block, actions []Action, dropStats map[string]*Dro
 		// could not place -- resend.com produced blocks reading "t", "b" and "s"
 		// -- and no artifact is improved by carrying it.
 		if b.Type != TypeImage && utf8.RuneCountInString(b.Text) < 2 {
+			note(DropSingleChar, b)
 			continue
 		}
 		// A short linked run is usually a menu item. It is not one when the
@@ -451,12 +452,14 @@ func pruneNonContent(blocks []Block, actions []Action, dropStats map[string]*Dro
 		if b.Href != "" && b.Type != TypeCode && !isContactHref(b.Href) &&
 			utf8.RuneCountInString(b.Text) <= maxNavLabelRunes &&
 			labels[dedupeKey(b.Text)] {
+			note(DropNavLabel, b)
 			continue
 		}
 		if k := dedupeKey(b.Text); b.Type != TypeTable &&
 			repeats[k] >= minTemplateRepeats {
 			kept[k]++
 			if kept[k] > 1 {
+				note(DropTemplateLabel, b)
 				continue
 			}
 		}
