@@ -51,13 +51,18 @@ Ctrl+L
 Type "sieve distill https://igloo.inc"
 Enter
 
-# Wait for the run to finish rather than guessing at it. A fixed sleep is
-# wrong in both directions here: igloo.inc takes anywhere from fifteen to
-# thirty-five seconds depending on how long its scene takes to build and how
-# patiently the sweep waits for text that is never coming, so a short sleep
-# clips the output and a long one records dead air. The regexp matches the
-# last line the command prints.
-Wait+Screen@60s /total/
+# Wait for the shell prompt to come back, rather than for any particular text.
+#
+# A fixed sleep is wrong in both directions here: igloo.inc takes anywhere from
+# fifteen to forty seconds depending on how long its scene takes to build and
+# how patiently the sweep waits for text that is never coming, so a short sleep
+# clips the output and a long one records dead air.
+#
+# Matching on output is worse still. Waiting for the last line the command
+# prints fails whenever that line has scrolled off a 620-pixel screen, which is
+# most of the time and looks exactly like the command having failed. The prompt
+# returning is the one signal that means "finished" and is always on screen.
+Wait@90s
 
 Type "# Read out of the 3D scene. 40 of 40 ground-truth facts, every run."
 Enter
