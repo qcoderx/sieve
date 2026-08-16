@@ -834,7 +834,7 @@ func (b *Browser) collectCorpus(ctx context.Context, col *collector) {
 // to return nothing at all. Two seconds was enough for a fixture served from
 // localhost and not for igloo.inc over the network, which failed outright on
 // two runs in five.
-const sceneFloor = 8 * time.Second
+const sceneFloor = 15 * time.Second
 
 // sceneCtx gives the scene walk whatever is left of the extraction budget, or
 // the floor above, whichever is longer -- bounded in every case by the tab.
@@ -861,18 +861,26 @@ func sceneCtx(tabCtx, postCtx context.Context) context.Context {
 // the worse of the two: an empty artifact is obviously wrong, and an artifact
 // missing a fifth of a site reads exactly like a complete one.
 const (
-	// sceneAnnounceWait is how long a page that draws is given to register a
-	// scene at all. A page with no canvas never waits.
-	sceneAnnounceWait = 3 * time.Second
+	// sceneAnnounceWait is how long a page that fingerprints as three.js is
+	// given to register a scene at all. No other page waits, so this can be
+	// generous: eight seconds was chosen because three was not enough on a
+	// machine under load, and a machine under load is exactly when the scene
+	// takes longest and the empty artifact is least likely to be noticed.
+	sceneAnnounceWait = 8 * time.Second
 
 	// sceneSettleWait bounds the whole walk once a scene has appeared.
-	sceneSettleWait = 6 * time.Second
+	sceneSettleWait = 12 * time.Second
 
-	// sceneStableReads is how many consecutive readings must agree before the
-	// scene is taken as finished. three.js has no completion event and a page
-	// may add to its scene whenever it likes, so agreement across two readings
-	// a beat apart is the cheapest evidence available that it has stopped.
-	sceneStableReads = 2
+	// sceneStablePeriod is how long the object count must hold still before the
+	// scene is taken as finished.
+	//
+	// Two consecutive equal readings is not enough and was measured not being
+	// enough: igloo.inc builds its scene over three to four seconds and pauses
+	// while doing it, so two readings a quarter of a second apart agreed on 78
+	// objects when there were eventually 95, and the walk returned 23 of 29
+	// text runs believing it was done. A count that has not moved for a second
+	// and a half is a scene that has finished rather than one drawing breath.
+	sceneStablePeriod = 1500 * time.Millisecond
 
 	sceneRetryWait = 250 * time.Millisecond
 )
@@ -885,13 +893,36 @@ func (b *Browser) introspectScene(ctx context.Context, res *Result) {
 	// The hook is installed on every page before any script runs, so asking for
 	// a scene always succeeds; it answers null until three.js registers one. A
 	// page with no 3D is therefore indistinguishable from a page whose 3D has
-	// not loaded yet, and the only cheap thing that separates them is whether
-	// the page draws at all. Pages with no canvas leave immediately and pay
-	// nothing, which is nearly all of them.
+	// not loaded yet, and waiting on that ambiguity has to be paid for by
+	// somebody.
+	//
+	// The library probe has already run by this point and says which of the two
+	// this is. That is a far better gate than "the page has a canvas", which is
+	// true of every chart and particle background on the web: those would have
+	// waited the whole budget to be told there was never a scene. A page that
+	// fingerprints as three.js and has not registered a scene yet is a page
+	// still loading, and it is the only page that waits.
+	// Either signal is enough, because the two fail in opposite directions and
+	// the costs are not symmetric.
+	//
+	// The fingerprint is precise when it fires and is itself a race: the probe
+	// runs before this walk, and on a slow run three.js has not loaded when it
+	// looks, so the page reports no libraries and the walk declines to wait for
+	// the scene that is about to appear. A canvas is the cruder signal and is
+	// present early. Taking either one costs a few seconds on a page that turns
+	// out to have no scene, and missing both costs an artifact that says a site
+	// is empty when it is not.
 	draws := res.Merged != nil && len(res.Merged.Canvases) > 0
+	for _, lib := range res.Libraries {
+		if strings.HasPrefix(lib, "three") {
+			draws = true
+			break
+		}
+	}
 
 	var best *capture.SceneIntrospection
-	bestN, stable := 0, 0
+	bestN := 0
+	lastChange := time.Now()
 
 	for {
 		var raw string
@@ -906,6 +937,12 @@ func (b *Browser) introspectScene(ctx context.Context, res *Result) {
 				break
 			}
 			n = len(sc.Names) + len(sc.Texts) + len(sc.Runs)
+		}
+
+		// Finished when the count has held still long enough to believe it.
+		if bestN > 0 && time.Since(lastChange) >= sceneStablePeriod {
+			res.Scene = best
+			return
 		}
 
 		switch {
@@ -924,17 +961,8 @@ func (b *Browser) introspectScene(ctx context.Context, res *Result) {
 			// said the other six were missing. A scene under construction is
 			// not a short scene.
 			cp := sc
-			best, bestN, stable = &cp, n, 0
-		default:
-			// The count has stopped moving. Two readings agreeing is the
-			// cheapest evidence available that the page has finished; there is
-			// no completion event to wait for, because three.js does not have
-			// one and a page can add to its scene at any time.
-			stable++
-			if stable >= sceneStableReads {
-				res.Scene = best
-				return
-			}
+			best, bestN = &cp, n
+			lastChange = time.Now()
 		}
 
 		if time.Since(started) >= sceneSettleWait {

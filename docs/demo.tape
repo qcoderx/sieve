@@ -12,8 +12,14 @@
 # `Sleep 1200` written meaning "1.2 seconds" is twenty minutes of vhs sitting
 # at a blank prompt with no indication anything is wrong.
 #
-# The sequence is chosen to make one point in under fifteen seconds: WebFetch
-# gets nothing from this page, and sieve gets the site. Everything else is cut.
+# The sequence is chosen to make one point: WebFetch gets nothing from this
+# page, and sieve gets the site. Everything else is cut.
+#
+# No block count is named on purpose. igloo.inc's scene carries decorative and
+# duplicated objects, so the number varies between twenty-three and twenty-nine
+# runs of text depending on how much of the page the sweep reached. What does
+# not vary is the ground truth: 40 of 40 facts, every run. A demo should assert
+# the number that holds.
 
 Output docs/demo.gif
 
@@ -53,7 +59,7 @@ Enter
 # last line the command prints.
 Wait+Screen@60s /total/
 
-Type "# 29 blocks, read out of the 3D scene. 40 of 40 ground-truth facts."
+Type "# Read out of the 3D scene. 40 of 40 ground-truth facts, every run."
 Enter
 Sleep 2000ms
 

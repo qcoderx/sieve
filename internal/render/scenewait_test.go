@@ -55,17 +55,23 @@ func TestSceneWalkPatienceHoldsTogether(t *testing.T) {
 			"igloo.inc two runs in five", sceneSettleWait, observedTooShort)
 	}
 
-	if sceneStableReads < 2 {
-		t.Errorf("sceneStableReads is %d.\nOne reading is exactly what produced the "+
-			"partial read: the scene was six milliseconds old and still filling, and "+
-			"the first answer was taken as the last.", sceneStableReads)
+	// A count that pauses is not a count that has stopped. igloo.inc builds its
+	// scene over three to four seconds with pauses in it, and two readings a
+	// quarter of a second apart agreed on 78 objects when there were eventually
+	// 95 -- so the walk returned 23 of 29 text runs believing it was finished.
+	if sceneStablePeriod < 4*sceneRetryWait {
+		t.Errorf("sceneStablePeriod is %v at %v per beat, which is %d readings.\n"+
+			"A scene drawing breath between batches looks finished across that few, "+
+			"and the walk then returns a partial read that is indistinguishable from "+
+			"a complete one.", sceneStablePeriod, sceneRetryWait,
+			int(sceneStablePeriod/sceneRetryWait))
 	}
 
-	// Enough beats inside the budget that "the count stopped moving" is a real
-	// observation rather than two samples of the same instant.
-	if beats := int(sceneSettleWait / sceneRetryWait); beats < 4*sceneStableReads {
-		t.Errorf("a %v budget at %v per beat is %d readings, too few to establish "+
-			"that a scene stopped growing when %d must agree",
-			sceneSettleWait, sceneRetryWait, beats, sceneStableReads)
+	// There has to be room inside the budget for a scene to appear late and
+	// then still hold still long enough to be believed.
+	if sceneAnnounceWait+sceneStablePeriod >= sceneSettleWait {
+		t.Errorf("announce %v plus stability %v leaves nothing inside a settle budget "+
+			"of %v for the scene to build in",
+			sceneAnnounceWait, sceneStablePeriod, sceneSettleWait)
 	}
 }
