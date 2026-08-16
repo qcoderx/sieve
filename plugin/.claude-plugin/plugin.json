@@ -1,6 +1,6 @@
 {
   "name": "sieve",
-  "version": "0.1.0",
+  "version": "0.2.0",
   "description": "Browser-grade page reading that does not eat your context window. Reads pages WebFetch returns empty, and says so when a read fails instead of letting the agent invent content.",
   "author": {
     "name": "Quadri Lasisi",

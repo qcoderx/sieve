@@ -1,6 +1,6 @@
 {
   "name": "@qcoderx/sieve",
-  "version": "0.1.0",
+  "version": "0.2.0",
   "description": "Browser-grade page reading for AI agents. Reads pages a plain fetch returns empty, and says so when a read fails instead of letting an agent invent content.",
   "keywords": ["claude", "claude-code", "mcp", "web-scraping", "extraction", "webfetch", "agent"],
   "homepage": "https://github.com/qcoderx/sieve",

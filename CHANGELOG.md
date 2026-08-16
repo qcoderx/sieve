@@ -1,5 +1,67 @@
 # Changelog
 
+## 0.2.0
+
+The artifact format is unchanged: schema is still 1.0 and everything in
+[docs/ARTIFACT.md](docs/ARTIFACT.md) still holds. What changed is how much of a
+page reaches it, and how honestly the artifact reports what it left out.
+
+### Fixed
+
+- **A Distiller stopped rendering after its first page.** The browser was
+  launched on the context of whichever page happened to need it first, so that
+  page's cancellation took Chromium down while the handle stayed non-nil. Every
+  later page opened a tab on a dead context and fell back to the served HTML,
+  which is a supported outcome and looks like a decision rather than a failure.
+  In practice this was `sieve site` reading the first page of a documentation
+  site and none of the rest, and the MCP server doing the same after its first
+  request. One page in isolation always worked, which is why nothing caught it.
+- **Reference documentation lost every term it defines.** A short linked run is
+  usually a menu item, and on an API reference it is the name of the thing being
+  documented. All five libcurl options on curl's cookie page were removed and
+  their definitions kept, leaving fluent prose about unnamed options. `<code>`
+  inside a link now outranks the guess, as do `mailto:` and `tel:` links, which
+  were taking contact addresses with them.
+- **Text folded behind a control could not get a page a browser.** Nothing in
+  the ladder could see that a page was holding content shut, so the disclosure
+  prober only ran on pages that had escalated for some other reason. It now
+  measures the prose behind closed disclosures, ignoring navigation, decorative
+  panels and anything the prober would refuse to press — 9.8% of a
+  two-hundred-site corpus newly escalates, against 24.7% for a naive count.
+- **Words in a 3D scene were read before the scene existed.** The sweep's settle
+  loop watches DOM text, so a page whose content is glyph geometry looks still
+  from the moment it loads. The scene was walked once and losing that race was
+  permanent; it now waits briefly for a scene that is present and empty.
+- Static extraction no longer treats an already-open `<details>` as closed.
+
+### Added
+
+- **An offline benchmark tier.** Four fixtures ship here with their ground
+  truth, graded with no network in CI, with floors set just under the measured
+  score. Every other measurement in this project points at a live site and is
+  therefore a measurement of the internet on a Tuesday.
+- **Thirty question sets**, ten each in three bands: hard, medium, and the easy
+  band where sieve must simply not lose. Ground truth for every set is read from
+  the page's own source rather than from a sieve artifact.
+- **A Claude Code plugin**, with the skill, the WebFetch hook and the MCP server
+  in one install, plus prebuilt binaries and an npm package so trying it does
+  not require a Go toolchain.
+- `sieve site` for reading across the pages of one documentation site, and
+  `sieve hook` for reading the page a WebFetch could not.
+
+### Changed
+
+- **The artifact now reports every exclusion it makes.** Three of the prune's
+  four rules removed text and recorded nothing, so the artifact's account of
+  itself said nothing had happened — on one page, 1,836 characters of silence.
+  All four now give a reason written for somebody wondering where a fact went.
+- The MCP server applies the timeouts it accepts. It registered `-timeout` and
+  `-load-timeout` and then discarded them, which is why pages that worked on the
+  command line failed over MCP.
+- The manifest no longer carries five keys that always read zero.
+- A hung run is killed and reported with its own exit code, and orphaned
+  browsers are reaped rather than left running.
+
 ## 0.1.0
 
 The first release with a frozen artifact format. Everything in

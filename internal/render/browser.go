@@ -24,7 +24,7 @@ import (
 // can be tied back to the code that produced it.
 //
 // A var rather than a const so a release build can stamp a commit onto it.
-var Version = "0.1.0"
+var Version = "0.2.0"
 
 // Browser owns one Chromium process. Reuse it across pages: process startup is
 // 200-600ms, which dominates the cost of a small page.
