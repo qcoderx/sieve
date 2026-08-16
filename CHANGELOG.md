@@ -29,9 +29,15 @@ page reaches it, and how honestly the artifact reports what it left out.
   panels and anything the prober would refuse to press — 9.8% of a
   two-hundred-site corpus newly escalates, against 24.7% for a naive count.
 - **Words in a 3D scene were read before the scene existed.** The sweep's settle
-  loop watches DOM text, so a page whose content is glyph geometry looks still
-  from the moment it loads. The scene was walked once and losing that race was
-  permanent; it now waits briefly for a scene that is present and empty.
+  loop watches DOM text, so a page whose content is glyph geometry looks
+  perfectly still from the moment it loads: the loop declares the page settled
+  and the scene is walked before three.js has built a single text object. The
+  scene was read once, so losing that race was permanent. `igloo.inc` — the case
+  this project exists for — returned an empty artifact on two runs in five. A
+  scene that is present and empty is now given time to fill, bounded by elapsed
+  time rather than a number of attempts. Six runs of six since, 40 of 40
+  ground-truth facts each time. A page with no scene, or one whose scene is
+  already built, still returns on the first read and pays nothing.
 - Static extraction no longer treats an already-open `<details>` as closed.
 
 ### Added
