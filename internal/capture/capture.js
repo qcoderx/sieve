@@ -3070,7 +3070,18 @@
       });
     },
     scene: function () {
-      return JSON.stringify(introspectScene() || null);
+      var r = introspectScene();
+      var seen = 0;
+      try {
+        seen = (window.__THREE_DEVTOOLS__ && window.__THREE_DEVTOOLS__.observed) || 0;
+      } catch (e) {}
+      // A page where three.js is running but has not built anything yet is a
+      // different answer from a page with no three.js on it, and returning
+      // null for both is what made the caller either wait on every canvas or
+      // give up on a scene that was seconds away.
+      if (!r) return JSON.stringify(seen > 0 ? { o: seen } : null);
+      r.o = seen;
+      return JSON.stringify(r);
     },
     libs: function (specs) {
       return JSON.stringify(detectLibraries(specs || []));

@@ -79,12 +79,6 @@
     "note": "WebGL scene. Try runtime scene-graph introspection before rasterising anything."
   },
   {
-    "n": "three-devtools",
-    "g": "__THREE_DEVTOOLS__",
-    "w": 0.9,
-    "c": "3d"
-  },
-  {
     "n": "spline",
     "s": "spline-viewer,canvas[data-engine*=spline]",
     "w": 0.95,

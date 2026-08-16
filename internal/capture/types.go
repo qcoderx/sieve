@@ -264,6 +264,14 @@ type SceneIntrospection struct {
 	// copy into WebGL -- igloo.inc draws every paragraph as glyph geometry --
 	// deserves its paragraphs as paragraphs rather than one welded blob.
 	Runs []SceneRun `json:"r,omitempty"`
+
+	// Observed counts how many times three.js has touched the devtools hook
+	// sieve installs. Non-zero means three.js is on the page and running, which
+	// is knowable long before it has finished building anything -- so an empty
+	// scene with a non-zero count is a scene that is coming, and one with a
+	// zero count is a page that has no three.js on it at all. Waiting is worth
+	// it in the first case and is pure cost in the second.
+	Observed int `json:"o,omitempty"`
 }
 
 // SceneRun is one text object from a 3D scene.

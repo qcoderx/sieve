@@ -34,8 +34,19 @@
       var scenes = [];
       window.__THREE_DEVTOOLS__ = {
         scenes: scenes,
+        // Counts every dispatch, not just the ones carrying a scene.
+        //
+        // three.js touches this hook from the WebGLRenderer constructor as
+        // well as from Scene, so a non-zero count means three.js is on the
+        // page and running -- which is knowable well before any scene has
+        // finished being built. That distinction is the difference between
+        // waiting for a scene that is coming and waiting on a page that has a
+        // canvas for some entirely unrelated reason, and the second is most
+        // pages with a canvas on them.
+        observed: 0,
         dispatchEvent: function (e) {
           try {
+            window.__THREE_DEVTOOLS__.observed++;
             var d = e && e.detail;
             if (d && d.isScene && scenes.indexOf(d) < 0 && scenes.length < 64) {
               scenes.push(d);

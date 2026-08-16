@@ -861,12 +861,12 @@ func sceneCtx(tabCtx, postCtx context.Context) context.Context {
 // the worse of the two: an empty artifact is obviously wrong, and an artifact
 // missing a fifth of a site reads exactly like a complete one.
 const (
-	// sceneAnnounceWait is how long a page that fingerprints as three.js is
-	// given to register a scene at all. No other page waits, so this can be
-	// generous: eight seconds was chosen because three was not enough on a
-	// machine under load, and a machine under load is exactly when the scene
-	// takes longest and the empty artifact is least likely to be noticed.
-	sceneAnnounceWait = 8 * time.Second
+	// sceneAnnounceWait is how long a page that merely has a canvas is given to
+	// show any sign of three.js. It is short on purpose: most canvases are
+	// charts and particle backgrounds, and this is the budget every one of them
+	// pays to establish that there is no scene coming. Once the hook reports
+	// three.js actually running, sceneSettleWait applies instead.
+	sceneAnnounceWait = 2 * time.Second
 
 	// sceneSettleWait bounds the whole walk once a scene has appeared.
 	sceneSettleWait = 12 * time.Second
@@ -912,13 +912,21 @@ func (b *Browser) introspectScene(ctx context.Context, res *Result) {
 	// present early. Taking either one costs a few seconds on a page that turns
 	// out to have no scene, and missing both costs an artifact that says a site
 	// is empty when it is not.
-	draws := res.Merged != nil && len(res.Merged.Canvases) > 0
-	for _, lib := range res.Libraries {
-		if strings.HasPrefix(lib, "three") {
-			draws = true
-			break
-		}
-	}
+	// A page with a canvas might be about to build a scene. A page without one
+	// never is, and leaves on the first read.
+	//
+	// This is the weak signal, and it is only used until the page answers the
+	// question properly. Most canvases on the web are charts and particle
+	// backgrounds with no three.js anywhere near them, so the wait it justifies
+	// is short; once the hook reports that three.js is actually running, the
+	// budget below opens up.
+	//
+	// The library fingerprints deliberately do not appear here. There used to
+	// be a detector for the three.js devtools hook, and sieve installs that
+	// hook itself on every page before any page script runs, so it fired
+	// everywhere: every rendered page waited the full budget for a scene that
+	// was never coming. It has been removed.
+	canvas := res.Merged != nil && len(res.Merged.Canvases) > 0
 
 	var best *capture.SceneIntrospection
 	bestN := 0
@@ -947,11 +955,16 @@ func (b *Browser) introspectScene(ctx context.Context, res *Result) {
 
 		switch {
 		case n == 0:
-			// Nothing registered yet. On a page that draws, this is the scene
-			// not having loaded rather than there being no scene: igloo.inc
-			// answered null outright on roughly one run in four, and the walk
-			// returned an empty artifact for a site that is entirely 3D text.
-			if !draws || time.Since(started) >= sceneAnnounceWait {
+			// Nothing built yet. How long that is worth waiting for depends
+			// entirely on whether three.js is running, which the hook now
+			// answers directly: igloo.inc reported nothing at all on roughly one
+			// run in four, and the walk returned an empty artifact for a site
+			// that is entirely 3D text.
+			wait := sceneAnnounceWait
+			if sc.Observed > 0 {
+				wait = sceneSettleWait
+			}
+			if (!canvas && sc.Observed == 0) || time.Since(started) >= wait {
 				return
 			}
 		case n > bestN:
