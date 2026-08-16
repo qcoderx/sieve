@@ -158,6 +158,40 @@ Stated so they are not mistaken for findings:
 
 ---
 
+## The tier that cannot rot
+
+Everything above points at a live site, which makes it a measurement of the
+internet on a particular Tuesday. Sites get redesigned, put behind a challenge
+page, and taken down. Nobody reading this in a year can re-run the igloo.inc row
+and get the igloo.inc number, and neither can I.
+
+So there is a second tier underneath it, and it runs offline:
+
+```sh
+go test ./internal/bench -run TestOfflineCorpus -v
+```
+
+Three pages ship in this repository under this project's own licence, each with
+its ground truth beside it in `testdata/questions/`:
+
+| fixture | what it is | coverage | tier reached |
+|---|---|---|---|
+| `immersive` | words drawn as glyph geometry in a three.js scene, empty `<body>` | 0.867 | render |
+| `adversarial` | real prose threaded through eight injection channels | 1.000 | render |
+| `disclosure` | everything worth knowing behind a control you must press | 1.000 | sweep |
+
+No network, no third party's content, no link rot, and reproducible by anyone
+forever. The floors are recorded in the test, set just under the measured score,
+so a change that quietly costs coverage fails the build rather than being
+noticed a month later while writing a table like this one.
+
+What that tier deliberately does not measure is as important as what it does.
+Two of those pages carry material sieve must **refuse**: eight injected
+instructions on one, four controls that speak on a visitor's behalf on the
+other. A coverage score has no way to express "and none of that appeared", so
+those are asserted string by string in the render and distill tests instead.
+Reading the table above as the whole fixture result would be reading half of it.
+
 ## Reproducing this
 
 ```sh

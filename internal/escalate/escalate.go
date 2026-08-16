@@ -159,6 +159,17 @@ type Factor struct {
 const (
 	staticShortfallRatio = 0.5
 	staticShortfallChars = 2000
+
+	// foldedChars is how much text has to be shut away before a browser is
+	// worth spending on opening it.
+	//
+	// The floor is not about significance, it is about false positives. A
+	// closed mobile navigation marked aria-hidden holds real characters and
+	// reveals nothing a reader wants; so does a decorative panel. Those run to
+	// a line or two of link text. A folded specification, price list or FAQ
+	// does not. Two hundred characters separates them on the corpus without
+	// sending pages to the browser to open their own hamburger menu.
+	foldedChars = 200
 )
 
 // Score judges a page from its served bytes.
@@ -222,6 +233,28 @@ func Score(sig static.Signals, libWeight float64, libName string, th Thresholds)
 					"a browser is the only way to find out which is right",
 				sig.TextChars, sig.MarkupChars))
 		}
+	}
+
+	// 1c. What the page is holding shut.
+	//
+	//    The shortfall rule above cannot see this one. Text inside a closed
+	//    <details> or an unselected tab is in the served bytes, so the naive
+	//    count and the extractor both find it and the ratio looks healthy --
+	//    but the extractor is reading it out of a region no visitor is looking
+	//    at, mixed into the page as though it were on display, and the parts a
+	//    visitor would reach by pressing something are the parts most likely to
+	//    be the pricing, the specification, or the schedule.
+	//
+	//    This is the signal that makes the disclosure prober reachable. Without
+	//    it the prober only ran on pages that had already escalated for some
+	//    other reason, which is to say it ran on heavy pages and never on the
+	//    small static ones that fold half of what they say.
+	foldedScore := 0.0
+	if sig.FoldedControls > 0 && sig.FoldedChars >= foldedChars {
+		foldedScore = 1.0
+		add("folded_content", float64(sig.FoldedChars), 0.30, fmt.Sprintf(
+			"%d characters sit behind %d shut controls; tier 0 has nothing to press with",
+			sig.FoldedChars, sig.FoldedControls))
 	}
 
 	// 2. Text against markup. A documentation page is text with a little markup
@@ -321,7 +354,8 @@ func Score(sig static.Signals, libWeight float64, libName string, th Thresholds)
 
 	score := textScore*0.35 + ratioScore*0.2 + structScore*0.15 +
 		declaredScore*0.1 + scriptScore*0.1 + canvasScore*0.1 +
-		opaqueScore*0.08 + libWeight*0.2 + shortfallScore*0.30
+		opaqueScore*0.08 + libWeight*0.2 + shortfallScore*0.30 +
+		foldedScore*0.30
 	if score > 1 {
 		score = 1
 	}
@@ -338,7 +372,12 @@ func Score(sig static.Signals, libWeight float64, libName string, th Thresholds)
 	// and diluting direct evidence with weighted guesses is how cuberto.com
 	// scored 0.340 against a 0.35 bar and lost nine facts to a rounding
 	// margin. Evidence of a bad read is not a vote.
-	if shortfallScore > 0 && score < th.EscalateAbove {
+	// Folded content escalates on its own for the same reason, and no further.
+	// It justifies opening a browser to press what the page offers; it says
+	// nothing about whether the page needs a full sweep or canvas recovery, and
+	// promoting it past the first tier would spend a great deal on the evidence
+	// that a tab was shut.
+	if (shortfallScore > 0 || foldedScore > 0) && score < th.EscalateAbove {
 		score = th.EscalateAbove
 		d.Score = round(score, 3)
 	}

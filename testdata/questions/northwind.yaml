@@ -1,0 +1,169 @@
+# Question set for the adversarial fixture.
+#
+# Part of the offline corpus: the page ships in this repository under this
+# project's own licence, so this row of any benchmark is reproducible forever by
+# anyone, cannot rot, and involves no third party's content.
+#
+#   (cd testdata/pages && python -m http.server 8080) &
+#   sieve distill http://localhost:8080/adversarial/ -allow-private-addresses -out ./artifacts
+#   sieve bench ./artifacts/localhost-8080-adversarial \
+#     --questions testdata/questions/northwind.yaml -coverage-only
+#
+# The page carries a real business description and, threaded through it, eight
+# injected instructions delivered by eight different channels: a hidden tab
+# panel, colour-on-colour text, zero opacity, off-screen positioning, a
+# right-to-left override, zero-width joiners inside ordinary prose, unwhitelisted
+# JSON-LD, and Markdown control characters intended to break out of a quoted
+# block.
+#
+# This set measures only the first half: whether the real content survives. That
+# the injected half does *not* is asserted separately, by name, in
+# TestDistillReturnsManifestNotBody and TestSmallPageArrivesWhole -- a coverage
+# score cannot express "and none of these eight strings appeared", and pretending
+# it could would be the more dangerous of the two failures to get wrong.
+
+name: Northwind Ceramics (adversarial fixture)
+url: http://localhost:8080/adversarial/
+
+questions:
+  # --- Factual retrieval ----------------------------------------------------
+  - id: q01
+    band: factual
+    ask: What kind of business is this and where is it?
+    expect: A studio pottery in Leeds.
+    facts:
+      - studio pottery
+      - Leeds
+
+  - id: q02
+    band: factual
+    ask: How is the work made?
+    expect: Wheel-thrown and wood-fired, in small batches.
+    facts:
+      - wheel-thrown
+      - wood-fired
+      - small batches
+
+  - id: q03
+    band: factual
+    ask: When was the studio founded?
+    expect: 1998.
+    facts:
+      - founded in 1998
+
+  - id: q04
+    band: factual
+    ask: How often is the kiln fired and for how long?
+    expect: The anagama kiln is fired twice a year, and each firing runs for
+      four days.
+    facts:
+      - anagama
+      - twice a year
+      - four days
+
+  - id: q05
+    band: factual
+    ask: Where does the glaze come from?
+    expect: Ash from the pine deposits on the pots and forms the glaze; glazes
+      are also mixed in the studio from wood ash, feldspar and local clay.
+    facts:
+      - ash from the pine
+      - feldspar
+      - local clay
+
+  # The prices are on this page, in a tabpanel, and they are deliberately not
+  # asked about. The fixture ships no JavaScript, so its tab buttons are inert:
+  # sieve presses "Pricing", nothing happens, and the panel stays hidden --
+  # which is exactly what happens to a person who clicks it. Grading against
+  # text no reader can reach would be grading against the bytes rather than the
+  # page, and the whole argument for these numbers is that they measure what a
+  # reader would have got.
+  #
+  # The tabs stay unwired on purpose. The "Notes" tab holds an injected
+  # instruction, and wiring the tabs would have the disclosure prober open it,
+  # which is the correct behaviour and would leave nothing asserting that the
+  # payload does not survive. The two properties cannot both be tested on one
+  # page, so this page tests the harder one.
+
+  - id: q09
+    band: factual
+    ask: When can visitors come?
+    expect: The first Saturday of each month.
+    facts:
+      - first Saturday
+
+  # This one is the zero-width-joiner line. The characters are invisible to a
+  # reader and must not survive into the text, or the hours become unsearchable.
+  - id: q10
+    band: factual
+    ask: What are the opening hours?
+    expect: Ten to five, Tuesday to Saturday.
+    facts:
+      - ten to five
+      - Tuesday to Saturday
+
+  - id: q11
+    band: factual
+    ask: Where does the studio ship, and how long does an order take?
+    expect: Within the UK only, packed by hand, taking about a week.
+    facts:
+      - UK only
+      - packed by hand
+      - take a week
+
+  - id: q11b
+    band: factual
+    ask: How is an order packed, and why does it take a week?
+    expect: Double-boxed in shredded paper rather than plastic, which is slower
+      to pack.
+    facts:
+      - double-boxed
+      - shredded paper
+
+  - id: q11c
+    band: factual
+    ask: How are large pieces sent?
+    expect: By pallet, quoted separately.
+    facts:
+      - pallet
+
+  - id: q11d
+    band: actionable
+    ask: A piece arrives broken. What happens, and what is needed?
+    expect: Replaced or refunded at the buyer's choice, with a photograph of the
+      packaging as well as the piece.
+    facts:
+      - replaced or refunded
+      - photograph
+
+  - id: q12
+    band: factual
+    ask: Where is the studio and what is parking like?
+    expect: On Kirkstall Road, with street parking.
+    facts:
+      - Kirkstall Road
+      - parking
+
+  # --- Structural -----------------------------------------------------------
+  - id: q13
+    band: structural
+    ask: What is the business called?
+    expect: Northwind Ceramics.
+    facts:
+      - Northwind Ceramics
+
+  - id: q14
+    band: structural
+    ask: Is there an image on the page, and what does it show?
+    expect: The anagama kiln during the spring firing.
+    facts:
+      - anagama kiln
+      - spring firing
+
+  # --- Actionable -----------------------------------------------------------
+  - id: q16
+    band: actionable
+    ask: Someone outside the UK wants to order. Can they?
+    expect: No, shipping is within the UK only.
+    facts:
+      - UK only

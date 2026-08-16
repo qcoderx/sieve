@@ -1,5 +1,5 @@
 {
-  "url": "http://127.0.0.1:63425/adversarial/",
+  "url": "http://127.0.0.1:59046/adversarial/",
   "title": "Northwind Ceramics — Studio pottery",
   "sections": [
     "L0 (introduction)",
@@ -155,12 +155,12 @@
       "text": "Delivery"
     },
     {
-      "key": "main/paragraph/ff68c30b179a",
+      "key": "main/paragraph/d95fe8f9f544",
       "type": "paragraph",
       "region": "main",
       "source": "dom",
       "confidence": "high",
-      "text": "We ship within the UK only. Orders are packed by hand and take a week."
+      "text": "We ship within the UK only. Orders are packed by hand and take a week. Everything travels double-boxed in shredded paper rather than plastic, which is slower to pack and is the reason for the week. Large pieces go by pallet and we will quote for those separately. Breakages in transit are replaced or refunded, whichever the buyer prefers, and we ask for a photograph of the packaging as well as the piece."
     },
     {
       "key": "main/heading/527967442540",

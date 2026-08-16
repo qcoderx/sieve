@@ -101,6 +101,24 @@ type Signals struct {
 	ExternalStylesheets int
 	ComplexHidingRules  int
 
+	// FoldedControls and FoldedChars count the disclosures the served document
+	// ships shut, and how much text they hold.
+	//
+	// This is the one shortfall tier 0 can see coming and can never repair. A
+	// closed <details>, a panel with aria-hidden="true", an unselected tab: the
+	// text is in the bytes, so MarkupChars counts it and no shortfall is
+	// detected, but a reader gets it by pressing something and tier 0 has
+	// nothing to press with. The page then scores as a well-served static
+	// document while a third of what it says stays folded.
+	//
+	// Without this signal the disclosure prober was mostly unreachable in
+	// practice. It only ran on pages that had already escalated for some other
+	// reason, so a small, fast, entirely static page whose pricing sits behind
+	// a tab -- which describes a great many real pages -- was answered from
+	// tier 0 with the pricing missing and no indication anything was.
+	FoldedControls int
+	FoldedChars    int
+
 	// TextRuns and ShortRuns detect split text: markup where an animation
 	// library has shattered a heading into one element per character or per
 	// word so each can be tweened separately.
@@ -310,6 +328,186 @@ func (e *extractor) scanStyles(root *html.Node) {
 	// visibility analysis was partial.
 	e.signals.ExternalStylesheets = countExternalStylesheets(root)
 	e.signals.ComplexHidingRules = e.hiding.complex
+	e.signals.FoldedControls, e.signals.FoldedChars = countFolded(root)
+}
+
+// countFolded measures the text the served document ships behind a shut control.
+//
+// The three shapes here are the same three the render tier will actually press,
+// deliberately: counting a fourth kind would promise a browser something it will
+// not open, and the point of the signal is to predict what escalating would
+// recover. Anything a visitor must assert -- an age gate, a consent banner, a
+// purchase -- is not in this list on either side.
+//
+// A folded region's descendants are not walked again once it has been counted,
+// so an accordion inside a closed tab is charged once rather than twice.
+func countFolded(root *html.Node) (controls, chars int) {
+	// Panels named by a collapsed control, resolved before the walk so a
+	// control that appears after its panel in document order still counts.
+	collapsed := map[string]bool{}
+	var findControls func(*html.Node)
+	findControls = func(n *html.Node) {
+		if n.Type == html.ElementNode && strings.EqualFold(attr(n, "aria-expanded"), "false") {
+			// A control the prober will refuse to press names content that is
+			// never going to be revealed, and counting it argues for a browser
+			// on the strength of a cookie banner. The two lists have to agree
+			// or the signal promises something the tier below it will decline
+			// to do, which on the open web means arguing for a browser on
+			// nearly every page, since a consent control is the single most
+			// common collapsed thing there is.
+			if !refusedLabel(textOfNode(n)) {
+				for _, id := range strings.Fields(attr(n, "aria-controls")) {
+					collapsed[id] = true
+				}
+			}
+		}
+		for c := n.FirstChild; c != nil; c = c.NextSibling {
+			findControls(c)
+		}
+	}
+	findControls(root)
+
+	var walk func(*html.Node)
+	walk = func(n *html.Node) {
+		if n.Type == html.ElementNode {
+			folded := false
+			switch {
+			// A <details> without the open attribute. Presence, not value:
+			// `open` is a boolean attribute, so the markup a page actually
+			// ships for an expanded section is <details open>, whose value is
+			// the empty string and reads as absent to anything comparing.
+			case n.DataAtom == atom.Details && !hasAttr(n, "open"):
+				folded = true
+			// A panel the page has hidden from assistive technology, which is
+			// how an unselected tab is nearly always marked.
+			case strings.EqualFold(attr(n, "aria-hidden"), "true"):
+				folded = true
+			// A region named by a control reporting itself collapsed.
+			case collapsed[attr(n, "id")]:
+				folded = true
+			}
+			if folded {
+				if c := foldedProse(n); c > 0 {
+					controls++
+					chars += c
+				}
+				return
+			}
+		}
+		for c := n.FirstChild; c != nil; c = c.NextSibling {
+			walk(c)
+		}
+	}
+	walk(root)
+	return controls, chars
+}
+
+// minFoldedRegion is the least a single shut region can hold and still count.
+// Roughly two sentences: below that a region is a label, a badge or a menu item,
+// and a browser spent to open it buys nothing.
+const minFoldedRegion = 120
+
+// refuseWords mirrors REFUSE_WORDS in capture.js. The two are separate because
+// one runs in a browser and one runs over served bytes, and they must stay in
+// step: this side decides whether to argue for a browser, that side decides
+// whether to press. Disagreement means spending a browser to be refused.
+var refuseWords = regexp.MustCompile(`(?i)\b(18|21)\+?\b|over\s*(18|21)|of\s+legal\s+age|\bi\s*am\b|i'?m\s+over|accept|agree|consent|cookie|privacy|terms|gdpr|allow\s+all|sign\s*in|sign\s*up|log\s*in|register|subscribe|newsletter|\bbuy\b|purchase|checkout|add\s+to\s+(cart|bag)|\bpay\b|\border\b|donate|delete|remove|submit|\bsend\b|download|install`)
+
+func refusedLabel(s string) bool {
+	return refuseWords.MatchString(s)
+}
+
+// textOfNode returns a node's text, for reading a control's label.
+func textOfNode(n *html.Node) string {
+	var sb strings.Builder
+	var walk func(*html.Node)
+	walk = func(node *html.Node) {
+		if node.Type == html.TextNode {
+			sb.WriteString(node.Data)
+			sb.WriteByte(' ')
+		}
+		for c := node.FirstChild; c != nil; c = c.NextSibling {
+			walk(c)
+		}
+	}
+	walk(n)
+	return sb.String()
+}
+
+// foldedProse returns the text in a shut region, or zero if the region is
+// navigation rather than reading matter.
+//
+// This distinction is the whole difference between a useful signal and one that
+// sends a quarter of the web to a browser. Measured across two hundred sites,
+// counting every shut region escalated 24.7% of them, and the reason was not
+// that a quarter of the web folds its prose away: it was closed dropdown menus,
+// off-screen mobile navigation and decorative panels marked aria-hidden. Those
+// pages have hundreds of "shut controls" holding ten characters each, and
+// opening every one of them buys a second copy of a menu that was already in
+// the artifact.
+//
+// A folded menu is almost entirely link text. A folded specification, FAQ or
+// price list is almost entirely not. That ratio separates them cleanly where a
+// character count cannot: mlb.com folds 3,323 characters across 329 regions and
+// none of it is prose, while a single collapsed pricing panel holds a few
+// hundred characters with no links in it at all.
+func foldedProse(n *html.Node) int {
+	// A <nav> is furniture by declaration, and so is anything with a menu role.
+	if n.DataAtom == atom.Nav {
+		return 0
+	}
+	switch strings.ToLower(attr(n, "role")) {
+	case "navigation", "menu", "menubar", "toolbar":
+		return 0
+	}
+
+	total := markupTextChars(renderNode(n))
+	if total == 0 {
+		return 0
+	}
+	linked := 0
+	var walk func(*html.Node)
+	walk = func(node *html.Node) {
+		if node.Type == html.ElementNode && (node.DataAtom == atom.A || node.DataAtom == atom.Button) {
+			linked += markupTextChars(renderNode(node))
+			return
+		}
+		for c := node.FirstChild; c != nil; c = c.NextSibling {
+			walk(c)
+		}
+	}
+	walk(n)
+
+	// Over half of it being link and button labels means this is something to
+	// navigate with, not something to read.
+	if linked*2 >= total {
+		return 0
+	}
+
+	// And a region has to hold enough to be worth a browser on its own.
+	//
+	// The link ratio catches menus; this catches everything else that folds a
+	// line at a time. On the corpus the two populations barely overlap: pages
+	// that fold reading matter hold between 133 and 7,854 characters per shut
+	// region, and pages whose shut regions are decoration hold 7 to 60. mlb.com
+	// folds 2,039 characters across 287 regions, which is seven characters each
+	// and not a fact among them.
+	if total < minFoldedRegion {
+		return 0
+	}
+	return total
+}
+
+// renderNode serialises a subtree so its text can be counted with the same
+// tag-stripping used for the document as a whole. Counting the two differently
+// is how a shortfall gets compared against a number that was never measuring
+// the same thing.
+func renderNode(n *html.Node) string {
+	var sb strings.Builder
+	if err := html.Render(&sb, n); err != nil {
+		return ""
+	}
+	return sb.String()
 }
 
 func countExternalStylesheets(root *html.Node) int {

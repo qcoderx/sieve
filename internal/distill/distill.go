@@ -1178,7 +1178,24 @@ func (d *Distiller) ensureBrowser(ctx context.Context, warm *warmup) error {
 	if have {
 		return nil
 	}
-	b, err := render.Launch(ctx, d.opts.Render)
+	// Detached from the caller's context for the same reason prewarm is, and it
+	// matters more here because this is the path that usually wins the race.
+	//
+	// A browser launched on the page's context is owned by that page: when the
+	// page's deadline fires or its caller cancels, Chromium goes down with it
+	// while d.browser stays non-nil. Every later page then opens a tab on a
+	// dead context, gets "context canceled", and falls back to the served HTML
+	// -- silently, because falling back to tier 0 is a supported outcome and
+	// looks like a decision rather than a failure.
+	//
+	// One page in isolation never shows this; the first page always works. It
+	// takes a second page on the same Distiller, which is to say `sieve site`
+	// on every page after the first, and the MCP server on every request after
+	// the first. The offline corpus found it by running three fixtures in a row
+	// and getting tier 0 on two of them with scores that had chosen a browser.
+	//
+	// The browser belongs to the Distiller. Close() ends it, and nothing else.
+	b, err := render.Launch(context.WithoutCancel(ctx), d.opts.Render)
 	if err != nil {
 		return err
 	}

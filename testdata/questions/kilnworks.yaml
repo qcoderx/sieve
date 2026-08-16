@@ -1,0 +1,160 @@
+# Question set for the disclosure fixture.
+#
+# Every fact here sits behind something a reader would have to press: a closed
+# <details>, an accordion with aria-expanded="false", an unselected tab, and a
+# "Show more results" button. None of it is in the first paint. A fetch tier
+# scores zero on this page by construction, and a render tier that does not open
+# disclosures scores zero as well -- which is the point of having it.
+#
+#   (cd testdata/pages && python -m http.server 8080) &
+#   sieve distill http://localhost:8080/disclosure/ -allow-private-addresses -out ./artifacts
+#   sieve bench ./artifacts/localhost-8080-disclosure \
+#     --questions testdata/questions/kilnworks.yaml -coverage-only
+#
+# The page also carries four controls sieve must NOT press: an age gate, a cookie
+# banner, an "Add to cart" button, and anything that would submit. Their payloads
+# are marked REFUSED_ and their absence is asserted by name in the render tests.
+# As with the adversarial fixture, a coverage score cannot express "and it did
+# not press the buy button", so that half is not measured here. Reading the score
+# on this page as the whole result would be reading half of it.
+
+name: Kilnworks (disclosure fixture)
+url: http://localhost:8080/disclosure/
+
+questions:
+  # --- Visible without pressing anything ------------------------------------
+  - id: q01
+    band: factual
+    ask: How long has the workshop used this kiln?
+    expect: The same anagama kiln since 1974.
+    facts:
+      - anagama
+      - 1974
+
+  - id: q02
+    band: factual
+    ask: How is the stoneware thrown?
+    expect: On a kick wheel.
+    facts:
+      - kick wheel
+
+  # --- Behind a closed <details> --------------------------------------------
+  - id: q03
+    band: factual
+    ask: How often is the kiln fired?
+    expect: Twice a year.
+    facts:
+      - twice a year
+
+  - id: q04
+    band: factual
+    ask: Which months is the kiln fired in?
+    expect: March and October.
+    facts:
+      - March
+      - October
+
+  # --- Behind an accordion with aria-expanded="false" -----------------------
+  - id: q05
+    band: factual
+    ask: What is the glaze recipe?
+    expect: Feldspar, silica and wood ash in equal parts.
+    facts:
+      - feldspar
+      - silica
+      - wood ash
+
+  - id: q06
+    band: factual
+    ask: In what proportion are the glaze ingredients mixed?
+    expect: Equal parts.
+    facts:
+      - equal parts
+
+  # --- Behind an unselected tab ---------------------------------------------
+  - id: q07
+    band: factual
+    ask: To what cone is the porcelain fired?
+    expect: Cone ten.
+    facts:
+      - porcelain
+      - cone ten
+
+  - id: q11
+    band: factual
+    ask: How long does loading and firing take, and how is the kiln staffed?
+    expect: Three days to load and four to fire, with two people stoking in
+      six-hour shifts through the night.
+    facts:
+      - three days
+      - six-hour shifts
+
+  - id: q12
+    band: factual
+    ask: How long does the kiln cool, and what happens if it is opened early?
+    expect: It is left sealed for a week; opening it early cracks the glaze.
+    facts:
+      - a week
+      - cracks the glaze
+
+  - id: q13
+    band: factual
+    ask: How is the wood ash prepared?
+    expect: Sieved twice, through a kitchen sieve and then eighty mesh, and not
+      washed, which keeps the alkalinity.
+    facts:
+      - eighty mesh
+      - not washed
+
+  - id: q14
+    band: factual
+    ask: Over what range is the glaze reliable?
+    expect: It is unreliable below cone nine and runs above cone eleven.
+    facts:
+      - cone nine
+      - cone eleven
+
+  - id: q15
+    band: factual
+    ask: Why is porcelain priced above stoneware?
+    expect: Losses run to about one piece in five.
+    facts:
+      - one piece in five
+
+  - id: q16
+    band: factual
+    ask: How is porcelain turned, and why?
+    expect: Leather-hard rather than dry, because dry porcelain chips at the foot.
+    facts:
+      - leather-hard
+      - chips at the foot
+
+  # --- Structural -----------------------------------------------------------
+  - id: q08
+    band: structural
+    ask: Which parts of this page are hidden until something is pressed?
+    expect: The firing schedule, the glaze recipe, and the porcelain firing
+      temperature, which sit behind a details element, an accordion and an
+      unselected tab respectively.
+    facts:
+      - firing schedule
+      - glaze recipe
+
+  # --- Actionable -----------------------------------------------------------
+  - id: q09
+    band: actionable
+    ask: Someone wants to visit a firing. When should they plan for?
+    expect: March or October, the two firings each year.
+    facts:
+      - March
+      - October
+
+  - id: q10
+    band: actionable
+    ask: Someone wants to reproduce the glaze. What do they need?
+    expect: Feldspar, silica and wood ash in equal parts.
+    facts:
+      - feldspar
+      - silica
+      - wood ash
+      - equal parts
