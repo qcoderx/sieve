@@ -76,6 +76,28 @@ $ sieve distill https://stripe.com
 
 ---
 
+## The case nothing else can read
+
+igloo.inc serves an empty `<body>` and draws every word as glyph geometry inside
+a three.js scene. Graded against 40 facts read out of the site's own JavaScript
+bundle, three runs each:
+
+| tool | tokens | facts |
+|---|---|---|
+| **sieve** | 1,687 | **40/40** |
+| jina-reader | 17 | 2/40 |
+| webfetch-approx | 2 | 1/40 |
+| firecrawl | 23 | 0/40 |
+
+Firecrawl renders and still returns nothing, because the words are not in the
+document at any point. This is not a multiple. It is an answer against no
+answer, and it is the one thing nothing else in the category does.
+
+Method, the rows where sieve loses, and what was not measured:
+[docs/COMPETITIVE.md](docs/COMPETITIVE.md).
+
+---
+
 ## What it costs to read a page
 
 Measured, not asserted. Reproduce any row in about thirty seconds with
@@ -101,9 +123,81 @@ content page benefits enormously.
 sieve says so and tells you to just fetch it.** A tool that claims to help
 everywhere is not measuring.
 
-The MCP tool definitions cost **~1,737 tokens**, paid once per session rather
-than per page. That number is a test, not an aspiration: it fails the build if
-it grows.
+### What the tools themselves cost
+
+Tool definitions are sent every session, before the model has read anything.
+Teams ration MCP installs over exactly this. Measured over a real session
+against each server:
+
+| server | tools | definitions |
+|---|---|---|
+| **sieve** | 7 | **1,737** |
+| playwright-mcp | 24 | 4,625 |
+| chrome-devtools-mcp | 29 | 5,814 |
+
+sieve's figure is a test, not an aspiration: the build fails if it grows.
+
+---
+
+## A documentation site, in one manifest
+
+Multi-page documentation is the highest-frequency web reading an agent does, and
+doing it a URL at a time is how a context window is spent. The agent does not
+know which of forty pages holds the answer, so it fetches the landing page,
+guesses, fetches another, guesses again — and every fetch is a whole page.
+
+```sh
+sieve site https://kubernetes.io --include docs --max-pages 20
+```
+
+One `site.json` naming every page, its outcome, and what it would cost to open:
+
+| | |
+|---|---|
+| pages read | 5 |
+| content behind them | 125,842 tokens |
+| **the manifest that indexes it** | **353 tokens** |
+
+The point is not compression. It is choosing a page before paying for one.
+
+Same origin, bounded depth and count, obeys `robots.txt`. It is not a crawler:
+it does not wander outward or discover pages nothing links to.
+
+**Boundary worth stating:** Context7 owns *library* documentation and does it
+well. This is for internal docs, product docs, API references, and anything
+outside that index.
+
+---
+
+## The WebFetch hook
+
+The most-reported failure in the whole Claude Code web-tooling category: a fetch
+returns a shell, gives no signal that anything went wrong, and the agent invents
+content to fill the gap. The detection half is already solved and published in
+community hooks. This is the other half.
+
+```json
+{
+  "hooks": {
+    "PostToolUse": [{
+      "matcher": "WebFetch",
+      "hooks": [{"type": "command", "command": "sieve hook", "timeout": 60}]
+    }]
+  }
+}
+```
+
+When WebFetch comes back with a shell, sieve reads the page properly and returns
+the content in the same turn. On igloo.inc that turns *"You need to enable
+JavaScript to run this app"* into 1,280 tokens of the actual site.
+
+It fires **only** when the fetch failed — one string scan on a fetch that worked,
+no process, no browser. It never fails the turn: bad input, a future payload
+shape, a page sieve also cannot read all exit quietly. And when sieve fails too,
+it says so with the evidence rather than letting the silence get filled.
+
+This is the piece that puts sieve into a daily loop without anyone deciding to
+adopt an extraction tool. [docs/HOOK.md](docs/HOOK.md).
 
 ---
 
@@ -311,9 +405,7 @@ structural marking a model reliably treats as data.
 
 ### As a Claude Code hook
 
-`WebFetch` has no JavaScript engine, so on a React or Next.js page it returns the
-pre-render shell: a valid 200 with no content and no signal that anything went
-wrong. This hook notices and reads the page properly, in the same turn.
+See the section above; the configuration is repeated here for convenience.
 
 ```json
 {
@@ -352,11 +444,6 @@ reads) and `index.html`.
 
 Section ids are derived from heading text, so they survive the page changing and
 can be held across calls. Block ids are positional and cannot.
-
-`sieve site` reads a documentation site across pages and writes one `site.json`
-naming every page, its outcome and what it would cost to open. On the Kubernetes
-docs that manifest is **353 tokens indexing 125,842** — the point is to choose a
-page before paying for one. Same origin, bounded, obeys robots.txt.
 
 **[docs/ARTIFACT.md](docs/ARTIFACT.md) is the format contract.** Schema 1.x adds
 fields and never removes or repurposes them, so it is safe to build against.
@@ -406,7 +493,15 @@ tell you whether anything changed. See [docs/CACHING.md](docs/CACHING.md).
   from a 3D scene. A site that renders its words into a texture instead defeats
   it, and `hatom.com` is committed as a deliberately failing test with the
   ruled-out causes written down.
-- **One page at a time.** No multi-page or whole-site mode yet.
+- **Whole-site mode is same-origin and bounded.** `sieve site` reads across the
+  pages of one documentation site. It does not crawl outward, follow
+  cross-origin links, or discover pages that are not linked from where it
+  started.
+- **On an ordinary page the cheap readers are cheaper.** Where the prose is
+  plainly in the HTML, Firecrawl and Jina return it for fewer tokens than sieve
+  does. On pear.no, three runs each: Firecrawl 1,032 tokens for 45 of 45 facts,
+  sieve 1,897 for 43. sieve is for the pages they cannot read, not for every
+  page.
 - **It is sensitive to machine load.** Under heavy contention a large page can
   time out and produce an empty artifact. It is labelled `empty_after_render`
   rather than reported as success, but the content is missing all the same.
