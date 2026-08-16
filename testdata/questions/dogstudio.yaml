@@ -1,0 +1,214 @@
+# Hard band: a studio site whose copy is broken into animated lines.
+#
+# Every sentence on this page is split across elements so each line can be
+# tweened separately -- "Dogstudio is a multidisciplinary", "creative studio at
+# the intersection", "of art, design and technology" are three runs of one
+# sentence -- and every project title appears three times over for a hover
+# transition. A tag-strip of the served bytes returns fifty-four lines of which
+# perhaps twenty are distinct statements.
+#
+# That is the reassembly problem rather than the visibility problem, and it is
+# why the facts below are phrased across the line breaks: a reader that returns
+# the fragments in the right order can answer them, and one that returns them
+# shuffled or deduplicated into a single copy cannot.
+#
+# Two things about this row that a later reader will otherwise trip over.
+#
+# The featured projects rotate. The fetch this set was written from showed
+# Louise's Phone, KIKK, the Kennedy Center and the Royal Opera; a run an hour
+# later also showed Tomorrowland, Navy Pier and MSI Chicago. Facts drawn from
+# the rotating slots are therefore softer than the rest and a future failure
+# here may mean the page changed rather than that sieve did. This is the
+# argument for the offline tier existing at all.
+#
+# The site is also behind a consent interstitial labelled "Accept", which sieve
+# refuses to click because it asks the visitor to say something on their own
+# behalf. The artifact says so and then answers the questions anyway, because
+# the content is in the served bytes behind the overlay. The refusal costs
+# nothing here; it is recorded because on another site it would cost
+# everything, and the artifact saying which is the point.
+#
+# Ground truth read from the served HTML, not from an artifact:
+#
+#   curl -s https://www.dogstudio.co | sed -e 's/<[^>]*>//g'
+#
+#   sieve distill https://www.dogstudio.co -out ./artifacts
+#   sieve bench ./artifacts/www.dogstudio.co \
+#     --questions testdata/questions/dogstudio.yaml -coverage-only
+
+name: Dogstudio
+url: https://www.dogstudio.co
+
+questions:
+  # --- Factual retrieval ----------------------------------------------------
+  - id: q01
+    band: factual
+    ask: What kind of studio is this?
+    expect: A multidisciplinary creative studio at the intersection of art,
+      design and technology.
+    facts:
+      - multidisciplinary
+      - art, design and technology
+
+  - id: q02
+    band: factual
+    ask: What is the studio's stated goal?
+    expect: To deliver amazing experiences that make people talk and build
+      strategic value for brands.
+    facts:
+      - make
+      - strategic value
+
+  - id: q03
+    band: factual
+    ask: Which sectors does the studio name?
+    expect: Brands, tech, entertainment, arts and culture.
+    facts:
+      - entertainment
+      - arts & culture
+
+  - id: q04
+    band: factual
+    ask: Where are the studio's offices?
+    expect: Belgium and Chicago.
+    facts:
+      - Belgium
+      - Chicago
+
+  - id: q05
+    band: factual
+    ask: How does the studio describe itself in the about section?
+    expect: A design and technology firm working globally.
+    facts:
+      - design & technology firm
+      - globally
+
+  - id: q06
+    band: factual
+    ask: What has become the studio's signature?
+    expect: A strong focus on producing high quality and emotional brandings,
+      digital products and experiences.
+    facts:
+      - emotional
+      - digital products
+
+  - id: q07
+    band: factual
+    ask: Name three clients the studio lists.
+    expect: Microsoft, the Museum of Science and Industry of Chicago, and The
+      Kennedy Center.
+    facts:
+      - Microsoft
+      - Museum of Science
+      - Kennedy Center
+
+  - id: q08
+    band: factual
+    ask: What was the Kennedy Center project?
+    expect: Building an immersive website to celebrate the memory of John F.
+      Kennedy.
+    facts:
+      - immersive website
+      - John F. Kennedy
+
+  - id: q09
+    band: factual
+    ask: What was "This Was Louise's Phone" about?
+    expect: A heart-moving immersive experience to educate people about the hell
+      of cyber-bullying.
+    facts:
+      - Louise
+      - cyber-bullying
+
+  - id: q10
+    band: factual
+    ask: What was the KIKK Festival 2018 project?
+    expect: A yearly revamp, the "Species and Beyond" edition.
+    facts:
+      - KIKK
+      - Species and Beyond
+
+  - id: q11
+    band: factual
+    ask: What was the Royal Opera of Wallonia project?
+    expect: Imagining and designing an oniric universe to promote the upcoming
+      season of a renowned Belgian opera house.
+    facts:
+      - oniric
+      - opera house
+
+  - id: q12
+    band: factual
+    ask: What is "Enchanted Waters" about?
+    expect: An immersive and uplifting reflection on Chicago's relationship with
+      Lake Michigan.
+    facts:
+      - Enchanted Waters
+      - Lake Michigan
+
+  - id: q13
+    band: factual
+    ask: What did the studio do for the Museum of Science and Industry of
+      Chicago?
+    expect: Rethinking, redesigning and improving its website.
+    facts:
+      - redesigning
+      - Museum of Science and Industry
+
+  - id: q14
+    band: factual
+    ask: What does the studio say it is crafting, and to what end?
+    expect: Emotional experiences aimed at improving results.
+    facts:
+      - emotional experiences
+      - improving results
+
+  - id: q15
+    band: factual
+    ask: What is the studio's informal tagline?
+    expect: We make good shit.
+    facts:
+      - Good Shit
+
+  - id: q16
+    band: factual
+    ask: What kinds of cookie does the site say it uses?
+    expect: Functional cookies to make the site work and analytical cookies to
+      measure behaviour.
+    facts:
+      - functional cookies
+      - analytical cookies
+
+  # --- Structural -----------------------------------------------------------
+  - id: q17
+    band: structural
+    ask: Which projects are featured?
+    expect: This Was Louise's Phone, KIKK Festival 2018, The Kennedy Center and
+      the Royal Opera of Wallonia.
+    facts:
+      - Featured projects
+      - Royal Opera Of Wallonia
+
+  - id: q18
+    band: structural
+    ask: What media does the page offer at the top?
+    expect: A showreel.
+    facts:
+      - Showreel
+
+  # --- Actionable -----------------------------------------------------------
+  - id: q19
+    band: actionable
+    ask: Someone wants to know what the studio stands for. What does the page
+      offer?
+    expect: A "Discover our values" link.
+    facts:
+      - Discover our values
+
+  - id: q20
+    band: actionable
+    ask: Someone wants to start a conversation with the studio. What does the
+      page say?
+    expect: That they would love to hear from you.
+    facts:
+      - hear from you

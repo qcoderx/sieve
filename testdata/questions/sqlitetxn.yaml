@@ -1,0 +1,196 @@
+# Easy band: a dense reference page, plain HTML, no JavaScript.
+#
+# Chosen because the facts are unusually unforgiving. This page is almost
+# entirely rules with exact conditions attached -- which statement starts which
+# kind of transaction, which upgrade succeeds, what error is returned when it
+# does not -- so a reader that returns the prose in roughly the right shape but
+# drops a clause scores worse here than on an ordinary article. Everyone should
+# still get all of it.
+#
+# Ground truth read from the served HTML, not from an artifact:
+#
+#   curl -s https://www.sqlite.org/lang_transaction.html | sed -e 's/<[^>]*>//g'
+#
+#   sieve distill https://www.sqlite.org/lang_transaction.html -out ./artifacts
+#   sieve bench ./artifacts/www.sqlite.org-lang_transaction.html \
+#     --questions testdata/questions/sqlitetxn.yaml -coverage-only
+
+name: SQLite, BEGIN TRANSACTION
+url: https://www.sqlite.org/lang_transaction.html
+
+questions:
+  # --- Factual retrieval ----------------------------------------------------
+  - id: q01
+    band: factual
+    ask: When do reads and writes occur in SQLite?
+    expect: Only within a transaction.
+    facts:
+      - except within a transaction
+
+  - id: q02
+    band: factual
+    ask: What happens if a command accesses the database with no transaction in
+      effect?
+    expect: A transaction is started automatically, and committed when the last
+      SQL statement finishes.
+    facts:
+      - automatically start a transaction
+      - last SQL statement finishes
+
+  - id: q03
+    band: factual
+    ask: How long does a manually started transaction persist?
+    expect: Usually until the next COMMIT or ROLLBACK.
+    facts:
+      - COMMIT or ROLLBACK
+
+  - id: q04
+    band: factual
+    ask: What else can cause a rollback?
+    expect: The database being closed, or an error where the ROLLBACK conflict
+      resolution algorithm is specified.
+    facts:
+      - database is closed
+      - conflict resolution
+
+  - id: q05
+    band: factual
+    ask: What is END TRANSACTION?
+    expect: An alias for COMMIT.
+    facts:
+      - alias for COMMIT
+
+  - id: q06
+    band: factual
+    ask: Do BEGIN...COMMIT transactions nest?
+    expect: No; for nested transactions you use savepoints.
+    facts:
+      - do not nest
+
+  - id: q07
+    band: factual
+    ask: What happens if BEGIN is invoked inside a transaction?
+    expect: It fails with an error, regardless of how the transaction was
+      started.
+    facts:
+      - will fail with an error
+
+  - id: q08
+    band: factual
+    ask: How many simultaneous read and write transactions does SQLite support?
+    expect: Multiple simultaneous read transactions, but only one simultaneous
+      write transaction.
+    facts:
+      - multiple simultaneous read transactions
+      - one simultaneous write transaction
+
+  - id: q09
+    band: factual
+    ask: What starts a read transaction, and what starts a write transaction?
+    expect: A SELECT starts a read transaction; CREATE, DELETE, DROP, INSERT or
+      UPDATE start a write transaction.
+    facts:
+      - SELECT
+      - CREATE, DELETE, DROP, INSERT, or UPDATE
+
+  - id: q10
+    band: factual
+    ask: What happens when a write statement occurs during a read transaction?
+    expect: The read transaction is upgraded to a write transaction if possible.
+    facts:
+      - upgraded
+
+  - id: q11
+    band: factual
+    ask: When is that upgrade not possible, and what happens then?
+    expect: When another connection has already modified the database or is
+      modifying it; the write statement then fails.
+    facts:
+      - already modified the database
+      - fail
+
+  - id: q12
+    band: factual
+    ask: What does a connection holding a read transaction see if another
+      connection changes the database?
+    expect: Nothing; it continues to see a historic snapshot of the database
+      from before those changes until its transaction ends.
+    facts:
+      - historic snapshot
+
+  - id: q13
+    band: factual
+    ask: What are the three transaction kinds, and which is the default?
+    expect: DEFERRED, IMMEDIATE and EXCLUSIVE; DEFERRED is the default.
+    facts:
+      - DEFERRED, IMMEDIATE, or EXCLUSIVE
+      - default transaction behavior is DEFERRED
+
+  - id: q14
+    band: factual
+    ask: What does DEFERRED mean?
+    expect: The transaction does not actually start until the database is first
+      accessed.
+    facts:
+      - does not actually
+      - first accessed
+
+  - id: q15
+    band: factual
+    ask: What does BEGIN DEFERRED do internally?
+    expect: Sets a flag on the connection that turns off the automatic commit
+      that would normally occur when the last statement finishes.
+    facts:
+      - sets a flag
+      - automatic commit
+
+  - id: q16
+    band: factual
+    ask: What kind of transaction follows BEGIN DEFERRED?
+    expect: A read transaction if the first statement is a SELECT, a write
+      transaction if the first statement is a write statement.
+    facts:
+      - read transaction is started
+      - write transaction is started
+
+  - id: q17
+    band: factual
+    ask: What does IMMEDIATE do?
+    expect: Starts a write transaction immediately, without waiting for a write
+      statement.
+    facts:
+      - immediately
+      - without waiting
+
+  - id: q18
+    band: factual
+    ask: How does EXCLUSIVE differ from IMMEDIATE?
+    expect: They are the same in WAL mode, but in other journaling modes
+      EXCLUSIVE prevents other connections from reading the database while the
+      transaction is underway.
+    facts:
+      - journaling modes
+      - prevents
+
+  # --- Structural -----------------------------------------------------------
+  - id: q19
+    band: structural
+    ask: What are the main sections of this page?
+    expect: Read versus write transactions; DEFERRED, IMMEDIATE and EXCLUSIVE
+      transactions; and implicit versus explicit transactions.
+    facts:
+      - Read transactions versus write transactions
+      - Implicit versus explicit transactions
+
+  # --- Actionable -----------------------------------------------------------
+  - id: q20
+    band: actionable
+    ask: A writer intermittently fails partway through a transaction that began
+      with a SELECT. What does the page suggest is happening, and what would
+      avoid it?
+    expect: The deferred transaction started as a read transaction and could not
+      be upgraded because another connection was writing; beginning with
+      IMMEDIATE takes the write transaction up front.
+    facts:
+      - upgrading to a write transaction is
+      - IMMEDIATE

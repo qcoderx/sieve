@@ -1,0 +1,175 @@
+# Easy band: a specification document, plain HTML, no framework.
+#
+# The facts here are deliberately short phrases. The document sets almost every
+# technical term as inline <code> or wraps it in a link, so its sentences are
+# broken into many small runs in the markup; a fact phrased as a long clause
+# would be testing whether a reader rejoins fragments in exactly the way this
+# one page happens to need, which is a different question from whether it read
+# the page. The reassembly question is asked directly by the dogstudio and
+# locomotive rows instead, where it is the point.
+#
+# Ground truth read from the served HTML, not from an artifact:
+#
+#   curl -s https://jsonapi.org/format/ | sed -e 's/<[^>]*>//g'
+#
+#   sieve distill https://jsonapi.org/format/ -out ./artifacts
+#   sieve bench ./artifacts/jsonapi.org-format \
+#     --questions testdata/questions/jsonapi.yaml -coverage-only
+
+name: JSON:API specification
+url: https://jsonapi.org/format/
+
+questions:
+  # --- Factual retrieval ----------------------------------------------------
+  - id: q01
+    band: factual
+    ask: Which version of JSON:API is this page?
+    expect: Version 1.1, the latest published version.
+    facts:
+      - version 1.1
+
+  - id: q02
+    band: factual
+    ask: What compatibility promise do new versions make?
+    expect: They will always be backwards compatible.
+    facts:
+      - backwards compatible
+
+  - id: q03
+    band: factual
+    ask: What is JSON:API a specification for?
+    expect: How a client should request that resources be fetched or modified,
+      and how a server should respond.
+    facts:
+      - fetched or modified
+      - how a server should respond
+
+  - id: q04
+    band: factual
+    ask: What is JSON:API designed to minimize?
+    expect: Both the number of requests and the amount of data transmitted
+      between clients and servers.
+    facts:
+      - number of requests
+      - amount of data
+
+  - id: q05
+    band: factual
+    ask: What is that efficiency not allowed to cost?
+    expect: Readability, flexibility or discoverability.
+    facts:
+      - readability, flexibility, or discoverability
+
+  - id: q06
+    band: factual
+    ask: When are the key words MUST, SHOULD and MAY to be interpreted as
+      requirement levels?
+    expect: When, and only when, they appear in all capitals.
+    facts:
+      - all capitals
+
+  - id: q07
+    band: factual
+    ask: How many media type parameters does the specification support?
+    expect: Two.
+    facts:
+      - two media type parameters
+
+  - id: q08
+    band: factual
+    ask: What is a media type parameter?
+    expect: An extra piece of information that can accompany a media type.
+    facts:
+      - extra piece of information
+
+  - id: q09
+    band: factual
+    ask: What do extensions do?
+    expect: Provide a means to extend the base specification.
+    facts:
+      - extend
+
+  - id: q10
+    band: factual
+    ask: What can extensions not do?
+    expect: Alter or remove specification semantics.
+    facts:
+      - alter or remove
+
+  - id: q11
+    band: factual
+    ask: What do profiles do?
+    expect: Provide a means to share a particular usage of the specification.
+    facts:
+      - particular usage
+
+  - id: q12
+    band: factual
+    ask: How are extensions and profiles identified?
+    expect: Each is uniquely identified by a URI.
+    facts:
+      - uniquely identified
+
+  - id: q13
+    band: factual
+    ask: What should visiting an extension's or profile's URI return?
+    expect: Documentation that describes its usage.
+    facts:
+      - documentation that describes its usage
+
+  - id: q14
+    band: factual
+    ask: How are multiple extension or profile URIs separated?
+    expect: By spaces.
+    facts:
+      - SPACE
+
+  - id: q15
+    band: factual
+    ask: What does HTTP require of media type parameter values?
+    expect: That they be surrounded by quotation marks.
+    facts:
+      - quotation marks
+
+  - id: q16
+    band: factual
+    ask: Why must an extension define a namespace?
+    expect: To guarantee that extensions will never conflict with current or
+      future versions of the specification.
+    facts:
+      - never
+      - conflict
+
+  - id: q17
+    band: factual
+    ask: How many namespaces may an extension define?
+    expect: No more than one.
+    facts:
+      - more than one namespace
+
+  - id: q18
+    band: factual
+    ask: What are members and rules reserved for implementors called?
+    expect: Implementation semantics, as against specification semantics.
+    facts:
+      - specification semantics
+
+  # --- Structural -----------------------------------------------------------
+  - id: q19
+    band: structural
+    ask: How can additions to the specification be proposed, and errors
+      reported?
+    expect: By opening an issue or pull request on the project's repository.
+    facts:
+      - issue or pull request
+
+  # --- Actionable -----------------------------------------------------------
+  - id: q20
+    band: actionable
+    ask: Someone wants to add a query parameter of their own without breaking
+      forward compatibility. What does the spec require?
+    expect: An extension with its own namespace, used for all its query
+      parameters and document members.
+    facts:
+      - namespace
+      - query parameters and document members

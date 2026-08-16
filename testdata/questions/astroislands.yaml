@@ -1,0 +1,192 @@
+# Medium band: documentation inside a large docs application.
+#
+# The article is real prose; around it sit a sidebar of about forty recipe
+# links, a table of contents, a version switcher and a search box. The
+# interesting measurement here is what fraction of the returned tokens is the
+# document rather than the navigation tree.
+#
+# Ground truth read from the served HTML, not from an artifact:
+#
+#   curl -s https://docs.astro.build/en/concepts/islands/ | sed -e 's/<[^>]*>//g'
+#
+#   sieve distill https://docs.astro.build/en/concepts/islands/ -out ./artifacts
+#   sieve bench ./artifacts/docs.astro.build-en-concepts-islands \
+#     --questions testdata/questions/astroislands.yaml -coverage-only
+
+name: Astro, Islands architecture
+url: https://docs.astro.build/en/concepts/islands/
+
+questions:
+  # --- Factual retrieval ----------------------------------------------------
+  - id: q01
+    band: factual
+    ask: How does islands architecture work?
+    expect: The majority of the page renders to fast static HTML, with smaller
+      islands of JavaScript added where interactivity is needed.
+    facts:
+      - static HTML
+      - islands
+
+  - id: q02
+    band: factual
+    ask: Who coined the term "component island" and when?
+    expect: Etsy's frontend architect, in 2019.
+    facts:
+      - Etsy
+      - 2019
+
+  - id: q03
+    band: factual
+    ask: Who expanded and documented the idea, and when?
+    expect: Jason Miller, creator of Preact, on 11 August 2020.
+    facts:
+      - Jason Miller
+      - Preact
+      - August 11, 2020
+
+  - id: q04
+    band: factual
+    ask: How does Jason Miller describe the general idea?
+    expect: Render HTML pages on the server, and inject placeholders or slots
+      around highly dynamic regions.
+    facts:
+      - render HTML pages on the server
+      - placeholders
+
+  - id: q05
+    band: factual
+    ask: What do most JavaScript frameworks do instead?
+    expect: Hydrate and render an entire website as one large JavaScript
+      application, also known as a single-page application.
+    facts:
+      - one large JavaScript application
+
+  - id: q06
+    band: factual
+    ask: What do SPAs lack?
+    expect: The native ability to selectively and strategically hydrate, which
+      makes them heavy-handed for most projects.
+    facts:
+      - selectively
+      - heavy-handed
+
+  - id: q07
+    band: factual
+    ask: What was Astro first to do?
+    expect: It was the first mainstream JavaScript web framework with selective
+      hydration built in.
+    facts:
+      - first mainstream
+      - selective hydration
+
+  - id: q08
+    band: factual
+    ask: What is an island in Astro?
+    expect: An enhanced UI component on an otherwise static page of HTML.
+    facts:
+      - enhanced UI component
+      - otherwise static page
+
+  - id: q09
+    band: factual
+    ask: What is a client island?
+    expect: An interactive JavaScript UI component hydrated separately from the
+      rest of the page.
+    facts:
+      - hydrated separately
+
+  - id: q10
+    band: factual
+    ask: What is a server island?
+    expect: A UI component that server-renders its dynamic content separately
+      from the rest of the page.
+    facts:
+      - server-renders its dynamic content
+
+  - id: q11
+    band: factual
+    ask: What do Astro components render to?
+    expect: Static HTML with no client-side runtime.
+    facts:
+      - no client-side runtime
+
+  - id: q12
+    band: factual
+    ask: How do islands relate to each other?
+    expect: An island always runs in isolation from other islands, and multiple
+      islands can exist on a page.
+    facts:
+      - in isolation
+
+  - id: q13
+    band: factual
+    ask: Can several UI frameworks be mixed on one page?
+    expect: Yes; because islands are independent, several frameworks can be
+      mixed on each page.
+    facts:
+      - mix several frameworks
+
+  - id: q14
+    band: factual
+    ask: What reasons does the page give for supporting multiple frameworks?
+    expect: Choosing the best framework per component, learning a new framework
+      without a new project, collaborating across frameworks, and incrementally
+      converting a site with no downtime.
+    facts:
+      - best for each component
+      - no downtime
+
+  - id: q15
+    band: factual
+    ask: What does Astro do to UI components by default?
+    expect: Renders every UI component to just HTML and CSS, stripping out all
+      client-side JavaScript automatically.
+    facts:
+      - HTML & CSS
+      - stripping out all client-side JavaScript
+
+  - id: q16
+    band: factual
+    ask: Why is that default described as worthwhile?
+    expect: It keeps Astro websites fast by default and protects developers from
+      accidentally sending unnecessary JavaScript.
+    facts:
+      - fast by default
+
+  - id: q17
+    band: factual
+    ask: What is needed to make a static component interactive?
+    expect: Only a client directive; Astro then builds and bundles the
+      client-side JavaScript.
+    facts:
+      - directive
+      - bundles
+
+  - id: q18
+    band: factual
+    ask: Why do both kinds of island improve page loads?
+    expect: They run expensive or slower processes independently, on a
+      per-component basis.
+    facts:
+      - per-component basis
+
+  # --- Structural -----------------------------------------------------------
+  - id: q19
+    band: structural
+    ask: What is this page about, and what pattern does it name?
+    expect: Islands architecture, a frontend architecture pattern Astro helped
+      pioneer and popularise.
+    facts:
+      - pioneer
+      - architecture pattern
+
+  # --- Actionable -----------------------------------------------------------
+  - id: q20
+    band: actionable
+    ask: A team wants to move an existing site to a different framework without
+      a rewrite. Does this page suggest that is possible?
+    expect: Yes; islands allow incrementally converting an existing site to
+      another framework with no downtime.
+    facts:
+      - Incrementally convert
+      - no downtime
