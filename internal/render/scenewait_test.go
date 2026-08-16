@@ -5,52 +5,67 @@ import (
 	"time"
 )
 
-// TestSceneWaitOutlastsARemoteScene guards a constant that was tuned against
-// the wrong thing.
+// TestSceneWalkPatienceHoldsTogether guards four constants whose relationships
+// are not visible from any one of them.
 //
-// The scene walk originally read once. A page whose words are glyph geometry
-// looks perfectly still to the sweep's settle loop -- nothing in the document
-// changes, ever -- so the loop declares the page settled and the walk can
-// arrive before three.js has built a single text object. Losing that race was
-// permanent, because there was no second look.
+// The scene walk read once, and that was wrong in two different ways, both
+// silent. On roughly one run in four igloo.inc had not registered its scene
+// when the walk arrived, and the artifact reported an empty site. On another
+// run the scene existed but was still filling, and the walk took 23 of its 29
+// text objects six milliseconds in and reported them as the whole page.
 //
-// The first fix retried three times at 250ms, which was enough for a fixture
-// served from localhost and demonstrably not enough for the real thing:
-// igloo.inc returned zero blocks on two runs in five with that budget, and
-// igloo.inc is the case the entire project is named for. Six seconds took it to
-// six runs out of six, with 40 of 40 ground-truth facts each time.
+// The partial read is the worse failure and the reason a simple "wait until
+// non-empty" fix was not enough. An empty artifact is obviously wrong and gets
+// investigated. An artifact missing a fifth of a site reads exactly like a
+// complete one, and the only thing that would have caught it is a question set
+// asking about the missing fifth.
 //
-// Two relationships have to hold, and neither is obvious from reading either
-// constant on its own:
+// What has to hold:
 //
-//   - the walk's context must outlast the wait, or the deadline check inside
-//     the loop cuts it short and the wait is decorative;
-//   - the wait must be long enough for a page loading over a network rather
-//     than from a local file server.
-//
-// If a future change shortens either one, the symptom is not a test failure
-// anywhere near here. It is igloo.inc intermittently reporting an empty site.
-func TestSceneWaitOutlastsARemoteScene(t *testing.T) {
-	if sceneFloor <= sceneEmptyWait {
-		t.Errorf("sceneFloor is %v and sceneEmptyWait is %v.\n"+
-			"The context handed to the walk must outlast the wait the walk performs, "+
+//   - the context given to the walk must outlast the walk's own budget, or the
+//     deadline check ends it early and the patience is decorative;
+//   - waiting for a scene to appear must be shorter than waiting for one to
+//     settle, because the first is spent on pages that turn out to have no
+//     scene at all and the second only on pages that certainly do;
+//   - a beat fine enough that several readings fit inside the budget, since
+//     agreement across readings is the whole completion signal;
+//   - at least two readings must agree, because one reading is what produced
+//     the partial read.
+func TestSceneWalkPatienceHoldsTogether(t *testing.T) {
+	if sceneFloor <= sceneSettleWait {
+		t.Errorf("sceneFloor is %v and sceneSettleWait is %v.\n"+
+			"The context handed to the walk must outlast the budget the walk spends, "+
 			"or the deadline check ends the loop early and the extra patience buys "+
-			"nothing. Raise sceneFloor above sceneEmptyWait.",
-			sceneFloor, sceneEmptyWait)
+			"nothing.", sceneFloor, sceneSettleWait)
+	}
+
+	if sceneAnnounceWait >= sceneSettleWait {
+		t.Errorf("sceneAnnounceWait is %v against a settle budget of %v.\n"+
+			"Waiting for a scene to appear is spent on pages that may have none; "+
+			"waiting for one to settle is spent only on pages that certainly do. "+
+			"The speculative wait should be the shorter of the two.",
+			sceneAnnounceWait, sceneSettleWait)
 	}
 
 	// Measured, not chosen: three quarters of a second was the budget that let
-	// igloo.inc fail outright two runs in five.
+	// igloo.inc fail outright on two runs in five.
 	const observedTooShort = 750 * time.Millisecond
-	if sceneEmptyWait <= observedTooShort {
-		t.Errorf("sceneEmptyWait is %v, which is at or below the %v that was measured "+
-			"failing on igloo.inc two runs in five", sceneEmptyWait, observedTooShort)
+	if sceneSettleWait <= observedTooShort {
+		t.Errorf("sceneSettleWait is %v, at or below the %v measured failing on "+
+			"igloo.inc two runs in five", sceneSettleWait, observedTooShort)
 	}
 
-	// A beat short enough that the wait is a poll rather than one long sleep,
-	// so a scene that fills early is picked up promptly.
-	if sceneRetryWait <= 0 || sceneRetryWait > sceneEmptyWait/8 {
-		t.Errorf("sceneRetryWait is %v against a %v budget: too coarse to notice a "+
-			"scene that filled early", sceneRetryWait, sceneEmptyWait)
+	if sceneStableReads < 2 {
+		t.Errorf("sceneStableReads is %d.\nOne reading is exactly what produced the "+
+			"partial read: the scene was six milliseconds old and still filling, and "+
+			"the first answer was taken as the last.", sceneStableReads)
+	}
+
+	// Enough beats inside the budget that "the count stopped moving" is a real
+	// observation rather than two samples of the same instant.
+	if beats := int(sceneSettleWait / sceneRetryWait); beats < 4*sceneStableReads {
+		t.Errorf("a %v budget at %v per beat is %d readings, too few to establish "+
+			"that a scene stopped growing when %d must agree",
+			sceneSettleWait, sceneRetryWait, beats, sceneStableReads)
 	}
 }

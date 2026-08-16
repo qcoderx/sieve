@@ -44,9 +44,16 @@ Ctrl+L
 # --- What sieve sees ---------------------------------------------------------
 Type "sieve distill https://igloo.inc"
 Enter
-Sleep 15000ms
 
-Type "# 23 blocks, read out of the 3D scene. 40 of 40 ground-truth facts."
+# Wait for the run to finish rather than guessing at it. A fixed sleep is
+# wrong in both directions here: igloo.inc takes anywhere from fifteen to
+# thirty-five seconds depending on how long its scene takes to build and how
+# patiently the sweep waits for text that is never coming, so a short sleep
+# clips the output and a long one records dead air. The regexp matches the
+# last line the command prints.
+Wait+Screen@60s /total/
+
+Type "# 29 blocks, read out of the 3D scene. 40 of 40 ground-truth facts."
 Enter
 Sleep 2000ms
 

@@ -32,6 +32,17 @@ answer, and it is the one thing nothing else in the category does.
 A cost-per-fact column is meaningless here and is left out on purpose: two
 tokens for one accidental fact is not efficiency.
 
+Measured 14 August 2026. igloo.inc has been rebuilt since: sieve now returns 29
+text objects for 1,261 tokens rather than 23 for 1,687, and coverage is
+unchanged at 40 of 40. The competitor figures are left at their measured date
+rather than mixed with a fresh one, because a table with one row from today and
+three from a fortnight ago is worse than a table that says when it was taken.
+
+That the coverage held at 40 of 40 across a redesign, while the token count
+moved by a quarter, is the more useful of the two observations. The facts were
+written from the site's own bundle and are about the studio rather than about
+its markup, so they survived the markup changing.
+
 ---
 
 ## Hidden text cannot reach the model

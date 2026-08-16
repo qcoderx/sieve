@@ -850,76 +850,115 @@ func sceneCtx(tabCtx, postCtx context.Context) context.Context {
 	return ctx
 }
 
-// sceneEmptyRetries and sceneRetryWait bound the wait for a scene that exists
-// but has not been filled yet.
+// The scene walk's patience, in three parts. All of it is spent only on a page
+// that draws and has a 3D scene, and none of it on the rest of the web.
 //
-// A hook with an empty scene is not the same answer as no hook, and reading it
-// once treated them identically. The sweep's own settle loop watches DOM text,
-// so a page whose words are glyph geometry looks perfectly still from the
-// moment it loads: nothing in the document changes, the loop declares the page
-// settled, and the scene is walked before three.js has built a single text
-// object. Sometimes the scene wins that race and sometimes it does not, which
-// is how the fixture that exists for exactly this case returned 39 of 45 facts
-// on five runs out of six and 30 on the other.
-//
-// Three attempts at 250ms is under a second in the worst case, and only on a
-// page that has a 3D hook and nothing in it yet. A page with no hook at all
-// returns on the first read and pays nothing.
+// Reading the scene once was wrong twice over, and both failures were silent.
+// On roughly one run in four igloo.inc had not registered its scene when the
+// walk arrived, and the artifact said the site was empty. On another run the
+// scene existed but was still filling, and the walk took 23 of 29 text objects
+// six milliseconds in and reported them as the whole page. A partial read is
+// the worse of the two: an empty artifact is obviously wrong, and an artifact
+// missing a fifth of a site reads exactly like a complete one.
 const (
-	// sceneEmptyWait is how long a scene that is present and empty is given to
-	// fill. It is deliberately generous: the page has told us, through the
-	// three.js devtools hook, that a scene exists, and an empty one means the
-	// page is still assembling it.
-	//
-	// Nothing else waits this long, and nothing else needs to. A page with no
-	// scene never enters the loop; a page whose scene is built leaves on the
-	// first read whether or not it has words in it. Only a page mid-assembly
-	// pays, and the alternative for that page is an artifact that says the site
-	// is empty.
-	sceneEmptyWait = 6 * time.Second
+	// sceneAnnounceWait is how long a page that draws is given to register a
+	// scene at all. A page with no canvas never waits.
+	sceneAnnounceWait = 3 * time.Second
+
+	// sceneSettleWait bounds the whole walk once a scene has appeared.
+	sceneSettleWait = 6 * time.Second
+
+	// sceneStableReads is how many consecutive readings must agree before the
+	// scene is taken as finished. three.js has no completion event and a page
+	// may add to its scene whenever it likes, so agreement across two readings
+	// a beat apart is the cheapest evidence available that it has stopped.
+	sceneStableReads = 2
+
 	sceneRetryWait = 250 * time.Millisecond
 )
 
 func (b *Browser) introspectScene(ctx context.Context, res *Result) {
 	started := time.Now()
+
+	// Whether it is worth waiting for a scene that has not announced itself.
+	//
+	// The hook is installed on every page before any script runs, so asking for
+	// a scene always succeeds; it answers null until three.js registers one. A
+	// page with no 3D is therefore indistinguishable from a page whose 3D has
+	// not loaded yet, and the only cheap thing that separates them is whether
+	// the page draws at all. Pages with no canvas leave immediately and pay
+	// nothing, which is nearly all of them.
+	draws := res.Merged != nil && len(res.Merged.Canvases) > 0
+
+	var best *capture.SceneIntrospection
+	bestN, stable := 0, 0
+
 	for {
 		var raw string
 		if err := chromedp.Run(ctx, chromedp.Evaluate(`window.__sieve.scene()`, &raw)); err != nil {
-			return
-		}
-		// No hook on this page. There is nothing to wait for.
-		if raw == "" || raw == "null" {
-			return
-		}
-		var sc capture.SceneIntrospection
-		if err := json.Unmarshal([]byte(raw), &sc); err != nil {
-			return
-		}
-		if len(sc.Names) > 0 || len(sc.Texts) > 0 || len(sc.Runs) > 0 {
-			res.Scene = &sc
-			return
+			break
 		}
 
-		// A scene that is present and empty. Seeing nothing is a reason to wait,
-		// not to conclude -- the same rule the settle loop follows, for the same
-		// reason, and this is the one place the settle loop cannot apply it
-		// because it has no view of the scene graph at all.
-		//
-		// Bounded by elapsed time rather than a number of attempts, because what
-		// matters is how long the page has had, not how many times it has been
-		// asked. A fixed count tuned against a fixture on localhost was three
-		// quarters of a second, and igloo.inc over the network needs several.
-		if time.Since(started) >= sceneEmptyWait {
-			return
+		var sc capture.SceneIntrospection
+		n := 0
+		if raw != "" && raw != "null" {
+			if err := json.Unmarshal([]byte(raw), &sc); err != nil {
+				break
+			}
+			n = len(sc.Names) + len(sc.Texts) + len(sc.Runs)
+		}
+
+		switch {
+		case n == 0:
+			// Nothing registered yet. On a page that draws, this is the scene
+			// not having loaded rather than there being no scene: igloo.inc
+			// answered null outright on roughly one run in four, and the walk
+			// returned an empty artifact for a site that is entirely 3D text.
+			if !draws || time.Since(started) >= sceneAnnounceWait {
+				return
+			}
+		case n > bestN:
+			// Still filling. Taking the first non-empty answer is what made the
+			// reads partial: one run returned 23 of igloo.inc's 29 text objects
+			// six milliseconds after the scene appeared, and nothing anywhere
+			// said the other six were missing. A scene under construction is
+			// not a short scene.
+			cp := sc
+			best, bestN, stable = &cp, n, 0
+		default:
+			// The count has stopped moving. Two readings agreeing is the
+			// cheapest evidence available that the page has finished; there is
+			// no completion event to wait for, because three.js does not have
+			// one and a page can add to its scene at any time.
+			stable++
+			if stable >= sceneStableReads {
+				res.Scene = best
+				return
+			}
+		}
+
+		if time.Since(started) >= sceneSettleWait {
+			break
 		}
 		if dl, ok := ctx.Deadline(); ok && time.Until(dl) <= sceneRetryWait {
-			return
+			break
 		}
+		// A bare break inside a select leaves the select, not the loop, which
+		// here would mean spinning on a cancelled context until the deadline.
 		select {
 		case <-ctx.Done():
+			if bestN > 0 {
+				res.Scene = best
+			}
 			return
 		case <-time.After(sceneRetryWait):
 		}
+	}
+
+	// Out of time. Whatever was read is better than nothing, and the artifact
+	// records the tier that produced it either way.
+	if bestN > 0 {
+		res.Scene = best
 	}
 }
 

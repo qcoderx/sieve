@@ -2,6 +2,12 @@
 
 **Browser-grade page reading that does not eat your context window.**
 
+![sieve reading igloo.inc, a page that strips to fourteen characters of text](docs/demo.gif)
+
+`igloo.inc` serves an empty `<body>` and draws every word as glyph geometry
+inside a three.js scene. Stripped of markup it is fourteen characters long.
+sieve returns the site. Regenerate this with `vhs docs/demo.tape`.
+
 ---
 
 ## Two bets
@@ -92,6 +98,12 @@ bundle, three runs each:
 Firecrawl renders and still returns nothing, because the words are not in the
 document at any point. This is not a multiple. It is an answer against no
 answer, and it is the one thing nothing else in the category does.
+
+Measured 14 August 2026. igloo.inc has been rebuilt since: sieve now returns 29
+text objects for 1,261 tokens rather than 23 for 1,687, and coverage is
+unchanged at 40 of 40. The competitor figures are left at their measured date
+rather than mixed with a fresh one, because a table with one row from today and
+three from a fortnight ago is worse than a table that says when it was taken.
 
 Method, the rows where sieve loses, and what was not measured:
 [docs/COMPETITIVE.md](docs/COMPETITIVE.md).
