@@ -1,0 +1,193 @@
+# Medium band: a long documentation page on a heavy application shell.
+#
+# The document is real prose and the site around it is a large single-page
+# application with its own navigation, a sidebar table of contents, and several
+# collapsible regions. That combination is the ordinary case for documentation
+# in 2026, which is why it is in the corpus: sieve should win here on margin,
+# by carrying the article and not the shell, rather than categorically.
+#
+# Ground truth read from the served HTML, not from an artifact:
+#
+#   curl -s https://developer.mozilla.org/en-US/docs/Web/HTTP/Guides/Caching \
+#     | sed -e 's/<[^>]*>//g'
+#
+#   sieve distill https://developer.mozilla.org/en-US/docs/Web/HTTP/Guides/Caching -out ./artifacts
+#   sieve bench ./artifacts/developer.mozilla.org-en-US-docs-Web-HTTP-Guides-Caching \
+#     --questions testdata/questions/httpcaching.yaml -coverage-only
+
+name: MDN, HTTP Caching
+url: https://developer.mozilla.org/en-US/docs/Web/HTTP/Guides/Caching
+
+questions:
+  # --- Factual retrieval ----------------------------------------------------
+  - id: q01
+    band: factual
+    ask: What does the HTTP cache do?
+    expect: Stores a response associated with a request and reuses the stored
+      response for subsequent requests.
+    facts:
+      - stores a response associated with a request
+      - reuses
+
+  - id: q02
+    band: factual
+    ask: What are the two main types of cache in the spec?
+    expect: Private caches and shared caches.
+    facts:
+      - private cache
+      - shared cache
+
+  - id: q03
+    band: factual
+    ask: What is a private cache?
+    expect: A cache tied to a specific client, typically a browser cache, whose
+      stored response is not shared with other clients.
+    facts:
+      - tied to a specific client
+      - browser cache
+
+  - id: q04
+    band: factual
+    ask: Where does a shared cache sit?
+    expect: Between the client and the server, storing responses that can be
+      shared among users.
+    facts:
+      - between the client and the server
+      - shared among users
+
+  - id: q05
+    band: factual
+    ask: What must you specify to keep personalized content out of shared caches?
+    expect: The private directive.
+    facts:
+      - private
+
+  - id: q06
+    band: factual
+    ask: Are cookies a reliable signal that a response is private?
+    expect: No; the presence of a cookie does not always indicate that it is
+      private.
+    facts:
+      - does not always indicate
+
+  - id: q07
+    band: factual
+    ask: What decides whether a response is fresh or stale?
+    expect: Its age, which in HTTP is the time elapsed since the response was
+      generated.
+    facts:
+      - time elapsed since the response was generated
+
+  - id: q08
+    band: factual
+    ask: How long is max-age=604800?
+    expect: One week.
+    facts:
+      - 604800
+      - one week
+
+  - id: q09
+    band: factual
+    ask: How was freshness specified in HTTP/1.0?
+    expect: By the Expires header.
+    facts:
+      - HTTP/1.0
+
+  - id: q10
+    band: factual
+    ask: What happens to stale responses?
+    expect: They are not immediately discarded; HTTP can turn a stale response
+      back into a fresh one by asking the origin server, which is called
+      validation.
+    facts:
+      - not immediately discarded
+      - validation
+
+  - id: q11
+    band: factual
+    ask: What is the effect of a successful revalidation?
+    expect: The client reverts the stored stale response back to being fresh and
+      can reuse it.
+    facts:
+      - back to being fresh
+
+  - id: q12
+    band: factual
+    ask: What does "max-age=0, must-revalidate" mean?
+    expect: The response is immediately stale, and must not be reused without
+      revalidation once stale.
+    facts:
+      - immediately stale
+      - without revalidation
+
+  - id: q13
+    band: factual
+    ask: What is max-age=31536000, and what is it usually paired with?
+    expect: One year, usually paired with immutable to prevent unnecessary
+      revalidation during reloads.
+    facts:
+      - 31536000
+      - immutable
+      - unnecessary revalidation
+
+  - id: q14
+    band: factual
+    ask: What does no-cache actually mean?
+    expect: Not "don't cache", but that the response is stored and revalidated
+      before reuse.
+    facts:
+      - no-cache
+
+  - id: q15
+    band: factual
+    ask: What is heuristic caching, and how do you avoid it?
+    expect: Implicit caching applied when no explicit directives are given;
+      avoided by giving all responses a default Cache-Control header.
+    facts:
+      - heuristic caching
+      - explicitly
+
+  - id: q16
+    band: factual
+    ask: What heuristic does the page describe for content not updated for a
+      year?
+    expect: Content not updated for a full year is assumed not to be updated for
+      some time after that.
+    facts:
+      - full year
+
+  - id: q17
+    band: factual
+    ask: Why does the page say cache operation matters?
+    expect: Proper operation of the cache is critical to the health of the
+      system.
+    facts:
+      - critical to the health of the system
+
+  - id: q18
+    band: factual
+    ask: What are managed caches for?
+    expect: Explicitly deployed by service developers to offload the origin
+      server and deliver content efficiently.
+    facts:
+      - offload the origin server
+
+  # --- Structural -----------------------------------------------------------
+  - id: q19
+    band: structural
+    ask: What kinds of cache does the page distinguish beyond private and
+      shared?
+    expect: Proxy caches and managed caches, as the two kinds of shared cache.
+    facts:
+      - proxy cache
+      - managed cache
+
+  # --- Actionable -----------------------------------------------------------
+  - id: q20
+    band: actionable
+    ask: Someone serves a hashed asset filename that never changes. What should
+      they send?
+    expect: A long max-age, for example 31536000, with immutable.
+    facts:
+      - 31536000
+      - immutable

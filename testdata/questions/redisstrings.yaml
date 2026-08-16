@@ -1,0 +1,187 @@
+# Medium band: a documentation page whose examples sit behind language tabs.
+#
+# The prose is served, so a fetch tier gets the concepts. What it does not get
+# is anything in a tab that is not the selected one, and this page has a tab per
+# client library. It is the shape of most modern documentation and it is where
+# the disclosure prober is supposed to earn its cost.
+#
+# The facts below are drawn from the prose and the command summary rather than
+# from the code samples. Sample code makes poor ground truth: it is mostly
+# identifiers that appear in every language's version of the same example, so a
+# reader that got none of it and a reader that got all of it can score the same.
+#
+# Ground truth read from the served HTML, not from an artifact:
+#
+#   curl -s https://redis.io/docs/latest/develop/data-types/strings/ \
+#     | sed -e 's/<[^>]*>//g'
+#
+#   sieve distill https://redis.io/docs/latest/develop/data-types/strings/ -out ./artifacts
+#   sieve bench ./artifacts/redis.io-docs-latest-develop-data-types-strings \
+#     --questions testdata/questions/redisstrings.yaml -coverage-only
+
+name: Redis strings
+url: https://redis.io/docs/latest/develop/data-types/strings/
+
+questions:
+  # --- Factual retrieval ----------------------------------------------------
+  - id: q01
+    band: factual
+    ask: What do Redis strings store?
+    expect: Sequences of bytes, including text, serialized objects and binary
+      arrays.
+    facts:
+      - sequences of bytes
+      - serialized objects
+      - binary arrays
+
+  - id: q02
+    band: factual
+    ask: Where do strings sit among Redis value types?
+    expect: They are the simplest type of value you can associate with a key.
+    facts:
+      - simplest type of value
+
+  - id: q03
+    band: factual
+    ask: What are strings often used for, and what else do they support?
+    expect: Often caching, and they also support counters and bitwise
+      operations.
+    facts:
+      - caching
+      - counters
+      - bitwise operations
+
+  - id: q04
+    band: factual
+    ask: How large can a single Redis string be?
+    expect: A maximum of 512 MB by default.
+    facts:
+      - 512 MB
+
+  - id: q05
+    band: factual
+    ask: What is the time complexity of most string operations?
+    expect: O(1).
+    facts:
+      - O(1)
+
+  - id: q06
+    band: factual
+    ask: What does APPEND do?
+    expect: Appends a string to the value of a key, creating the key if it does
+      not exist.
+    facts:
+      - Appends a string to the value of a key
+
+  - id: q07
+    band: factual
+    ask: What does INCR do, and what happens if the key does not exist?
+    expect: Increments the integer value of a key by one, using 0 as the initial
+      value if the key does not exist.
+    facts:
+      - Increments the integer value of a key by one
+      - 0 as initial value
+
+  - id: q08
+    band: factual
+    ask: What does INCRBY do?
+    expect: Increments the integer value of a key by a number.
+    facts:
+      - Increments the integer value of a key by a number
+
+  - id: q09
+    band: factual
+    ask: What does GETRANGE return?
+    expect: A substring of the string stored at a key.
+    facts:
+      - substring of the string stored at a key
+
+  - id: q10
+    band: factual
+    ask: What does MGET do?
+    expect: Atomically returns the string values of one or more keys.
+    facts:
+      - Atomically returns the string values
+
+  - id: q11
+    band: factual
+    ask: What does GETDEL do?
+    expect: Returns the string value of a key after deleting the key.
+    facts:
+      - after deleting the key
+
+  - id: q12
+    band: factual
+    ask: What is the complexity of MGET?
+    expect: O(N) where N is the number of keys to retrieve.
+    facts:
+      - number of keys to retrieve
+
+  - id: q13
+    band: factual
+    ask: Why is INCR safe with multiple clients?
+    expect: Concurrent INCR calls never enter a race condition; the
+      read-increment-set operation runs while no other client is executing a
+      command.
+    facts:
+      - race condition
+      - read-increment-set
+
+  - id: q14
+    band: factual
+    ask: What example does the page give of the race that cannot happen?
+    expect: Two clients both reading 10, both incrementing to 11; the final
+      value is always 12.
+    facts:
+      - always
+      - 12
+
+  - id: q15
+    band: factual
+    ask: Where should you look for bitwise operations and integer fields inside
+      a string?
+    expect: The bitmaps and bitfields data type documentation.
+    facts:
+      - bitfields
+
+  - id: q16
+    band: factual
+    ask: What use case does the page name for mapping a string to a string?
+    expect: Caching HTML fragments or pages.
+    facts:
+      - caching HTML fragments
+
+  # --- Structural -----------------------------------------------------------
+  - id: q17
+    band: structural
+    ask: How many commands does the string command summary cover?
+    expect: 26.
+    facts:
+      - 26 commands
+
+  - id: q18
+    band: structural
+    ask: What are the named sections of this page?
+    expect: An introduction, a string command summary, strings as counters, and
+      bitwise and bitfield operations.
+    facts:
+      - String command summary
+      - Strings as counters
+      - Bitwise and bitfield operations
+
+  # --- Actionable -----------------------------------------------------------
+  - id: q19
+    band: actionable
+    ask: Someone needs a thread-safe page-view counter. Which commands does the
+      page point to?
+    expect: INCR and INCRBY, which are atomic and initialise to 0.
+    facts:
+      - INCR
+      - INCRBY
+
+  - id: q20
+    band: actionable
+    ask: Someone wants to store a 700 MB video in a single string value. Can they?
+    expect: No; a single string can be at most 512 MB.
+    facts:
+      - 512 MB

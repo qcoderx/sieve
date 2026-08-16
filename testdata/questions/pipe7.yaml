@@ -1,0 +1,177 @@
+# Easy band: a manual page, which is about as plain as the web gets.
+#
+# No JavaScript, no framework, no layout to speak of. Every reader should get
+# all of this, and the row exists to show that sieve does too. The only column
+# worth arguing about here is cost, and on a page like this the cheap readers
+# are cheaper.
+#
+# Ground truth read from the served HTML, not from an artifact:
+#
+#   curl -s https://man7.org/linux/man-pages/man7/pipe.7.html | sed -e 's/<[^>]*>//g'
+#
+#   sieve distill https://man7.org/linux/man-pages/man7/pipe.7.html -out ./artifacts
+#   sieve bench ./artifacts/man7.org-linux-man-pages-man7-pipe.7.html \
+#     --questions testdata/questions/pipe7.yaml -coverage-only
+
+name: pipe(7), Linux manual page
+url: https://man7.org/linux/man-pages/man7/pipe.7.html
+
+questions:
+  # --- Factual retrieval ----------------------------------------------------
+  - id: q01
+    band: factual
+    ask: What do pipes and FIFOs provide?
+    expect: A unidirectional interprocess communication channel.
+    facts:
+      - unidirectional
+      - interprocess communication
+
+  - id: q02
+    band: factual
+    ask: What does the pipe call return?
+    expect: Two file descriptors, one for the read end and one for the write end.
+    facts:
+      - two file descriptors
+      - read end
+      - write end
+
+  - id: q03
+    band: factual
+    ask: What does FIFO stand for?
+    expect: First In First Out.
+    facts:
+      - First In First Out
+
+  - id: q04
+    band: factual
+    ask: What is the only difference between pipes and FIFOs?
+    expect: The manner in which they are created and opened; after that, I/O is
+      exactly the same.
+    facts:
+      - created and opened
+      - exactly the same
+
+  - id: q05
+    band: factual
+    ask: Who may open a FIFO?
+    expect: Any process, assuming file permissions allow it.
+    facts:
+      - Any process
+
+  - id: q06
+    band: factual
+    ask: What happens when a process reads from an empty pipe?
+    expect: It blocks until data is available.
+    facts:
+      - block until data is available
+
+  - id: q07
+    band: factual
+    ask: Are there message boundaries in a pipe?
+    expect: No; there is no concept of message boundaries.
+    facts:
+      - no concept of message boundaries
+
+  - id: q08
+    band: factual
+    ask: What happens when all write-end descriptors are closed?
+    expect: A read sees end of file and returns 0.
+    facts:
+      - return 0
+
+  - id: q09
+    band: factual
+    ask: What was a pipe's capacity before Linux 2.6.11?
+    expect: The same as the system page size, for example 4096 bytes on i386.
+    facts:
+      - 2.6.11
+      - page size
+      - 4096
+
+  - id: q10
+    band: factual
+    ask: What is the pipe capacity since Linux 2.6.11?
+    expect: 16 pages, which is 65,536 bytes where the page size is 4096.
+    facts:
+      - 16 pages
+      - 65,536
+
+  - id: q11
+    band: factual
+    ask: What changed in Linux 2.6.35 regarding pipe capacity?
+    expect: The default stayed at 16 pages but the capacity became queryable and
+      settable.
+    facts:
+      - 2.6.35
+
+  - id: q12
+    band: factual
+    ask: How do you find out how many unread bytes are in a pipe?
+    expect: ioctl(fd, FIONREAD, &nbytes).
+    facts:
+      - FIONREAD
+
+  - id: q13
+    band: factual
+    ask: Is FIONREAD standardised?
+    expect: No; it is not specified in any standard, though provided on many
+      implementations.
+    facts:
+      - not specified in any standard
+
+  - id: q14
+    band: factual
+    ask: What is the default value of /proc/sys/fs/pipe-max-size?
+    expect: 1048576, that is 1 MiB.
+    facts:
+      - pipe-max-size
+      - 1048576
+
+  - id: q15
+    band: factual
+    ask: What is the minimum value that can be assigned to pipe-max-size?
+    expect: The system page size.
+    facts:
+      - system page size
+
+  - id: q16
+    band: factual
+    ask: What happened to /proc/sys/fs/pipe-max-pages?
+    expect: It was removed in Linux 2.6.35 in favour of pipe-max-size.
+    facts:
+      - pipe-max-pages
+      - removed
+
+  - id: q17
+    band: factual
+    ask: What does the page advise about relying on pipe capacity?
+    expect: Applications should not rely on a particular capacity; the reading
+      process should consume data as soon as it is available.
+    facts:
+      - should not rely
+      - as soon as it is available
+
+  # --- Structural -----------------------------------------------------------
+  - id: q18
+    band: structural
+    ask: What is the one-line description of this page?
+    expect: An overview of pipes and FIFOs.
+    facts:
+      - overview of pipes and FIFOs
+
+  - id: q19
+    band: structural
+    ask: Which manual section is this page in?
+    expect: Section 7, miscellaneous information.
+    facts:
+      - Miscellaneous Information
+
+  # --- Actionable -----------------------------------------------------------
+  - id: q20
+    band: actionable
+    ask: A writer is blocking forever on a full pipe. What does the page suggest?
+    expect: Either use nonblocking I/O, or design so the reading process consumes
+      data as soon as it is available.
+    facts:
+      - Nonblocking
+      - as soon as it is available
