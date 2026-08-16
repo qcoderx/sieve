@@ -825,7 +825,16 @@ func (b *Browser) collectCorpus(ctx context.Context, col *collector) {
 // One evaluate against an object graph already in memory. It buys a whole
 // site on the pages that need it and is never reached on the pages that do
 // not, because a page with no scene returns from the walk immediately.
-const sceneFloor = 2 * time.Second
+//
+// Eight seconds rather than two because this is a ceiling on waiting, not a
+// spend. A page with no scene returns on the first evaluate, and so does a
+// page whose scene is built -- with or without words in it. The only page that
+// reaches the end of this allowance is one announcing a three.js scene that is
+// still empty, which is a page mid-construction, and the alternative there is
+// to return nothing at all. Two seconds was enough for a fixture served from
+// localhost and not for igloo.inc over the network, which failed outright on
+// two runs in five.
+const sceneFloor = 8 * time.Second
 
 // sceneCtx gives the scene walk whatever is left of the extraction budget, or
 // the floor above, whichever is longer -- bounded in every case by the tab.
@@ -857,12 +866,23 @@ func sceneCtx(tabCtx, postCtx context.Context) context.Context {
 // page that has a 3D hook and nothing in it yet. A page with no hook at all
 // returns on the first read and pays nothing.
 const (
-	sceneEmptyRetries = 3
-	sceneRetryWait    = 250 * time.Millisecond
+	// sceneEmptyWait is how long a scene that is present and empty is given to
+	// fill. It is deliberately generous: the page has told us, through the
+	// three.js devtools hook, that a scene exists, and an empty one means the
+	// page is still assembling it.
+	//
+	// Nothing else waits this long, and nothing else needs to. A page with no
+	// scene never enters the loop; a page whose scene is built leaves on the
+	// first read whether or not it has words in it. Only a page mid-assembly
+	// pays, and the alternative for that page is an artifact that says the site
+	// is empty.
+	sceneEmptyWait = 6 * time.Second
+	sceneRetryWait = 250 * time.Millisecond
 )
 
 func (b *Browser) introspectScene(ctx context.Context, res *Result) {
-	for attempt := 0; ; attempt++ {
+	started := time.Now()
+	for {
 		var raw string
 		if err := chromedp.Run(ctx, chromedp.Evaluate(`window.__sieve.scene()`, &raw)); err != nil {
 			return
@@ -884,7 +904,12 @@ func (b *Browser) introspectScene(ctx context.Context, res *Result) {
 		// not to conclude -- the same rule the settle loop follows, for the same
 		// reason, and this is the one place the settle loop cannot apply it
 		// because it has no view of the scene graph at all.
-		if attempt >= sceneEmptyRetries {
+		//
+		// Bounded by elapsed time rather than a number of attempts, because what
+		// matters is how long the page has had, not how many times it has been
+		// asked. A fixed count tuned against a fixture on localhost was three
+		// quarters of a second, and igloo.inc over the network needs several.
+		if time.Since(started) >= sceneEmptyWait {
 			return
 		}
 		if dl, ok := ctx.Deadline(); ok && time.Until(dl) <= sceneRetryWait {

@@ -31,7 +31,7 @@ Type "curl -s https://igloo.inc | tr -d '[:space:]' | wc -c"
 Enter
 Sleep 2500
 
-Type "# A few hundred bytes of shell. No words. This is what WebFetch gets."
+Type "# Fourteen characters. No words at all. This is what WebFetch gets."
 Enter
 Sleep 1800
 
@@ -40,9 +40,9 @@ Ctrl+L
 # --- What sieve sees ---------------------------------------------------------
 Type "sieve distill https://igloo.inc"
 Enter
-Sleep 14000
+Sleep 15000
 
-Type "# 29 blocks, read out of the 3D scene."
+Type "# 23 blocks, read out of the 3D scene. 40 of 40 ground-truth facts."
 Enter
 Sleep 2000
 
