@@ -131,7 +131,7 @@ against each server:
 
 | server | tools | definitions |
 |---|---|---|
-| **sieve** | 7 | **1,737** |
+| **sieve** | 7 | **1,797** |
 | playwright-mcp | 24 | 4,625 |
 | chrome-devtools-mcp | 29 | 5,814 |
 

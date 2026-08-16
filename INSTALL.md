@@ -49,7 +49,7 @@ One install, three surfaces:
 |---|---|---|
 | **skill** | teaches Claude when a page needs sieve, and to read `outcome` first | nothing until invoked |
 | **hook** | when WebFetch returns a shell, reads the page properly in the same turn | one string scan per fetch |
-| **MCP server** | `distill`, `get_content`, `search_content` and the rest | ~1,737 tokens per session |
+| **MCP server** | `distill`, `get_content`, `search_content` and the rest | ~1,800 tokens per session |
 
 The MCP server is the only standing charge of the three. If you would rather
 drive sieve from the skill alone, disable that server in `/plugin` and keep the
