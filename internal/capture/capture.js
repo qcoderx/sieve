@@ -1525,7 +1525,20 @@
   // than the load allowance, and pressing something during that is both futile
   // and the wrong response: what it needs is patience.
   function looksLikeLoader(text) {
-    if (/loading|please wait|preparing|initialis|initializ/i.test(text)) return true;
+    // The word, but only on a page that is showing almost nothing else.
+    //
+    // The percentage rule below has carried this guard from the start, with a
+    // note explaining that "98% of our clients renew" is copy. The word rule
+    // did not, so any page whose prose happened to contain "loading" was read
+    // as a loading screen and waited out the entire load allowance -- forty
+    // seconds, on a page that had already rendered. "Loading takes three days",
+    // "lazy loading", "the loading dock", "preparing your order" all did it.
+    //
+    // A loading screen shows a handful of words. A page showing paragraphs is
+    // a page, whatever those paragraphs mention.
+    if (text.length < 200 && /loading|please wait|preparing|initialis|initializ/i.test(text)) {
+      return true;
+    }
     // A bare percentage counts only on a page that is showing almost nothing
     // else. A progress figure is a loader; "98% of our clients renew" is copy,
     // and treating every percentage as progress made pear.no wait out rounds it

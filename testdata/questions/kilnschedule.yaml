@@ -1,0 +1,91 @@
+# Question set for the hydrated fixture.
+#
+# A single-page application whose render never completes. The document holds a
+# loading screen and nothing else a reader could use, while every word of the
+# page sits in a typed __NUXT_DATA__ payload in the served bytes -- which is
+# where the framework itself would read them from, had it ever finished.
+#
+# This is the offline stand-in for hatom.com, which behaves the same way against
+# a live site and cannot be relied on to keep behaving that way. Every fact here
+# is a literal string in the fixture, which ships in this repository.
+#
+# What the set does NOT ask about is as deliberate as what it does. The payload
+# also carries a build hash, a component name, a CSS module name, a timestamp,
+# two asset URLs, four routes, three i18n keys and two feature flags. None of
+# those are questions, because none of them are content, and an artifact that
+# swallowed them would score no better here while costing tokens to say nothing.
+# That they stay out is asserted directly in TestHydrationTakesProseAndLeavesMachinery.
+#
+#   (cd testdata/pages && python -m http.server 8080) &
+#   sieve distill http://localhost:8080/hydrated/ -allow-private-addresses -out ./artifacts
+#   sieve bench ./artifacts/localhost-8080-hydrated \
+#     --questions testdata/questions/kilnschedule.yaml -coverage-only
+
+name: Kiln schedule (hydration fixture)
+url: http://localhost:8080/hydrated/
+
+questions:
+  - id: q01
+    band: factual
+    ask: What is this page about?
+    expect: The firing schedule for the coming year.
+    facts:
+      - firing schedule
+
+  - id: q02
+    band: factual
+    ask: How often is the kiln fired, and when?
+    expect: Twice a year, in March and October.
+    facts:
+      - Two firings a year
+      - March and October
+
+  - id: q03
+    band: factual
+    ask: How long does loading take, and how long the firing?
+    expect: Three days to load and four to fire.
+    facts:
+      - three days
+      - runs for four
+
+  - id: q04
+    band: factual
+    ask: How is the firing staffed?
+    expect: Two people stoking in six-hour shifts through the night.
+    facts:
+      - six-hour shifts
+      - through the night
+
+  - id: q05
+    band: factual
+    ask: How long does the kiln cool, and why does that matter?
+    expect: A full week; opening it early cracks the glaze.
+    facts:
+      - full week
+      - cracks the glaze
+
+  - id: q06
+    band: factual
+    ask: When must greenware arrive, and why?
+    expect: A month beforehand, because the bisque firing must be finished
+      before loading can begin.
+    facts:
+      - a month beforehand
+      - bisque firing
+
+  # --- Actionable -----------------------------------------------------------
+  - id: q07
+    band: actionable
+    ask: Someone wants their work in the March firing. What do they need to do?
+    expect: Deliver greenware a month beforehand, so the bisque firing can be
+      finished before loading begins.
+    facts:
+      - a month beforehand
+
+  - id: q08
+    band: actionable
+    ask: Someone wants to open the kiln as soon as the firing ends. Should they?
+    expect: No; it is left sealed for a full week, and opening it early cracks
+      the glaze.
+    facts:
+      - cracks the glaze

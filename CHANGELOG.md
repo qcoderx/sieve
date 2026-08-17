@@ -38,9 +38,29 @@ page reaches it, and how honestly the artifact reports what it left out.
   time rather than a number of attempts. Six runs of six since, 40 of 40
   ground-truth facts each time. A page with no scene, or one whose scene is
   already built, still returns on the first read and pays nothing.
+- **A page whose prose mentioned loading waited out the whole load allowance.**
+  The gate treats a loading screen as a reason for patience, correctly, but the
+  word test had no length guard: any page containing "loading", "preparing" or
+  "initialising" anywhere in its visible text was read as a loading screen and
+  waited up to forty seconds, after it had already rendered. The percentage test
+  beside it has carried that guard from the start, with a note explaining that
+  "98% of our clients renew" is copy. A page showing paragraphs is a page,
+  whatever those paragraphs mention.
 - Static extraction no longer treats an already-open `<details>` as closed.
 
 ### Added
+
+- **A page that never finishes hydrating can now be read from the state it
+  shipped.** When a page produces almost no readable text of its own and carries
+  a typed hydration payload -- `<script type="application/json"
+  id="__NUXT_DATA__">` or the Next.js equivalent -- sieve reads the prose out of
+  it. These are the strings the framework itself would have rendered the page
+  from, so they are the page's words rather than a guess, and only pages that
+  produced nothing are offered them: a page that rendered is read from what
+  rendered. `hatom.com` went from 0.05 to 0.738 on its question set. It had
+  been failing for a year against a note explaining why it could not be fixed,
+  and the note was half a guess: the payload it said the page fetched is also
+  inlined in the first response.
 
 - **An offline benchmark tier.** Four fixtures ship here with their ground
   truth, graded with no network in CI, with floors set just under the measured

@@ -21,33 +21,36 @@
 # genre are easy to conflate, and ground truth taken from memory rather than
 # from the page is how a benchmark ends up grading the wrong thing.
 #
-# THIS SET CURRENTLY FAILS, AND IS COMMITTED FAILING ON PURPOSE.
+# THIS SET USED TO FAIL COMPLETELY, AND THE REASON IT NO LONGER DOES IS WORTH
+# READING BEFORE TRUSTING THE NUMBER.
 #
-# sieve scores about 0.05 on it. That is not a set that needs fixing: every fact
-# below was read out of the payload the page itself fetches, so the content is
-# real and the site does display it. sieve cannot get to it, and says so rather
-# than guessing -- the artifact it produces carries a note reading "this site is
-# behind an entry screen labelled LOADING 5 PHASES ... HEADPHONES RECOMMENDED;
-# the page past it never loaded, so this artifact describes the interstitial and
-# not the site".
+# It scored 0.05 for as long as it existed. The header said the content arrived
+# in a JSON payload the page fetched for itself and that sieve could not reach
+# it. Half of that was right and half was a guess that nobody re-checked: the
+# payload is fetched, but an identical copy of it is also inlined in the served
+# HTML, in a <script type="application/json" id="__NUXT_DATA__"> block. Every
+# heading and paragraph of this site has been sitting in the first response the
+# whole time.
 #
-# What was ruled out, so the next person does not repeat it:
+# sieve now reads that block when a page produces almost nothing of its own, and
+# this set scores 0.738 -- 31 of 42.
 #
-#   - Not a load-timeout problem. At -load-timeout 120s the loader still reports
-#     100 and the render still comes back with nothing readable.
-#   - Not the entry-gate handler. There is no button to press: the bundle has no
-#     enter, start or begin label, only framework internals that match those
-#     words (beforeRouteEnter, onEnterFrame).
-#   - Not the scene walk either, which is what reads igloo.inc. hatom does use
-#     three.js -- the devtools hook, WebGLRenderer and isScene are all in the
-#     bundle -- but it has no MSDF or troika glyph text, so its words are most
-#     likely painted as textures. There is no geometry to read them out of.
+# What the remaining eleven are, so nobody mistakes them for extraction bugs:
 #
-# The value of a failing test here is that it is specific. If the phases ever
-# start appearing, this set will say so on the first run; and if the answer
-# turns out to be that texture-drawn text cannot be recovered without OCR, that
-# is a limit worth having written down against a real page rather than
-# rediscovered.
+#   - Ethereum, Base, Solana, Avalanche and two of their URLs are in the
+#     artifact, as links, in content.json. They are not in index.md because
+#     sieve's markdown renders navigation links and not in-content ones, and
+#     changing that would add link lists to every artifact on the web. The
+#     facts are recovered; the grader reads the markdown.
+#   - "five phases" is a fault in this set. The page says "5 phases".
+#   - Contact, French, audio, subtitles are navigation and configuration labels
+#     rather than content, and the harvest deliberately rejects bare words: in a
+#     state payload they are indistinguishable from component and route names.
+#
+# The lesson worth keeping is not about Nuxt. It is that this set recorded a
+# guess about *why* a page failed, in a comment, and the guess went unexamined
+# for as long as the failure looked expected. A failing test that explains
+# itself convincingly is harder to re-open than one that just fails.
 #
 #   sieve distill https://hatom.com -load-timeout 40s -out ./artifacts
 #   sieve bench ./artifacts/hatom.com --questions testdata/questions/hatom.yaml

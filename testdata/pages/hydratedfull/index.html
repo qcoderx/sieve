@@ -1,0 +1,40 @@
+<!doctype html>
+<meta charset="utf-8">
+<title>Kiln schedule</title>
+<!--
+  The same hydration payload as ../hydrated/, on a page that rendered.
+
+  This is the control. The payload here carries a sentence that appears nowhere
+  in the document, and sieve must not return it: the page said what it had to
+  say, so there is nothing to recover and reading the payload anyway would put
+  text into an artifact that no visitor ever saw.
+
+  That is the whole safety property of the hydration channel. It is a recovery
+  path, and a recovery path that also runs when nothing needs recovering is not
+  a recovery path -- it is a second, unaccountable source of text, with no
+  position, no ordering, and no way for a reader to tell which half of the
+  artifact they are looking at.
+-->
+<style>
+  body { font: 16px/1.5 system-ui, sans-serif; margin: 2rem; max-width: 40rem; }
+</style>
+
+<h1>The firing schedule for the coming year</h1>
+<p>Two firings a year, in March and October, and everything that has to happen
+   before either of them.</p>
+<p>Loading takes three days and the firing itself runs for four, with two people
+   stoking in six-hour shifts through the night.</p>
+<p>The kiln is then left sealed for a full week to cool, because opening it
+   early cracks the glaze on everything inside.</p>
+<p>Greenware has to arrive a month beforehand, since the bisque firing must be
+   finished before loading can begin.</p>
+
+<script type="application/json" id="__NUXT_DATA__">
+[
+  {"content":1},
+  {
+    "heading": "The firing schedule for the coming year",
+    "unrendered": "PAYLOAD_ONLY_NEVER_DISPLAYED this sentence exists in the state payload and in no part of the document a visitor sees."
+  }
+]
+</script>

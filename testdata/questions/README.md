@@ -1,6 +1,6 @@
 # The question corpus
 
-Thirty sets, fifteen to twenty questions each, in three bands.
+Thirty-one sets, fifteen to twenty questions each, in three bands.
 
 The bands exist because a benchmark that only measures the cases you win is
 marketing. The hard band is where sieve is sometimes the only reader that
@@ -46,7 +46,7 @@ checked rather than taken.
 
 | set | page | note |
 |---|---|---|
-| `hatom` | hatom.com | **deliberately failing**: kept because a corpus with no failures is not a corpus |
+| `hatom` | hatom.com | a Nuxt app whose render never completes; read from its inlined hydration payload |
 | `httpcaching` | MDN, HTTP caching | long article inside an application shell |
 | `redisstrings` | Redis strings | examples behind language tabs |
 | `caddyfile` | Caddyfile concepts | reference inside a docs SPA |
@@ -56,6 +56,7 @@ checked rather than taken.
 | `stripewebhooks` | Stripe webhooks | prose rules among code samples in eight languages |
 | `kilnworks` | fixture | everything worth knowing behind a control |
 | `northwind` | fixture | prose threaded through eight injection channels |
+| `kilnschedule` | fixture | a single-page app that never hydrates, offline |
 
 ### Easy
 

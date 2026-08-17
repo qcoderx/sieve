@@ -837,6 +837,64 @@ func (d *Distiller) Distill(ctx context.Context, rawURL string) (*Result, error)
 		decision.Reason = sprov.TierReason
 	}
 
+	// Last resort: the state the page shipped for its own hydration.
+	//
+	// Everything above has run and the page still produced nothing readable.
+	// That is the condition, and it is checked rather than assumed, because on
+	// a page that rendered this text would arrive a second time with no
+	// position to place it by and no way to tell a heading from a tooltip.
+	//
+	// hatom.com is the page this exists for. It spends its entire loading
+	// budget on an intro sequence and its render never completes, so the
+	// artifact was an interstitial and a note -- while every heading and
+	// paragraph of the site sat in a typed __NUXT_DATA__ block in the served
+	// bytes, which is where the framework itself reads them from.
+	//
+	// The gate is content poverty, measured, rather than the outcome status.
+	//
+	// Status was the obvious choice and it is wrong: a page can be a shell and
+	// still report `ok`, because a title and one run of text is enough to look
+	// like a page that worked. hatom.com only reported `challenge` because it
+	// happens to have an entry screen; a Nuxt site that simply never finishes
+	// hydrating reports `ok` with "Loading" on it and would never have been
+	// offered the recovery it needs.
+	//
+	// So the test is what the page actually said against what its payload has
+	// to say. Both halves matter: the first keeps this away from every page
+	// that rendered, and the second means a genuinely short page -- a stub, a
+	// redirect notice -- is not padded out with strings from a framework's
+	// state just because it is brief.
+	contentChars := 0
+	for i := range g.Blocks {
+		if !g.Blocks[i].Region.IsChrome() {
+			contentChars += utf8.RuneCountInString(g.Blocks[i].Text)
+		}
+	}
+	payloadChars := 0
+	for _, s := range staticRes.Hydration {
+		payloadChars += utf8.RuneCountInString(s)
+	}
+	shell := contentChars < shellContentChars && payloadChars > 2*contentChars
+	if shell && len(staticRes.Hydration) > 0 {
+		hlinks := make([]graph.HydrationLink, 0, len(staticRes.HydrationLinks))
+		for _, l := range staticRes.HydrationLinks {
+			hlinks = append(hlinks, graph.HydrationLink{Text: l.Text, Href: l.Href})
+		}
+		if n := graph.AdoptHydrationText(g, staticRes.Hydration, hlinks); n > 0 {
+			d.logf("the page rendered nothing; adopted %d run(s) from its hydration payload", n)
+			g.Audit.Notes = append(g.Audit.Notes, fmt.Sprintf(
+				"this page produced no readable content when it was rendered, so the %d run(s) "+
+					"of text below were taken from the server-rendered state the page ships for "+
+					"its own hydration -- a typed JSON payload in the served HTML, which is where "+
+					"the site's own framework reads them from. They are the page's words. What "+
+					"they do not have is a position: nothing observed them on screen, so their "+
+					"order is the order they were serialised in rather than a reading order, and "+
+					"a heading here does not necessarily introduce the run after it. Each is "+
+					"marked speculative and flagged.", n))
+			g.Recount()
+		}
+	}
+
 	timing["total"] = time.Since(start)
 	d.progress(Progress{Stage: "done", Tier: decision.Tier, Elapsed: time.Since(start), Partial: g})
 	return &Result{
@@ -845,6 +903,15 @@ func (d *Distiller) Distill(ctx context.Context, rawURL string) (*Result, error)
 		Scene: res.Scene, Libraries: res.Libraries, Status: res.Status,
 	}, nil
 }
+
+// shellContentChars is how little readable text a page can produce before its
+// hydration payload is worth reading instead.
+//
+// Five hundred characters is a short paragraph. A page that produced more than
+// that has said something, and its payload is then a second copy with no
+// position to place it by. A page that produced less has not, whatever its
+// outcome status claims.
+const shellContentChars = 500
 
 // staticAdvantage is how much more text the served HTML must carry before it
 // displaces a rendered capture.

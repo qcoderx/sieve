@@ -78,6 +78,12 @@ func TestOfflineCorpus(t *testing.T) {
 		// set name both halves, so keeping the prose and losing the terms
 		// scores about half rather than scoring well.
 		{"reference", "/reference/", "optref.yaml", 0.90},
+		// A single-page application whose render never completes, with every
+		// word of the page in the typed hydration payload the framework would
+		// have read them from. Without the recovery channel this row is a
+		// loading screen and nothing else, which is what hatom.com was for a
+		// year.
+		{"hydrated", "/hydrated/", "kilnschedule.yaml", 0.90},
 	}
 
 	srv := httptest.NewServer(http.FileServer(http.Dir("../../testdata/pages")))

@@ -1,0 +1,55 @@
+<!doctype html>
+<meta charset="utf-8">
+<title>Kiln schedule</title>
+<!--
+  A page that ships its content twice: once as a framework's server-rendered
+  state, and once as nothing at all.
+
+  This is the shape of a single-page application whose render never completes.
+  The document contains a loading screen and a typed JSON payload holding every
+  word of the page, which is where the framework itself would read them from
+  once it hydrated. It never does here, exactly as hatom.com's never does
+  inside sieve's budget.
+
+  The payload deliberately also carries the things a payload carries and an
+  artifact must not fill up with: routes, asset URLs, class names, i18n keys,
+  hashes, feature flags and component names. Those are the reason the harvest
+  filters for prose rather than taking every string.
+-->
+<style>
+  body { font: 16px/1.5 system-ui, sans-serif; margin: 2rem; }
+</style>
+
+<!--
+  An empty mount point, and nothing else. The word "Loading" is deliberately
+  absent: sieve waits on a loading screen, correctly and for a long time, and
+  this fixture is about the hydration payload rather than about that wait. The
+  live case it stands in for -- hatom.com -- does both, and pays for both.
+-->
+<div id="__nuxt"></div>
+
+<script type="application/json" id="__NUXT_DATA__">
+[
+  {"page":1,"config":2},
+  "kiln-schedule",
+  {"flags":3,"routes":4,"assets":5,"i18n":6,"content":7},
+  {"enableAudio":true,"experimentalLayout":false},
+  ["/", "/about", "/schedule", "/en/preview/"],
+  ["https://cdn.example.org/a7f3c9e1b2.woff2", "https://cdn.example.org/kiln_hero_2400.jpg"],
+  {"nav.home":"Home","nav.about":"About","btn.submit":"Submit"},
+  {
+    "heading": "The firing schedule for the coming year",
+    "standfirst": "Two firings a year, in March and October, and everything that has to happen before either of them.",
+    "body": [
+      "Loading takes three days and the firing itself runs for four, with two people stoking in six-hour shifts through the night.",
+      "The kiln is then left sealed for a full week to cool, because opening it early cracks the glaze on everything inside.",
+      "Greenware has to arrive a month beforehand, since the bisque firing must be finished before loading can begin."
+    ],
+    "partners": ["Ethereum", "https://ethereum.foundation/", "Solana", "https://solana.com/"],
+    "buildHash": "9f2c1ab77e4d3f80c5a6b1e2d4f8a0c3",
+    "componentName": "KilnScheduleHero",
+    "cssModule": "_hero_1x2y3_11",
+    "timestamp": "2026-08-17T09:41:22.881Z"
+  }
+]
+</script>

@@ -35,6 +35,12 @@ type Result struct {
 	// RawHTML is retained for the change-detection ladder and for the token
 	// comparison that justifies the project.
 	RawHTML string
+	// Hydration is the prose a framework shipped as server-rendered state in a
+	// typed JSON container. It is not content until something decides the page
+	// produced none of its own; see HydrationText.
+	Hydration []string
+	// HydrationLinks are the labelled destinations from the same payload.
+	HydrationLinks []HydrationLink
 }
 
 // Signals are the measurements the escalation scorer reads.
@@ -198,6 +204,8 @@ func Extract(pageURL string, body io.Reader, sizeHint int) (*Result, error) {
 	// tier would ingest exactly the material the rendered tiers quarantine.
 	ex.scanStyles(doc)
 	ex.walk(doc, "html", "html", "", "", 0, false, 0)
+	hydration := HydrationText(doc)
+	hydrationLinks := HydrationLinks(doc)
 
 	snap := &capture.Snapshot{
 		Checkpoint:   0,
@@ -226,9 +234,11 @@ func Extract(pageURL string, body io.Reader, sizeHint int) (*Result, error) {
 	ex.signals.MarkupChars = markupTextChars(string(raw))
 
 	return &Result{
-		Merged:  ex.acc.Result(),
-		Signals: ex.signals,
-		RawHTML: string(raw),
+		Merged:    ex.acc.Result(),
+		Signals:   ex.signals,
+		RawHTML:   string(raw),
+		Hydration:      hydration,
+		HydrationLinks: hydrationLinks,
 	}, nil
 }
 
