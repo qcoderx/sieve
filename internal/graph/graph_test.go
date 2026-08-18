@@ -4,6 +4,7 @@ import (
 	"context"
 	"net/http"
 	"net/http/httptest"
+	"os"
 	"strings"
 	"testing"
 	"time"
@@ -14,6 +15,18 @@ import (
 
 func buildFixture(t *testing.T, page string) *graph.Graph {
 	t.Helper()
+	// Every browser-driven test in this package comes through here, so this is
+	// the one place the switch has to be honoured.
+	//
+	// It was not, and SIEVE_SKIP_BROWSER therefore did not mean what its name
+	// says: the render, distill and bench packages all skipped, and these
+	// launched Chromium anyway. On a machine with Chromium installed and no
+	// memory to spare, the launch times out and the failure reads as a graph
+	// bug -- "could not dial ws://..." against a test about retention
+	// arithmetic.
+	if os.Getenv("SIEVE_SKIP_BROWSER") != "" {
+		t.Skip("SIEVE_SKIP_BROWSER set")
+	}
 	if render.ChromiumPath("") == "" {
 		t.Skip("no Chromium available")
 	}

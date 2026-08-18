@@ -57,13 +57,23 @@ authenticated sessions.
 
 ```sh
 go build ./...
-go test ./...                            # needs Chromium for some packages
-SIEVE_SKIP_BROWSER=1 go test ./...       # the rest
+go test -p 1 ./...                       # needs Chromium for some packages
+SIEVE_SKIP_BROWSER=1 go test ./...       # the rest, in under a minute
 ```
 
 The browser-free packages — `escalate`, `corroborate`, `textnorm`, `safety`,
-`tokens`, `emit` — carry the tests that must pass everywhere. The `graph` and
-`render` packages need a browser and are skipped without one.
+`tokens`, `emit` — carry the tests that must pass everywhere. The `graph`,
+`render`, `distill` and `bench` packages need a browser and skip without one.
+
+**`-p 1` on the browser run, and it is not optional on a working machine.**
+Go tests packages in parallel, and four of these launch their own Chromium; on
+a developer machine that already has a browser open, the launches contend and
+one of them loses. The failure does not look like contention — it surfaces as
+`could not dial ws://…: context deadline exceeded` inside a test about
+retention arithmetic, or as a coverage number a few facts short, and the
+obvious next move is to go looking for a bug in whatever the test was named
+after. It is worth reproducing any browser-test failure with `-p 1` before
+believing it.
 
 ---
 
