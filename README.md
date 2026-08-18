@@ -1,4 +1,10 @@
-# sieve
+<p align="center">
+  <picture>
+    <source media="(prefers-color-scheme: dark)" srcset="docs/logo-dark.png">
+    <source media="(prefers-color-scheme: light)" srcset="docs/logo.png">
+    <img alt="sieve — read the web, keep what matters" src="docs/logo.png" width="380">
+  </picture>
+</p>
 
 **Browser-grade page reading that does not eat your context window.**
 
