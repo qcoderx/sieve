@@ -31,6 +31,13 @@ tout.txt
 /npm/bin/sieve.exe
 /npm/node_modules/
 
+# An `npm i` run anywhere in this tree, which is easy to do by accident when
+# testing the published package and leaves a root package.json declaring the
+# project as a dependency of itself.
+node_modules/
+package-lock.json
+/package.json
+
 # Scratch space for recording the demo: a Linux sieve binary built for WSL,
 # and whatever vhs leaves behind. Not part of the build.
 .demo/
