@@ -1,5 +1,17 @@
 # Changelog
 
+## 0.3.1
+
+### Fixed
+
+- **Removed a browser-process registry data race.** The pre-start chromedp
+  command hook polled `exec.Cmd.Process` while `os/exec.Start` was assigning the
+  same field. Browsers are now registered from the stable `os.Process` exposed
+  after allocation completes, and the registry stores only process handles and
+  immutable PIDs. Removing the hook also restores chromedp's Linux parent-death
+  protection. A process-lifecycle regression test and the complete Linux race
+  suite cover the fix.
+
 ## 0.3.0
 
 The artifact schema remains 1.0. This release makes sieve substantially faster

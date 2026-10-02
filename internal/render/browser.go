@@ -24,7 +24,7 @@ import (
 // can be tied back to the code that produced it.
 //
 // A var rather than a const so a release build can stamp a commit onto it.
-var Version = "0.3.0"
+var Version = "0.3.1"
 
 // Browser owns one Chromium process. Reuse it across pages: process startup is
 // 200-600ms, which dominates the cost of a small page.
@@ -150,14 +150,6 @@ func Launch(ctx context.Context, opts Options) (*Browser, error) {
 		fs.set("disable-dev-shm-usage", true)
 	}
 
-	// Track the browser process so it can be killed without its context.
-	//
-	// Every ordinary shutdown cancels the allocator and chromedp does the rest.
-	// The watchdog is the path where that cannot happen -- os.Exit runs no
-	// defers -- and a Chromium tree left behind keeps the caller's command open
-	// long after this process is gone.
-	fs.opts = append(fs.opts, chromedp.ModifyCmdFunc(trackBrowser))
-
 	allocCtx, allocCancel := chromedp.NewExecAllocator(ctx, fs.opts...)
 
 	ctxOpts := []chromedp.ContextOption{}
@@ -174,6 +166,21 @@ func Launch(ctx context.Context, opts Options) (*Browser, error) {
 		baseCancel()
 		allocCancel()
 		return nil, fmt.Errorf("start browser %q: %w", path, err)
+	}
+
+	// Register only after Allocate has completed cmd.Start and published the
+	// process through chromedp's Browser. Reading exec.Cmd.Process from the
+	// pre-start command hook raced with os/exec assigning that field. Keeping
+	// the default hook also restores chromedp's parent-death signal on Linux.
+	if chrome := chromedp.FromContext(baseCtx).Browser; chrome != nil {
+		if process := chrome.Process(); process != nil {
+			trackBrowser(process)
+			pid := process.Pid
+			go func() {
+				<-chrome.LostConnection
+				forgetBrowser(pid)
+			}()
+		}
 	}
 
 	b := &Browser{

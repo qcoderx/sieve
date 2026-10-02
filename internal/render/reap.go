@@ -1,11 +1,11 @@
 package render
 
 import (
+	"os"
 	"os/exec"
 	"runtime"
 	"strconv"
 	"sync"
-	"time"
 )
 
 // The browser registry exists for one case: the process is about to die without
@@ -22,28 +22,23 @@ import (
 // view of the only party that cares.
 var browsers struct {
 	sync.Mutex
-	live map[int]*exec.Cmd
+	live map[int]*os.Process
 }
 
-func init() { browsers.live = map[int]*exec.Cmd{} }
+func init() { browsers.live = map[int]*os.Process{} }
 
 // trackBrowser records a launched browser so it can be killed without its
-// context. It is registered through chromedp's ModifyCmdFunc, which runs after
-// the command is built and before it starts.
-func trackBrowser(cmd *exec.Cmd) {
-	go func() {
-		// The pid does not exist until Start, and ModifyCmdFunc runs before it.
-		// Poll briefly rather than reaching into chromedp's lifecycle.
-		for i := 0; i < 100; i++ {
-			if cmd.Process != nil {
-				browsers.Lock()
-				browsers.live[cmd.Process.Pid] = cmd
-				browsers.Unlock()
-				return
-			}
-			time.Sleep(20 * time.Millisecond)
-		}
-	}()
+// context. Launch calls this only after chromedp.Run has returned from starting
+// Chromium, so Process and its PID are already immutable. The old command hook
+// polled exec.Cmd.Process while os/exec.Start was assigning it, which was a real
+// data race and also replaced chromedp's Linux parent-death configuration.
+func trackBrowser(process *os.Process) {
+	if process == nil {
+		return
+	}
+	browsers.Lock()
+	browsers.live[process.Pid] = process
+	browsers.Unlock()
 }
 
 // forgetBrowser drops a browser that shut down the ordinary way.
@@ -62,38 +57,34 @@ func forgetBrowser(pid int) {
 // It reports how many it killed so the watchdog can say so.
 func KillBrowsers() int {
 	browsers.Lock()
-	cmds := make([]*exec.Cmd, 0, len(browsers.live))
-	for _, c := range browsers.live {
-		cmds = append(cmds, c)
+	processes := make([]*os.Process, 0, len(browsers.live))
+	for _, process := range browsers.live {
+		processes = append(processes, process)
 	}
-	browsers.live = map[int]*exec.Cmd{}
+	browsers.live = map[int]*os.Process{}
 	browsers.Unlock()
 
 	n := 0
-	for _, c := range cmds {
-		if c.Process == nil {
-			continue
-		}
-		// Skip one that has already gone. chromedp waits on the command itself,
-		// so a browser closed the ordinary way has its state set here, and
-		// signalling a finished pid risks hitting whatever inherited the number.
-		if c.ProcessState != nil {
-			continue
-		}
-		pid := c.Process.Pid
+	for _, process := range processes {
+		pid := process.Pid
+		killed := false
 		// Chromium is a tree: the browser process spawns renderers, a GPU
 		// process and utilities, and killing only the parent leaves the rest
 		// holding the handles that keep a caller waiting.
 		if runtime.GOOS == "windows" {
 			// /T takes the tree, /F does not ask.
-			_ = exec.Command("taskkill", "/T", "/F", "/PID", strconv.Itoa(pid)).Run()
+			killed = exec.Command("taskkill", "/T", "/F", "/PID", strconv.Itoa(pid)).Run() == nil
 		} else {
-			// Negative pid addresses the process group, which chromedp's
-			// allocator sets up for exactly this reason.
-			_ = syscallKillGroup(pid)
+			// Try the process group first in case Chromium is its leader; the
+			// direct process kill below is the portable fallback.
+			killed = syscallKillGroup(pid) == nil
 		}
-		_ = c.Process.Kill()
-		n++
+		if err := process.Kill(); err == nil {
+			killed = true
+		}
+		if killed {
+			n++
+		}
 	}
 	return n
 }
