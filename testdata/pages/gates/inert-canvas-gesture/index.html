@@ -1,0 +1,22 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>Inert canvas gesture</title>
+<style>
+  html, body { margin: 0; width: 100%; height: 100%; background: #050505; color: white; }
+  canvas, #gate { position: fixed; inset: 0; width: 100%; height: 100%; }
+  #gate { z-index: 10; display: grid; place-items: center; background: #050505;
+          font: 16px system-ui; }
+</style>
+</head>
+<body>
+  <canvas aria-label="A scene whose text is stored outside the DOM"></canvas>
+  <div id="gate" aria-label="Decorative scene entrance"></div>
+<script>
+  // The scene accepts a trusted visitor gesture internally, but the DOM layer
+  // does not change. This is the live igloo.inc failure shape.
+  window.addEventListener("click", function () { window.sceneStarted = true; }, {once: true});
+</script>
+</body>
+</html>

@@ -231,8 +231,27 @@ func (d *Distiller) progress(p Progress) {
 
 // Distill produces an artifact for one URL.
 func (d *Distiller) Distill(ctx context.Context, rawURL string) (*Result, error) {
+	return d.distill(ctx, rawURL, d.opts.MinTier, d.opts.OnProgress)
+}
+
+// DistillAtLeast produces an artifact while applying a per-request tier floor.
+// A reused Distiller can therefore serve MCP requests with different floors
+// without rebuilding (and relaunching) its browser resources for every job.
+func (d *Distiller) DistillAtLeast(ctx context.Context, rawURL string, minTier escalate.Tier, onProgress func(Progress)) (*Result, error) {
+	if minTier.Rank() < d.opts.MinTier.Rank() {
+		minTier = d.opts.MinTier
+	}
+	return d.distill(ctx, rawURL, minTier, onProgress)
+}
+
+func (d *Distiller) distill(ctx context.Context, rawURL string, minTier escalate.Tier, onProgress func(Progress)) (*Result, error) {
 	start := time.Now()
 	timing := map[string]time.Duration{}
+	progress := func(p Progress) {
+		if onProgress != nil {
+			onProgress(p)
+		}
+	}
 
 	u, err := url.Parse(rawURL)
 	if err != nil {
@@ -259,8 +278,8 @@ func (d *Distiller) Distill(ctx context.Context, rawURL string) (*Result, error)
 	// What the ladder expects before it has looked: the memory's verdict on this
 	// domain, raised by anything the caller has already insisted on.
 	expected := d.memory.Predicted(u.Hostname())
-	if d.opts.MinTier.Rank() > expected.Rank() {
-		expected = d.opts.MinTier
+	if minTier.Rank() > expected.Rank() {
+		expected = minTier
 	}
 	if d.opts.MaxTier != "" && expected.Rank() > d.opts.MaxTier.Rank() {
 		expected = d.opts.MaxTier
@@ -389,10 +408,10 @@ func (d *Distiller) Distill(ctx context.Context, rawURL string) (*Result, error)
 	}
 	timing["fetch"] = time.Since(t0)
 	if fetchFailure == "" {
-		d.progress(Progress{Stage: "fetch", Tier: escalate.TierFetch,
+		progress(Progress{Stage: "fetch", Tier: escalate.TierFetch,
 			Message: fmt.Sprintf("HTTP %d, %d bytes", resp.Status, len(resp.Body)), Elapsed: time.Since(start)})
 	} else {
-		d.progress(Progress{Stage: "fetch", Tier: escalate.TierFetch,
+		progress(Progress{Stage: "fetch", Tier: escalate.TierFetch,
 			Message: "failed, escalating to the browser", Elapsed: time.Since(start)})
 	}
 
@@ -441,7 +460,7 @@ func (d *Distiller) Distill(ctx context.Context, rawURL string) (*Result, error)
 	if fetchFailure == "" {
 		decision = d.memory.Apply(u.Hostname(), decision)
 	}
-	decision = clampTier(decision, d.opts.MinTier, d.opts.MaxTier)
+	decision = clampTier(decision, minTier, d.opts.MaxTier)
 	if fetchFailure != "" {
 		// The score was computed from an empty document, so it describes nothing.
 		// The browser is the only remaining source, and saying so is more honest
@@ -540,7 +559,7 @@ func (d *Distiller) Distill(ctx context.Context, rawURL string) (*Result, error)
 		// it scrolls into view can be read completely without a browser at all.
 		d.adoptServed(g, staticRes)
 		timing["total"] = time.Since(start)
-		d.progress(Progress{Stage: "done", Tier: escalate.TierFetch, Elapsed: time.Since(start)})
+		progress(Progress{Stage: "done", Tier: escalate.TierFetch, Elapsed: time.Since(start)})
 		return &Result{Graph: g, Freshness: freshness, Decision: decision, Timing: timing}, nil
 	}
 
@@ -639,7 +658,7 @@ func (d *Distiller) Distill(ctx context.Context, rawURL string) (*Result, error)
 			decision.Reason = bprov.TierReason
 			timing["render"] = time.Since(tr)
 			timing["total"] = time.Since(start)
-			d.progress(Progress{Stage: "done", Tier: decision.Tier, Elapsed: time.Since(start)})
+			progress(Progress{Stage: "done", Tier: decision.Tier, Elapsed: time.Since(start)})
 			return &Result{
 				Graph: bg, Freshness: freshness, Decision: decision, Timing: timing,
 				Capture: staticRes.Merged, StaticHTML: staticRes.RawHTML,
@@ -648,7 +667,7 @@ func (d *Distiller) Distill(ctx context.Context, rawURL string) (*Result, error)
 		}
 	}
 	timing["render"] = time.Since(tr)
-	d.progress(Progress{Stage: "render", Tier: decision.Tier,
+	progress(Progress{Stage: "render", Tier: decision.Tier,
 		Message: fmt.Sprintf("%d checkpoints", res.Merged.Checkpoints), Elapsed: time.Since(start)})
 
 	// The browser has now told us things the served HTML could not: which
@@ -748,7 +767,7 @@ func (d *Distiller) Distill(ctx context.Context, rawURL string) (*Result, error)
 			notes = append(notes, "canvas recovery failed: "+err.Error())
 		}
 		timing["recover"] = time.Since(tc)
-		d.progress(Progress{Stage: "recover", Tier: decision.Tier,
+		progress(Progress{Stage: "recover", Tier: decision.Tier,
 			Message: fmt.Sprintf("%d canvas region(s)", len(recovered)), Elapsed: time.Since(start)})
 	}
 
@@ -896,7 +915,7 @@ func (d *Distiller) Distill(ctx context.Context, rawURL string) (*Result, error)
 	}
 
 	timing["total"] = time.Since(start)
-	d.progress(Progress{Stage: "done", Tier: decision.Tier, Elapsed: time.Since(start), Partial: g})
+	progress(Progress{Stage: "done", Tier: decision.Tier, Elapsed: time.Since(start), Partial: g})
 	return &Result{
 		Graph: g, Freshness: freshness, Decision: decision, Timing: timing,
 		Capture: res.Merged, StaticHTML: staticRes.RawHTML,
@@ -1164,7 +1183,8 @@ func (d *Distiller) adoptServed(g *graph.Graph, staticRes *static.Result) {
 			"because %d sentence-length fragments of that same hidden text were independently "+
 			"witnessed on this page -- on screen during the render, or published by the site as "+
 			"its own structured data -- so on this page that marking is a reveal state rather than "+
-			"concealment. Each one is marked speculative and flagged.", n, proof))
+			"concealment. Each one is marked as statically sourced, assigned conservative confidence, "+
+			"and flagged as not personally observed rendered.", n, proof))
 }
 
 // sweepOptions is the render configuration for one tier.

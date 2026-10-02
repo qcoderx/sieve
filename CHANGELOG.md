@@ -1,5 +1,64 @@
 # Changelog
 
+## 0.3.0
+
+The artifact schema remains 1.0. This release makes sieve substantially faster
+on difficult sites, more exact on animation-heavy markup, and available to
+Codex through the same MCP server used by Claude Code.
+
+### Added
+
+- **Codex support.** `codex mcp add sieve -- sieve mcp` registers sieve as a
+  local Codex MCP server. Installation and CLI help now document both Codex and
+  Claude Code.
+- **A reusable MCP worker pool.** Two Distillers keep their Chromium processes
+  warm by default, identical concurrent requests share one in-flight job, and
+  domain escalation knowledge is shared across workers.
+- **Bounded MCP payloads.** Manifests, content, actions, hidden text and search
+  results are token-budgeted and paginated. The table of contents is capped
+  without reporting a false section count.
+- Regression fixtures for persistent gesture covers, unsemantic click-anywhere
+  gates, inert canvas entrances and false scroll containers.
+
+### Changed
+
+- **Animation-shattered source text is repaired exactly before escalation.**
+  Inline character wrappers are collapsed from authored source whitespace only
+  when the subtree contains no hidden, interactive or media descendants.
+  Standalone short labels such as `01` are no longer mistaken for split words.
+  On the live Organimo benchmark this changed a fragmented 102-second browser
+  fallback into an exact 1.1-second fetch result while retaining 59/59 facts.
+- Entry gates hand off as soon as a safe gesture exposes content, or after its
+  bounded response window when a canvas accepts the gesture without changing
+  the DOM. Ordinary navigation labels no longer veto an explicit benign entry
+  instruction, while age, consent, account and transaction controls remain
+  refused.
+- A sweep that falsely identifies a scroll container now retries once through
+  the virtual-scroll/wheel driver. The live Igloo benchmark completes in about
+  21 seconds with 40/40 facts.
+- Initial rendered readiness is capped rather than consuming the whole load
+  allowance. Late content now rebuilds sections, summaries, hashes and token
+  counts before emission.
+- Search uses Unicode-aware BM25-style ranking with phrase, heading and section
+  boosts. Manifest token counts now measure emitted Markdown with the real
+  tokenizer.
+
+### Fixed
+
+- Served text corroborated by visible evidence is marked exact-but-unpositioned
+  instead of speculative and silently omitted.
+- Active MCP jobs cannot be evicted, invalid tiers are rejected, tracking
+  parameters do not defeat request coalescing, and browser workers close
+  cleanly.
+- Large content blocks paginate by rune offset without splitting UTF-8 text.
+
+### Verification
+
+- Live coverage: Organimo 59/59 and Igloo 40/40 ground-truth facts.
+- Reproducible offline corpus: 151/154 facts (98.1%).
+- The complete Chromium-enabled test suite, `go vet ./...`, and `go build ./...`
+  pass. CI also runs the no-browser suite under the race detector.
+
 ## 0.2.0
 
 The artifact format is unchanged: schema is still 1.0 and everything in

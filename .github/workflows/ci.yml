@@ -35,10 +35,7 @@ jobs:
       - name: Test
         env:
           SIEVE_SKIP_BROWSER: "1"
-        run: >
-          go test -race ./internal/escalate/... ./internal/corroborate/...
-          ./internal/textnorm/... ./internal/safety/... ./internal/tokens/...
-          ./internal/emit/... ./internal/static/...
+        run: go test -race ./...
 
   # Extraction is only meaningful against a real browser, so the golden corpus
   # and the adversarial fixtures run here.
@@ -73,6 +70,9 @@ jobs:
 
       - name: Render layer
         run: go test -count=1 ./internal/render/...
+
+      - name: Offline accuracy corpus
+        run: go test -count=1 -run TestOfflineCorpus ./internal/bench/...
 
       # The latent invariant is the project's central security claim: hidden
       # content must never reach a default payload. It is asserted on every

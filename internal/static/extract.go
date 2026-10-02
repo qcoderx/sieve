@@ -135,7 +135,9 @@ type Signals struct {
 	// HTML has neither, so tier 0 emits the fragments in document order. When
 	// the library also reorders the source for its effect, the result is not
 	// merely ugly, it is wrong: organimo.com yields "Liitless m", "Te real h"
-	// and a heading spelled out as "e / v / er / n / eed."
+	// and a heading spelled out as "e / v / er / n / eed." ShortRuns counts
+	// only tiny runs that share a block with other text; a standalone "01"
+	// feature badge is short, but it is not a fragment of anything.
 	//
 	// Every other escalation signal here asks whether the text is present.
 	// This one asks whether it is legible, which is a different question and
@@ -204,6 +206,7 @@ func Extract(pageURL string, body io.Reader, sizeHint int) (*Result, error) {
 	// tier would ingest exactly the material the rendered tiers quarantine.
 	ex.scanStyles(doc)
 	ex.walk(doc, "html", "html", "", "", 0, false, 0)
+	ex.measureSplitRuns()
 	hydration := HydrationText(doc)
 	hydrationLinks := HydrationLinks(doc)
 
@@ -234,9 +237,9 @@ func Extract(pageURL string, body io.Reader, sizeHint int) (*Result, error) {
 	ex.signals.MarkupChars = markupTextChars(string(raw))
 
 	return &Result{
-		Merged:    ex.acc.Result(),
-		Signals:   ex.signals,
-		RawHTML:   string(raw),
+		Merged:         ex.acc.Result(),
+		Signals:        ex.signals,
+		RawHTML:        string(raw),
 		Hydration:      hydration,
 		HydrationLinks: hydrationLinks,
 	}, nil
@@ -619,6 +622,27 @@ func (e *extractor) walk(n *html.Node, path, blockPath, landmark, href string, d
 			blockPath = path
 		}
 
+		// Animation libraries often use semantic inline tags as character
+		// wrappers: <i>e</i><em>v</em><strong>er</strong>.  Walking those tags as
+		// independent styled runs makes the graph quite reasonably preserve the
+		// style boundaries, which turns "ever need" into several blocks.  The
+		// served subtree already carries the exact authored string, including its
+		// word-boundary whitespace, so collapse only the narrow, mechanically
+		// provable shape before synthetic geometry can damage it.
+		//
+		// The predicate refuses block descendants, controls, media, and any
+		// hidden descendant.  This is text repair, never visibility promotion or
+		// flattening of meaningful page structure.
+		if raw, ok := e.shatteredInlineText(n); ok {
+			line := parentLine
+			if line == 0 {
+				e.lineNo++
+				line = e.lineNo
+			}
+			e.emitFragment(n, raw, path, blockPath, landmark, href, depth, line)
+			return
+		}
+
 	case html.TextNode:
 		return
 	}
@@ -692,6 +716,102 @@ func (e *extractor) walk(n *html.Node, path, blockPath, landmark, href string, d
 	flush()
 }
 
+// shatteredInlineText returns the exact source text of a block whose inline
+// descendants have been split into several one- or two-character wrappers.
+// It deliberately returns the source string rather than attempting to infer
+// words: whitespace between tags is authored evidence and therefore exact.
+func (e *extractor) shatteredInlineText(root *html.Node) (string, bool) {
+	if root == nil || root.Type != html.ElementNode || !isBlockish(root.DataAtom) {
+		return "", false
+	}
+	runs := 0
+	short := 0
+	unsafe := false
+	var walk func(*html.Node, bool)
+	walk = func(n *html.Node, isRoot bool) {
+		if unsafe {
+			return
+		}
+		switch n.Type {
+		case html.TextNode:
+			text := normalizeSpace(n.Data)
+			if text == "" {
+				return
+			}
+			runs++
+			if utf8.RuneCountInString(text) <= maxShatteredRun {
+				short++
+			}
+			return
+		case html.ElementNode:
+			if !isRoot {
+				if isBlockish(n.DataAtom) || e.hiddenReason(n) != "" {
+					unsafe = true
+					return
+				}
+				switch n.DataAtom {
+				case atom.A, atom.Button, atom.Form, atom.Input, atom.Select,
+					atom.Textarea, atom.Img, atom.Picture, atom.Video, atom.Audio,
+					atom.Canvas, atom.Br:
+					unsafe = true
+					return
+				}
+			}
+		}
+		for c := n.FirstChild; c != nil; c = c.NextSibling {
+			walk(c, false)
+		}
+	}
+	walk(root, true)
+	if unsafe || runs < 3 || short < 1 {
+		return "", false
+	}
+	var sb strings.Builder
+	collectSourceText(root, &sb)
+	raw := sb.String()
+	if utf8.RuneCountInString(normalizeSpace(raw)) < 12 {
+		return "", false
+	}
+	return raw, true
+}
+
+// measureSplitRuns distinguishes character fragments from legitimately short
+// standalone labels.  The old global count sent Organimo to a browser because
+// its feature bubbles are numbered "01" and "02"; those nodes own their block
+// and cannot be pieces of a word.  A splitting plugin's letters share the
+// nearest block with the other pieces, which is the evidence the signal needs.
+func (e *extractor) measureSplitRuns() {
+	perBlock := make(map[string]int, len(e.nodes))
+	for i := range e.nodes {
+		perBlock[e.nodes[i].Block]++
+	}
+	e.signals.TextRuns = len(e.nodes)
+	e.signals.ShortRuns = 0
+	for i := range e.nodes {
+		n := &e.nodes[i]
+		if perBlock[n.Block] > 1 && utf8.RuneCountInString(n.Text) <= maxShatteredRun {
+			e.signals.ShortRuns++
+		}
+	}
+}
+
+// collectSourceText preserves exactly the whitespace authored between inline
+// elements. collectText intentionally inserts separators between every child,
+// which is right for generic labels but would turn character wrappers back
+// into "e v er" and defeat shatteredInlineText.
+func collectSourceText(n *html.Node, sb *strings.Builder) {
+	if n.Type == html.TextNode {
+		sb.WriteString(n.Data)
+		return
+	}
+	if n.Type == html.ElementNode && skipTags[n.DataAtom] {
+		return
+	}
+	for c := n.FirstChild; c != nil; c = c.NextSibling {
+		collectSourceText(c, sb)
+	}
+}
+
 // ownsText reports whether an element holds any words of its own, as opposed to
 // only holding other elements.
 func ownsText(n *html.Node) bool {
@@ -735,10 +855,6 @@ func (e *extractor) emitFragment(n *html.Node, raw, path, blockPath, landmark, h
 	}
 	runes := utf8.RuneCountInString(text)
 	e.signals.TextChars += runes
-	e.signals.TextRuns++
-	if runes <= maxShatteredRun {
-		e.signals.ShortRuns++
-	}
 	// Static extraction has no geometry. Positions are synthesised from
 	// document order so the ordering pass has a consistent, monotonic input:
 	// on a served document, source order *is* reading order, which is exactly

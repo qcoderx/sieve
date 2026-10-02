@@ -1,0 +1,39 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>Persistent gesture layer</title>
+<style>
+  html, body { margin: 0; background: #111; color: white; font: 16px/1.5 system-ui; }
+  main { padding: 4rem; max-width: 48rem; }
+  #gate { position: fixed; inset: 0; z-index: 20; display: grid; place-items: center;
+          background: #050505; color: white; }
+</style>
+</head>
+<body>
+  <section id="gate"><div id="progress">100</div><button id="go" type="button">Enable sound</button></section>
+  <main>
+    <h1>Persistent-cover studio</h1>
+    <p>THE STUDIO IS OPEN. This substantive paragraph is deliberately long enough
+       to prove that a complete page already exists underneath the entry layer.</p>
+    <p>The archive documents field recordings, production notes, commissions,
+       collaborators, dates, locations, and the complete publication history.</p>
+    <p>Additional project material makes the hidden body comfortably exceed the
+       gate threshold without relying on navigation labels or repeated chrome.</p>
+    <p>The collection also includes transcripts, technical specifications,
+       conservation records, exhibition histories, installation instructions,
+       interviews, essays, correspondence, and a searchable public bibliography.</p>
+    <p>Every record carries its authorship, publication date, revision history,
+       geographic scope, source material, related works, and accessibility notes.</p>
+  </main>
+<script>
+  // The gesture is accepted and the label changes, but the decorative layer
+  // deliberately remains mounted: this is the live Organimo failure shape.
+  document.getElementById("go").addEventListener("click", function accepted() {
+    document.getElementById("progress").textContent = "COMPLETE";
+    document.getElementById("go").textContent = "Sound on";
+    document.getElementById("go").removeEventListener("click", accepted);
+  });
+</script>
+</body>
+</html>

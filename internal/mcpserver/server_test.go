@@ -3,9 +3,11 @@ package mcpserver_test
 import (
 	"context"
 	"encoding/json"
+	"fmt"
 	"net/http"
 	"net/http/httptest"
 	"strings"
+	"sync/atomic"
 	"testing"
 	"time"
 
@@ -15,6 +17,7 @@ import (
 	"github.com/qcoderx/sieve/internal/escalate"
 	"github.com/qcoderx/sieve/internal/mcpserver"
 	"github.com/qcoderx/sieve/internal/safety"
+	"github.com/qcoderx/sieve/internal/tokens"
 )
 
 // connect wires a client to the server over an in-memory transport, so the test
@@ -280,6 +283,196 @@ func TestUnknownJobIsAClearError(t *testing.T) {
 	}
 }
 
+func TestEquivalentRequestsReuseOneJob(t *testing.T) {
+	var pageHits atomic.Int32
+	fx := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if r.URL.Path == "/robots.txt" {
+			_, _ = w.Write([]byte("User-agent: *\nAllow: /\n"))
+			return
+		}
+		pageHits.Add(1)
+		time.Sleep(1500 * time.Millisecond)
+		_, _ = w.Write([]byte("<html><title>Slow page</title><main><h1>Slow page</h1><p>A page used to prove identical work is coalesced.</p></main></html>"))
+	}))
+	defer fx.Close()
+	sess, done := connect(t, fx)
+	defer done()
+
+	type result struct {
+		JobID string `json:"job_id"`
+		State string `json:"state"`
+	}
+	var first, second result
+	callJSON(t, sess, "distill", map[string]any{
+		"url": fx.URL + "/page#first", "wait_seconds": 1, "index_only": true,
+	}, &first)
+	callJSON(t, sess, "distill", map[string]any{
+		"url": fx.URL + "/page#second", "wait_seconds": 1, "index_only": true,
+	}, &second)
+	if first.JobID == "" || second.JobID != first.JobID {
+		t.Fatalf("equivalent requests used different jobs: first=%+v second=%+v", first, second)
+	}
+	if pageHits.Load() != 1 {
+		t.Fatalf("page fetched %d times, want one shared job", pageHits.Load())
+	}
+}
+
+func TestDistillRejectsUnknownTier(t *testing.T) {
+	fx := fixtureServer(t)
+	sess, done := connect(t, fx)
+	defer done()
+
+	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
+	defer cancel()
+	res, err := sess.CallTool(ctx, &mcp.CallToolParams{
+		Name: "distill", Arguments: map[string]any{"url": fx.URL, "tier": "maximum"},
+	})
+	if err == nil && !res.IsError {
+		t.Fatal("unknown tier was silently treated as automatic")
+	}
+}
+
+func TestGetContentPaginatesOneLargeBlockBySerializedTokenCost(t *testing.T) {
+	paragraph := strings.Repeat("Precision retrieval keeps every verified sentence available for later pagination. ", 1000)
+	fx := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if r.URL.Path == "/robots.txt" {
+			_, _ = w.Write([]byte("User-agent: *\nAllow: /\n"))
+			return
+		}
+		_, _ = w.Write([]byte("<html><title>Large page</title><main><h1>Large page</h1><p>" + paragraph + "</p></main></html>"))
+	}))
+	defer fx.Close()
+	sess, done := connect(t, fx)
+	defer done()
+
+	var distilled struct {
+		JobID string `json:"job_id"`
+		State string `json:"state"`
+	}
+	callJSON(t, sess, "distill", map[string]any{
+		"url": fx.URL + "/large", "wait_seconds": 60, "index_only": true,
+	}, &distilled)
+	if distilled.State != "ready" {
+		t.Fatalf("distill state = %q", distilled.State)
+	}
+
+	cursor := ""
+	var recovered strings.Builder
+	for page := 0; page < 20; page++ {
+		args := map[string]any{"job_id": distilled.JobID}
+		if cursor != "" {
+			args["cursor"] = cursor
+		}
+		ctx, cancel := context.WithTimeout(context.Background(), 20*time.Second)
+		res, err := sess.CallTool(ctx, &mcp.CallToolParams{Name: "get_content", Arguments: args})
+		cancel()
+		if err != nil || res.IsError {
+			t.Fatalf("get_content page %d: err=%v result=%+v", page, err, res)
+		}
+		raw, err := json.Marshal(res.StructuredContent)
+		if err != nil {
+			t.Fatal(err)
+		}
+		if len(raw) > 24000 {
+			t.Fatalf("page %d serialized to %d bytes, over 24000", page, len(raw))
+		}
+		if got := tokens.Estimate(string(raw)); got > 5500 {
+			t.Fatalf("page %d estimated at %d tokens, over 5500", page, got)
+		}
+		var out struct {
+			Blocks []struct {
+				Text string `json:"text"`
+			} `json:"blocks"`
+			NextCursor string `json:"next_cursor"`
+		}
+		if err := json.Unmarshal(raw, &out); err != nil {
+			t.Fatal(err)
+		}
+		for _, block := range out.Blocks {
+			recovered.WriteString(block.Text)
+		}
+		if out.NextCursor == "" {
+			break
+		}
+		if out.NextCursor == cursor {
+			t.Fatalf("cursor made no progress at %q", cursor)
+		}
+		cursor = out.NextCursor
+	}
+	if !strings.Contains(recovered.String(), strings.TrimSpace(paragraph)) {
+		t.Fatalf("large block was truncated across pages: recovered %d of %d characters",
+			recovered.Len(), len(paragraph))
+	}
+}
+
+func TestListActionsIsTokenBoundedAndPaged(t *testing.T) {
+	var page strings.Builder
+	page.WriteString("<html><title>Links</title><main><h1>Directory</h1>")
+	for i := 0; i < 900; i++ {
+		page.WriteString(fmt.Sprintf(`<a href="/item/%d">Detailed catalogue item number %d</a>`, i, i))
+	}
+	page.WriteString("</main></html>")
+	fx := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if r.URL.Path == "/robots.txt" {
+			_, _ = w.Write([]byte("User-agent: *\nAllow: /\n"))
+			return
+		}
+		_, _ = w.Write([]byte(page.String()))
+	}))
+	defer fx.Close()
+	sess, done := connect(t, fx)
+	defer done()
+
+	var distilled struct {
+		JobID    string `json:"job_id"`
+		Manifest *struct {
+			Counts struct {
+				Actions int `json:"actions"`
+			} `json:"counts"`
+		} `json:"manifest"`
+	}
+	callJSON(t, sess, "distill", map[string]any{
+		"url": fx.URL + "/links", "wait_seconds": 60, "index_only": true,
+	}, &distilled)
+
+	cursor, total := "", 0
+	for response := 0; response < 30; response++ {
+		args := map[string]any{"job_id": distilled.JobID}
+		if cursor != "" {
+			args["cursor"] = cursor
+		}
+		ctx, cancel := context.WithTimeout(context.Background(), 20*time.Second)
+		res, err := sess.CallTool(ctx, &mcp.CallToolParams{Name: "list_actions", Arguments: args})
+		cancel()
+		if err != nil || res.IsError {
+			t.Fatalf("list_actions response %d: err=%v result=%+v", response, err, res)
+		}
+		raw, _ := json.Marshal(res.StructuredContent)
+		if len(raw) > 24000 || tokens.Estimate(string(raw)) > 5500 {
+			t.Fatalf("actions response %d exceeded its budget: %d bytes, %d tokens",
+				response, len(raw), tokens.Estimate(string(raw)))
+		}
+		var out struct {
+			Actions    []json.RawMessage `json:"actions"`
+			NextCursor string            `json:"next_cursor"`
+		}
+		if err := json.Unmarshal(raw, &out); err != nil {
+			t.Fatal(err)
+		}
+		total += len(out.Actions)
+		if out.NextCursor == "" {
+			break
+		}
+		if out.NextCursor == cursor {
+			t.Fatalf("action cursor made no progress at %q", cursor)
+		}
+		cursor = out.NextCursor
+	}
+	if distilled.Manifest == nil || total != distilled.Manifest.Counts.Actions {
+		t.Fatalf("paged actions recovered %d of manifest count %+v", total, distilled.Manifest)
+	}
+}
+
 // TestToolSurfaceStaysSmall is a budget, not a style preference.
 //
 // Tool definitions are sent on every session before the model has read a single
@@ -295,7 +488,7 @@ func TestUnknownJobIsAClearError(t *testing.T) {
 // a model actually needs now lives in Instructions, which is sent once per
 // session rather than once per tool.
 //
-// The budget is deliberately generous against the 1,737 measured when this was
+// The budget is deliberately generous against the 1,860 measured when this was
 // written. It exists to catch a struct being reflected into a schema again by
 // accident, not to argue about a sentence.
 func TestToolSurfaceStaysSmall(t *testing.T) {

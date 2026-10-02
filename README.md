@@ -149,7 +149,7 @@ against each server:
 
 | server | tools | definitions |
 |---|---|---|
-| **sieve** | 7 | **1,797** |
+| **sieve** | 7 | **1,860** |
 | playwright-mcp | 24 | 4,625 |
 | chrome-devtools-mcp | 29 | 5,814 |
 
@@ -365,7 +365,13 @@ npm install -g @qcoderx/sieve          # prebuilt, no Go toolchain
 go install github.com/qcoderx/sieve/cmd/sieve@latest   # or build it
 ```
 
-Then, in Claude Code:
+Then connect either agent. For Codex:
+
+```sh
+codex mcp add sieve -- sieve mcp
+```
+
+For Claude Code (including its skill and WebFetch fallback hook):
 
 ```
 /plugin marketplace add qcoderx/sieve
@@ -394,7 +400,13 @@ This is the primary interface. The CLI is for humans and CI.
 claude mcp add sieve -- sieve mcp
 ```
 
-For Codex, in `~/.codex/config.toml`:
+For Codex, register the same server directly:
+
+```sh
+codex mcp add sieve -- sieve mcp
+```
+
+or in `~/.codex/config.toml`:
 
 ```toml
 [mcp_servers.sieve]
@@ -496,8 +508,9 @@ would otherwise hand the artifact a large apparent win.
 
 ## Caching
 
-The MCP server reuses a completed artifact for 30 minutes, and never reuses one
-that is still rendering or that came back incomplete. Across sessions the
+The MCP server reuses a completed artifact for 30 minutes. Identical concurrent
+requests join the same in-flight job instead of launching duplicate browsers;
+incomplete artifacts are never cached as final. Across sessions the
 `content_hash` is what matters: it covers the normalised semantic graph, not the
 bytes, so re-distilling an unchanged page produces the same hash and a differing
 hash means the content differs. WebFetch caches by URL for 15 minutes and cannot

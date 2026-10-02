@@ -11,6 +11,7 @@ import (
 
 	"github.com/qcoderx/sieve/internal/graph"
 	"github.com/qcoderx/sieve/internal/render"
+	"github.com/qcoderx/sieve/internal/tokens"
 )
 
 func buildFixture(t *testing.T, page string) *graph.Graph {
@@ -60,6 +61,44 @@ func buildFixture(t *testing.T, page string) *graph.Graph {
 		t.Fatalf("build: %v", err)
 	}
 	return g
+}
+
+func TestRecountRefreshesLateContentDerivatives(t *testing.T) {
+	g := &graph.Graph{
+		SchemaVersion: graph.SchemaVersion,
+		URL:           "https://example.com/",
+		FinalURL:      "https://example.com/",
+		Title:         "Recovered scene",
+		Blocks: []graph.Block{{
+			ID: "b_000", Type: graph.TypeHeading, Level: 1,
+			Text: "Overview", Region: graph.RegionMain, Source: graph.SourceDOM,
+		}},
+	}
+	g.Recount()
+	before := g.ContentHash
+
+	late := "è¿™æ®µæ–‡å­—æ˜¯ä»Žå»¶è¿Ÿçš„ä¸‰ç»´åœºæ™¯æ¢å¤çš„ï¼Œå¿…é¡»æ›´æ–°ç« èŠ‚ã€æ‘˜è¦ã€ä»¤ç‰Œæ•°å’Œå†…å®¹å“ˆå¸Œã€‚"
+	g.Blocks = append(g.Blocks, graph.Block{
+		ID: "b_001", Type: graph.TypeParagraph, Text: late,
+		Region: graph.RegionMain, Source: graph.SourceCanvasScene,
+	})
+	g.Recount()
+
+	if g.ContentHash == before {
+		t.Fatal("content hash did not change after late recovered content")
+	}
+	if len(g.Sections) != 1 || g.Sections[0].BlockCount != 2 {
+		t.Fatalf("sections were not rebuilt around late content: %+v", g.Sections)
+	}
+	if g.Blocks[1].SectionID != g.Sections[0].ID {
+		t.Error("late block was not assigned to the rebuilt section")
+	}
+	if got, want := g.Sections[0].Tokens, tokens.Estimate("Overview\n"+late); got != want {
+		t.Errorf("section tokens = %d, want tokenizer estimate %d", got, want)
+	}
+	if !strings.Contains(g.Summary, "ä¸‰ç»´åœºæ™¯") {
+		t.Errorf("summary was not refreshed from late content: %q", g.Summary)
+	}
 }
 
 func TestBuildImmersive(t *testing.T) {

@@ -37,9 +37,10 @@ import (
 // from it -- which is precisely the injection case, where an attacker's hidden
 // block has no visible counterpart anywhere on the page.
 //
-// Everything adopted is marked: speculative verification, an explicit flag, and
-// a line in the audit. It is offered as what it is -- text the site served and
-// sieve did not personally watch appear -- and never as observed content.
+// Everything adopted is marked with its static source, conservative
+// confidence, an explicit flag, and a line in the audit. It is page-authored
+// text corroborated by several independent visible witnesses, so it is exact
+// content even though its placement was not observed.
 func AdoptServedText(g *Graph, served []capture.LatentNode) (adopted int, proof int) {
 	if g == nil || len(served) == 0 {
 		return 0, 0
@@ -136,10 +137,10 @@ func AdoptServedText(g *Graph, served []capture.LatentNode) (adopted int, proof 
 			Type:       TypeParagraph,
 			Text:       c.text,
 			Order:      len(g.Blocks),
-			Source:     SourceDOM,
+			Source:     SourceStatic,
 			Score:      adoptedConfidence,
 			Confidence: Bucket(adoptedConfidence),
-			Verified:   VerificationSpeculative,
+			Verified:   VerificationNone,
 			Region:     RegionMain,
 			Flags:      []string{"served-html-not-observed-rendered"},
 		})

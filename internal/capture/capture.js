@@ -1805,7 +1805,15 @@
       }
       var t = norm(node.innerText || node.textContent || "");
       if (t && t.length <= 60 && !label) label = t;
-      if (t && REFUSE_WORDS.test(t)) return null;
+      // Refuse a dangerous surface, not an unrelated word somewhere in an
+      // ancestor that happens to contain the whole page.  organimo.com's
+      // full-screen intro includes its ordinary "LOGIN" navigation label in
+      // the same section as "Click anywhere"; treating the aggregate section
+      // text as the label made the safe instruction impossible to follow.
+      // Short text still describes this surface.  Forms and outbound links
+      // are rejected structurally above, and refusedGateLabel independently
+      // catches explicit age/consent/account controls anywhere in the gate.
+      if (i === 0 && t && t.length <= 120 && REFUSE_WORDS.test(t)) return null;
     }
     return {
       tag: el.tagName ? el.tagName.toLowerCase() : "",
@@ -1832,16 +1840,22 @@
       text = norm((document.body && document.body.innerText) || "").slice(0, 400);
     } catch (e) {}
     var ctl = findEntryControl();
+    var refused = ctl ? null : refusedGateLabel();
     return {
       text: text,
       chars: text.length,
       loading: looksLikeLoader(text),
-      invites: ENTER_INVITE.test(text) && !REFUSE_WORDS.test(text),
-      keys: KEY_INVITE.test(text) && !REFUSE_WORDS.test(text),
+      // Apply the refusal to an actual gate control, not to every navigation
+      // word in body.innerText.  A normal LOGIN link elsewhere on a site must
+      // not veto an explicit "Click anywhere" intro.  refusedGateLabel is
+      // deliberately narrow and deny-first: age, consent, account and
+      // transaction controls still win over an entrance instruction.
+      invites: ENTER_INVITE.test(text) && !refused,
+      keys: KEY_INVITE.test(text) && !refused,
       control: ctl,
       cover: findCover(),
       centre: ctl ? null : centreTarget(),
-      refused: ctl ? null : refusedGateLabel(),
+      refused: refused,
     };
   }
 
@@ -1850,13 +1864,18 @@
   function refusedGateLabel() {
     var els;
     try {
-      els = document.querySelectorAll("button,[role=button],a");
+      // Search prose as well as controls.  A full-screen "click anywhere"
+      // age or consent gate may attach its handler to window and have no
+      // semantic button at all.  It still states the claim in a short element,
+      // and the action words below keep an unrelated LOGIN navigation label
+      // from being mistaken for that claim.
+      els = document.querySelectorAll("body *");
     } catch (e) {
       return null;
     }
-    for (var i = 0; i < els.length && i < 300; i++) {
+    for (var i = 0; i < els.length && i < 3000; i++) {
       var label = norm(els[i].innerText || els[i].textContent || "");
-      if (label && label.length <= 40 && REFUSE_WORDS.test(label) &&
+      if (label && label.length <= 120 && REFUSE_WORDS.test(label) &&
         /enter|continue|proceed|yes|agree|accept/i.test(label)) {
         return label;
       }
@@ -2544,6 +2563,7 @@
     var scrollTotal = 0;
     var settleWorst = 0;
     var captureWorst = 0;
+    var driverRescues = 0;
 
     // Once, before the first checkpoint.
     var throttled = throttleGL ? throttleCanvases() : 0;
@@ -2835,6 +2855,26 @@
       // this stop" is not evidence about a section the sweep has not reached.
       var pending = st.mode === "window" && !st.virtual &&
         nextTarget(targets, visited, snap.sy, vh) !== null;
+
+      // Stability only says that the current driver stopped producing new
+      // information. It does not say the page ended. A false-positive scroll
+      // container on a transform-driven site can accept scrollTop writes while
+      // moving none of the content; stopping here returned four checkpoints
+      // from organimo.com with the bottom unproved and 1,435 unread chars.
+      // Abandon that driver once and force the library/wheel path before an
+      // incomplete stable result is allowed.
+      if (!pending && !atBottom && stableRun >= stableK && stalls >= 2 &&
+          driverRescues < 1) {
+        driverRescues++;
+        stableRun = 0;
+        stalls = 0;
+        if (st.container) {
+          st.container = null;
+          st.containerChecked = true;
+        }
+        st.virtual = true;
+        note("the first scroll driver stopped before the document end; sieve switched to the page's virtual-scroll or wheel path");
+      }
 
       if (!pending && stableRun >= stableK && (atBottom || stalls >= 2)) {
         reachedBottom = reachedBottom || atBottom;

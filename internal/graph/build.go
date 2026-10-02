@@ -216,7 +216,6 @@ func Build(in Input) (*Graph, error) {
 	// Timestamps and timings change on every run and would make an unchanged
 	// site look different every time, defeating the point of a content-addressed
 	// cache; so would a rewritten asset URL or a whitespace change.
-	g.ContentHash = semanticHash(g)
 	g.Recount()
 
 	// Decided last, because it needs the block count that survived pruning.
@@ -242,10 +241,14 @@ func Build(in Input) (*Graph, error) {
 // glyph geometry, announced twenty-eight tokens for twenty-three paragraphs
 // and a ninety-four per cent saving it had not made.
 //
-// The hash is deliberately not recomputed here: it identifies the semantic
-// graph, and the callers that append re-derive it themselves when they are
-// done. Recount is about what the artifact claims of itself.
+// Sections, the summary, and the content hash are derived from the block
+// list too. Keeping all of them here makes late recovery atomic: callers
+// cannot remember to update the token count while accidentally leaving the
+// table of contents or cache identity behind.
 func (g *Graph) Recount() {
+	g.Sections = makeSections(g.Blocks)
+	g.Summary = makeSummary(g)
+	g.ContentHash = semanticHash(g)
 	g.Stats.ContentNodes = 0
 	g.Stats.ChromeNodes = 0
 	for _, b := range g.Blocks {
@@ -795,6 +798,7 @@ func sectionID(title string, dup int) string {
 func makeSections(blocks []Block) []Section {
 	var secs []Section
 	cur := -1
+	sectionText := map[string][]string{}
 
 	// How many sections have already claimed each heading, so repeats are told
 	// apart by their order among themselves rather than by absolute position.
@@ -826,13 +830,16 @@ func makeSections(blocks []Block) []Section {
 		secs[cur].LastBlock = b.ID
 		secs[cur].BlockCount++
 		secs[cur].Chars += utf8.RuneCountInString(b.Text)
+		sectionText[secs[cur].ID] = append(sectionText[secs[cur].ID], b.Text)
 	}
 
 	for i := range secs {
 		if secs[i].Title == "" {
 			secs[i].Title = "(introduction)"
 		}
-		secs[i].Tokens = tokens.EstimateChars(secs[i].Chars)
+		// Estimate the actual text, not chars/4. The latter substantially
+		// undercounts CJK and can overcount prose while missing code-heavy pages.
+		secs[i].Tokens = tokens.Estimate(strings.Join(sectionText[secs[i].ID], "\n"))
 	}
 	return secs
 }

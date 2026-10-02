@@ -203,6 +203,36 @@ func TestSweepImmersiveFixture(t *testing.T) {
 	}
 }
 
+func TestSweepAbandonsFalseScrollContainer(t *testing.T) {
+	if os.Getenv("SIEVE_SKIP_BROWSER") != "" {
+		t.Skip("SIEVE_SKIP_BROWSER set")
+	}
+	srv := serveFixtures(t)
+	b := newBrowser(t)
+	ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
+	defer cancel()
+
+	res, err := b.Sweep(ctx, srv.URL+"/false-scroller/", nil)
+	if err != nil {
+		t.Fatalf("sweep: %v", err)
+	}
+	got := allText(res.Merged)
+	for _, want := range []string{"ALPHA VIRTUAL CONTENT", "BRAVO VIRTUAL CONTENT", "CHARLIE VIRTUAL CONTENT", "DELTA VIRTUAL CONTENT"} {
+		if !strings.Contains(got, want) {
+			t.Errorf("missing %q after the apparent scroll container stalled", want)
+		}
+	}
+	foundSwitch := false
+	for _, note := range res.Notes {
+		if strings.Contains(note, "first scroll driver stopped") {
+			foundSwitch = true
+		}
+	}
+	if !foundSwitch {
+		t.Error("sweep never reported switching away from the false scroll container")
+	}
+}
+
 func allText(m *capture.Merged) string {
 	var sb strings.Builder
 	for _, n := range m.Nodes {

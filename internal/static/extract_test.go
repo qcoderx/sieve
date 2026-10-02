@@ -224,3 +224,43 @@ func TestInlineElementsKeepTheirPlace(t *testing.T) {
 		}
 	}
 }
+
+func TestShatteredInlineMarkupUsesExactAuthoredText(t *testing.T) {
+	const page = `<!doctype html><html><body><main>
+<div>The only natural multivitamin you will <i>e</i><em>v</em><strong>er</strong> <em>n</em><strong>eed.</strong></div>
+<div>All naturally sourced <strong>marine</strong> <strong>i<em>n</em>gredients</strong> from Canada.</div>
+<div>Li<em>m</em>itless begins here.</div>
+</main></body></html>`
+	res := extract(t, page)
+	got := allText(res)
+	for _, want := range []string{
+		"The only natural multivitamin you will ever need.",
+		"All naturally sourced marine ingredients from Canada.",
+		"Limitless begins here.",
+	} {
+		if !strings.Contains(got, want) {
+			t.Errorf("shattered source text was not repaired exactly; missing %q in:\n%s", want, got)
+		}
+	}
+	for _, broken := range []string{"\nev\n", "marinei", "\ngredients\n"} {
+		if strings.Contains(got, broken) {
+			t.Errorf("fragment %q survived exact subtree repair:\n%s", broken, got)
+		}
+	}
+	if res.Signals.ShortRuns != 0 {
+		t.Errorf("repaired text still advertises %d shattered runs and would waste a browser", res.Signals.ShortRuns)
+	}
+}
+
+func TestStandaloneShortLabelsDoNotTriggerSplitText(t *testing.T) {
+	const page = `<!doctype html><html><body><main>
+<section><div>01</div><p>Rich in vitamins and minerals that increase energy levels.</p></section>
+<section><div>02</div><p>Anti-inflammatory properties reduce the risk of fatigue.</p></section>
+<section><div>03</div><p>Natural prebiotic ingredients support healthy digestion.</p></section>
+<section><div>04</div><p>Marine ingredients are harvested from renewable sources.</p></section>
+</main></body></html>`
+	res := extract(t, page)
+	if res.Signals.ShortRuns != 0 || res.Signals.SplitTextRatio() != 0 {
+		t.Fatalf("standalone numbered badges classified as split text: %+v", res.Signals)
+	}
+}

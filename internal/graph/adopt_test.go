@@ -70,7 +70,8 @@ func TestAdoptRefusesDisplayNone(t *testing.T) {
 func TestAdoptTakesRevealedTextOnProof(t *testing.T) {
 	// The pear.no shape: the render saw some served-hidden sections on screen,
 	// which proves the marking is a reveal state, so the sections it never
-	// travelled to are adopted -- flagged, and never as observed content.
+	// travelled to are adopted -- flagged as statically sourced, not discarded
+	// as model speculation.
 	g := &Graph{
 		Blocks: []Block{
 			{Text: "You pay nothing to start: no retainer, no project fee, no hours on a clock.", Region: RegionMain},
@@ -100,8 +101,11 @@ func TestAdoptTakesRevealedTextOnProof(t *testing.T) {
 	if !strings.Contains(last.Text, "We say no more often than yes") {
 		t.Errorf("adopted the wrong run: %q", last.Text)
 	}
-	if last.Verified != VerificationSpeculative {
-		t.Errorf("verified = %q, want speculative: sieve did not watch this appear", last.Verified)
+	if last.Verified != VerificationNone {
+		t.Errorf("verified = %q, want none: corroborated served text is exact page content", last.Verified)
+	}
+	if last.Source != SourceStatic {
+		t.Errorf("source = %q, want static", last.Source)
 	}
 	var flagged bool
 	for _, f := range last.Flags {

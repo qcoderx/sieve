@@ -7,6 +7,7 @@ import (
 
 	"github.com/qcoderx/sieve/internal/emit"
 	"github.com/qcoderx/sieve/internal/graph"
+	"github.com/qcoderx/sieve/internal/tokens"
 )
 
 // docs/ARTIFACT.md is a promise, and a promise nothing checks is a wish.
@@ -47,6 +48,52 @@ func contractGraph() *graph.Graph {
 	g.Provenance.TierReason = "the served HTML is a shell"
 	g.Recount()
 	return g
+}
+
+func TestManifestTokenCountMatchesInlineArtifact(t *testing.T) {
+	g := contractGraph()
+	g.Actions = append(g.Actions, graph.Action{
+		ID: "a_000", Type: "link", Label: "A deliberately long action label",
+		Href: "https://example.com/apply",
+	})
+	g.Gaps = append(g.Gaps, graph.Gap{
+		Label: "Pricing", Kind: "disclosure",
+		Reason: "available only after an interaction",
+	})
+
+	opt := emit.CompactMarkdownOptions()
+	opt.Actions, opt.Navigation, opt.Structured, opt.Gaps, opt.Notes = true, true, true, true, true
+	want := tokens.Estimate(emit.Markdown(g, opt))
+	got := emit.BuildManifest(g).Counts.TotalTokens
+	if got != want {
+		t.Fatalf("manifest estimated %d tokens, but the artifact it gates costs %d", got, want)
+	}
+}
+
+func TestAgentManifestBoundsHugeTablesOfContents(t *testing.T) {
+	g := contractGraph()
+	g.Sections = nil
+	for i := 0; i < 500; i++ {
+		g.Sections = append(g.Sections, graph.Section{
+			ID:     "s_" + strings.Repeat("a", 10),
+			Title:  strings.Repeat("A long generated reference heading ", 12),
+			Tokens: 20,
+		})
+	}
+	m := emit.BuildManifest(g).ForAgent()
+	if !m.SectionsTruncated {
+		t.Fatal("500-section table of contents was returned without a cap")
+	}
+	if m.Counts.Sections != 500 {
+		t.Fatalf("total section count = %d, want 500", m.Counts.Sections)
+	}
+	raw, err := json.Marshal(m)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if got := tokens.Estimate(string(raw)); got > 3000 {
+		t.Fatalf("bounded agent manifest still costs %d tokens", got)
+	}
 }
 
 // TestManifestKeepsItsContractedFields walks the field list in docs/ARTIFACT.md.

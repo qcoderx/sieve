@@ -1,12 +1,11 @@
 # Installing sieve
 
-Two parts: the binary does the work, the plugin tells Claude Code when to reach
-for it. Pick one line from each section.
+The binary does the work. Connect it to Codex with MCP, or install the Claude
+Code plugin for MCP plus automatic WebFetch fallback.
 
 ## 1. The binary
 
-**npm**, which is the shortest path for a Claude Code user, since Claude Code
-itself arrives that way:
+**npm** is the shortest cross-platform path:
 
 ```sh
 npm install -g @qcoderx/sieve
@@ -36,7 +35,32 @@ Chromium is the one other dependency, and only the tiers above `fetch` need it.
 sieve finds Chrome, Chromium or Edge on its own; `sieve doctor` says so if it
 cannot.
 
-## 2. The plugin, for every project
+## 2A. Connect Codex
+
+Codex and Claude use the same token-cheap MCP server; there is no second
+extraction path to drift or produce different answers. After installing the
+binary, register it once:
+
+```sh
+codex mcp add sieve -- sieve mcp
+codex mcp list
+```
+
+Or add it manually to `~/.codex/config.toml` (or a trusted project's
+`.codex/config.toml`):
+
+```toml
+[mcp_servers.sieve]
+command = "sieve"
+args = ["mcp"]
+startup_timeout_sec = 10
+tool_timeout_sec = 360
+```
+
+Start a new Codex session after adding it. Ask Codex to read a URL; it can call
+`distill`, inspect the manifest, search it, and fetch only the matching blocks.
+
+## 2B. Connect Claude Code
 
 ```
 /plugin marketplace add qcoderx/sieve
@@ -49,7 +73,7 @@ One install, three surfaces:
 |---|---|---|
 | **skill** | teaches Claude when a page needs sieve, and to read `outcome` first | nothing until invoked |
 | **hook** | when WebFetch returns a shell, reads the page properly in the same turn | one string scan per fetch |
-| **MCP server** | `distill`, `get_content`, `search_content` and the rest | ~1,800 tokens per session |
+| **MCP server** | `distill`, `get_content`, `search_content` and the rest | ~1,860 tokens per session |
 
 The MCP server is the only standing charge of the three. If you would rather
 drive sieve from the skill alone, disable that server in `/plugin` and keep the
@@ -90,7 +114,13 @@ directories that had a settings file when the session started.
 claude mcp add sieve -- sieve mcp
 ```
 
-For Codex, in `~/.codex/config.toml`:
+For Codex, the equivalent one-line registration is:
+
+```sh
+codex mcp add sieve -- sieve mcp
+```
+
+or in `~/.codex/config.toml`:
 
 ```toml
 [mcp_servers.sieve]

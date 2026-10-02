@@ -458,9 +458,20 @@ func (b *Browser) Sweep(ctx context.Context, rawURL string, guard NavGuard) (*Re
 	// time plus the settle budget, when what is actually wanted is "tell me when
 	// this page is both loaded and still" -- and the settle loop, which gates
 	// itself on readyState, answers exactly that question in one call.
-	readyBudget := b.opts.LoadBudget - time.Since(start)
-	if readyBudget < b.opts.FirstSettle {
-		readyBudget = b.opts.FirstSettle
+	// Readiness is an information wait, not permission to spend the whole load
+	// allowance watching a decorative animation. The gate loop below already
+	// owns long-running loaders and entry sequences; this first probe only needs
+	// enough time to observe DOMContentLoaded and a few quiet frames. Organimo's
+	// page was usable while a perpetual canvas kept this call alive for 27s.
+	readyBudget := 3 * b.opts.FirstSettle
+	if readyBudget < 3*time.Second {
+		readyBudget = 3 * time.Second
+	}
+	if readyBudget > 8*time.Second {
+		readyBudget = 8 * time.Second
+	}
+	if remaining := b.opts.LoadBudget - time.Since(start); remaining > 0 && remaining < readyBudget {
+		readyBudget = remaining
 	}
 	if readyBudget < 300*time.Millisecond {
 		readyBudget = 300 * time.Millisecond
@@ -1349,9 +1360,13 @@ const maxUnansweredProbes = 30
 const quietRounds = 3
 
 // blankRounds is the same for a page showing nothing whatsoever, which is a
-// page that has not started rather than a page with nothing on it. At gatePace
-// this is about three seconds.
-const blankRounds = 20
+// page that has not started rather than a page with nothing on it. A probe can
+// spend a full settle interval on a busy canvas, so this must be a small count:
+// twenty probes cost igloo.inc twenty-two seconds before the safe gesture it
+// was always going to receive. Six still gives a blank document several looks
+// in which to paint a loader, under the same full-screen-cover and refusal
+// checks, without duplicating most of the readiness budget.
+const blankRounds = 6
 
 // press dispatches a real mouse click. Real, because a great many entry screens
 // listen for a trusted event and ignore element.click().
@@ -1567,6 +1582,37 @@ func (b *Browser) openEntryGate(ctx context.Context, res *Result, deadline time.
 		unanswered = 0
 		var g gateState
 		if json.Unmarshal([]byte(raw), &g) != nil {
+			return
+		}
+
+		// A safe gesture that changes the screen and leaves a fully assembled
+		// document underneath has done its job even when the decorative cover
+		// remains mounted. Audio-first sites commonly keep that layer as a HUD;
+		// waiting for it to be removed spent the full 45s gate allowance on
+		// organimo.com after the page had already changed from 100 to COMPLETE.
+		// This cannot authorize a questionable interaction: presses only reach
+		// here after the refusal checks and benign-gate allow list above.
+		if presses > 0 && g.Text != pressedAt &&
+			!g.Loading && g.hidesRealText() {
+			b.opts.logf("gate: the gesture changed the screen and exposed %d characters; proceeding while the decorative cover remains", g.Cover.Hidden)
+			res.note("the entry gesture took effect and substantive page content became available, " +
+				"but its decorative cover remained mounted; sieve proceeded without waiting for that layer to disappear")
+			return
+		}
+
+		// A trusted, bounded gesture that receives no visible response has no
+		// reason to hold the gate phase hostage for another 45 seconds. Canvas
+		// sites can accept the gesture entirely inside their scene while leaving
+		// the DOM cover and its text unchanged; igloo.inc does exactly that, and
+		// scene introspection succeeds while this loop is still staring at the
+		// same layer. awaitOpening has already allowed three seconds for an exit
+		// animation. The normal readiness and sweep budgets remain after this, so
+		// a page still assembling itself is not abandoned -- it simply consumes
+		// the budget designed for assembly rather than the gate budget as well.
+		if presses > 0 && g.Text == pressedAt && !g.Loading && g.Control == nil {
+			b.opts.logf("gate: the accepted gesture produced no further DOM transition; handing off to page readiness")
+			res.note("the entry gesture produced no visible DOM transition after its response window; " +
+				"the page was handed to the normal readiness and sweep checks instead of spending the full gate allowance")
 			return
 		}
 

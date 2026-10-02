@@ -45,7 +45,10 @@ By default it speaks stdio, which is what a local host launches. Both transports
 serve the same tool surface from the same core, so behaviour cannot drift
 between them.
 
-Register with Claude Code:
+Register with Codex:
+  codex mcp add sieve -- sieve mcp
+
+Or with Claude Code:
   claude mcp add sieve -- sieve mcp
 
 Or a hosted instance:

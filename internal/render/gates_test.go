@@ -57,6 +57,8 @@ func TestEntryGates(t *testing.T) {
 			"opens for a real input event and ignores element.click()"},
 		{"key-to-enter", true, true,
 			"listens for a key and ignores the mouse entirely, and says so in words"},
+		{"unsemantic-anywhere", true, true,
+			"an explicit click-anywhere screen shares a layer with ordinary LOGIN navigation, but has no semantic control"},
 
 		{"age-gate", false, false,
 			"asks the visitor to state their age; sieve does not answer for a visitor"},
@@ -106,5 +108,67 @@ func TestEntryGates(t *testing.T) {
 					"this page from an empty one (%s)", tc.why)
 			}
 		})
+	}
+}
+
+func TestPersistentGestureCoverDoesNotSpendTheGateBudget(t *testing.T) {
+	if os.Getenv("SIEVE_SKIP_BROWSER") != "" {
+		t.Skip("SIEVE_SKIP_BROWSER set")
+	}
+	srv := serveFixtures(t)
+	b := newBrowser(t)
+
+	started := time.Now()
+	ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
+	defer cancel()
+	res, err := b.Sweep(ctx, srv.URL+"/gates/persistent-gesture/", nil)
+	if err != nil {
+		t.Fatalf("sweep: %v", err)
+	}
+	if res.EnteredGate == "" {
+		t.Fatal("the benign gesture layer was never pressed")
+	}
+	if elapsed := time.Since(started); elapsed > 10*time.Second {
+		t.Fatalf("persistent decorative cover cost %v; the accepted gesture should end the gate wait", elapsed)
+	}
+	foundNote := false
+	for _, note := range res.Notes {
+		if strings.Contains(note, "decorative cover remained mounted") {
+			foundNote = true
+		}
+	}
+	if !foundNote {
+		t.Error("artifact does not disclose that it proceeded past a persistent cover")
+	}
+}
+
+func TestInertCanvasGestureDoesNotSpendTheGateBudget(t *testing.T) {
+	if os.Getenv("SIEVE_SKIP_BROWSER") != "" {
+		t.Skip("SIEVE_SKIP_BROWSER set")
+	}
+	srv := serveFixtures(t)
+	b := newBrowser(t)
+
+	started := time.Now()
+	ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
+	defer cancel()
+	res, err := b.Sweep(ctx, srv.URL+"/gates/inert-canvas-gesture/", nil)
+	if err != nil {
+		t.Fatalf("sweep: %v", err)
+	}
+	if res.EnteredGate == "" {
+		t.Fatal("the full-screen canvas gesture was never pressed")
+	}
+	if elapsed := time.Since(started); elapsed > 10*time.Second {
+		t.Fatalf("inert canvas layer cost %v; readiness should own the post-gesture wait", elapsed)
+	}
+	foundNote := false
+	for _, note := range res.Notes {
+		if strings.Contains(note, "normal readiness and sweep checks") {
+			foundNote = true
+		}
+	}
+	if !foundNote {
+		t.Error("artifact does not disclose the inert post-gesture DOM")
 	}
 }

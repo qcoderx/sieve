@@ -1,0 +1,35 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>False scroll container</title>
+<style>
+  html, body { margin: 0; overflow: hidden; background: #161616; color: #fff;
+               font: 18px/1.5 system-ui; }
+  #decoy { position: fixed; inset: 0; overflow-y: auto; pointer-events: none; }
+  #decoy::after { content: ""; display: block; height: 6000px; }
+  section { position: fixed; inset: 0; padding: 10vh 10vw; opacity: 0;
+            transition: opacity 20ms linear; }
+  section.active { opacity: 1; }
+</style>
+</head>
+<body>
+  <div id="decoy"></div>
+  <main>
+    <section class="active"><h1>Chapter one</h1><p>ALPHA VIRTUAL CONTENT describes the opening workshop.</p></section>
+    <section><h1>Chapter two</h1><p>BRAVO VIRTUAL CONTENT records the material catalogue.</p></section>
+    <section><h1>Chapter three</h1><p>CHARLIE VIRTUAL CONTENT explains the production method.</p></section>
+    <section><h1>Chapter four</h1><p>DELTA VIRTUAL CONTENT contains the final publication details.</p></section>
+  </main>
+<script>
+  var panels = Array.from(document.querySelectorAll("section"));
+  var current = 0;
+  addEventListener("wheel", function (event) {
+    if (event.deltaY <= 0 || current >= panels.length - 1) return;
+    panels[current].classList.remove("active");
+    current++;
+    panels[current].classList.add("active");
+  });
+</script>
+</body>
+</html>

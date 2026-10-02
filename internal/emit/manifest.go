@@ -4,6 +4,7 @@ import (
 	"time"
 
 	"github.com/qcoderx/sieve/internal/graph"
+	"github.com/qcoderx/sieve/internal/textnorm"
 	"github.com/qcoderx/sieve/internal/tokens"
 )
 
@@ -30,7 +31,8 @@ type Manifest struct {
 	ContentHash string        `json:"content_hash"`
 	DistilledAt time.Time     `json:"distilled_at"`
 
-	Sections []ManifestSection `json:"sections"`
+	Sections          []ManifestSection `json:"sections"`
+	SectionsTruncated bool              `json:"sections_truncated,omitempty"`
 
 	Counts     ManifestCounts   `json:"counts"`
 	Stats      *graph.Stats     `json:"stats,omitempty"`
@@ -62,11 +64,12 @@ type ManifestSection struct {
 
 // ManifestCounts is the shape of the artifact at a glance.
 type ManifestCounts struct {
-	Blocks  int `json:"blocks"`
-	Actions int `json:"actions"`
-	Forms   int `json:"forms"`
-	Links   int `json:"links"`
-	Media   int `json:"media"`
+	Sections int `json:"sections"`
+	Blocks   int `json:"blocks"`
+	Actions  int `json:"actions"`
+	Forms    int `json:"forms"`
+	Links    int `json:"links"`
+	Media    int `json:"media"`
 	// Latent counts hidden blocks. They are not part of the default payload
 	// and are not counted in TotalTokens.
 	Latent int `json:"latent"`
@@ -117,16 +120,20 @@ func BuildManifest(g *graph.Graph) Manifest {
 			forms++
 		}
 	}
+	// This is the body a small artifact is actually inlined as. Estimating the
+	// serialized payload rather than only PlainText keeps the decision honest
+	// when actions, navigation, structured facts, gaps, or notes dominate.
+	full := CompactMarkdownOptions()
+	full.Actions, full.Navigation, full.Structured, full.Gaps, full.Notes = true, true, true, true, true
 	m.Counts = ManifestCounts{
-		Blocks:  len(g.Blocks),
-		Actions: len(g.Actions),
-		Forms:   forms,
-		Links:   len(g.Links),
-		Media:   len(g.MediaAll),
-		Latent:  len(g.Latent),
-		// PlainText excludes latent content by construction, so the headline
-		// token count is what a caller actually pays for the default payload.
-		TotalTokens: tokens.Estimate(graph.PlainText(g)),
+		Sections:    len(g.Sections),
+		Blocks:      len(g.Blocks),
+		Actions:     len(g.Actions),
+		Forms:       forms,
+		Links:       len(g.Links),
+		Media:       len(g.MediaAll),
+		Latent:      len(g.Latent),
+		TotalTokens: tokens.Estimate(Markdown(g, full)),
 	}
 	return m
 }
@@ -163,15 +170,24 @@ func (m Manifest) ForAgent() Manifest {
 	// caller assembling ranges by hand, which get_content does for them, and
 	// the character count says the same thing as the token estimate in units
 	// nobody is budgeting in.
-	out.Sections = make([]ManifestSection, len(m.Sections))
-	copy(out.Sections, m.Sections)
-	for i := range out.Sections {
-		out.Sections[i].FirstBlock = ""
-		out.Sections[i].LastBlock = ""
-		out.Sections[i].Chars = 0
+	const sectionBudget = 1800
+	used := 0
+	out.Sections = nil
+	for _, section := range m.Sections {
+		section.Title, _ = textnorm.Truncate(section.Title, 200)
+		section.FirstBlock = ""
+		section.LastBlock = ""
+		section.Chars = 0
 		// The block count says nothing a caller acts on: the token estimate
 		// beside it is what decides whether to fetch.
-		out.Sections[i].Blocks = 0
+		section.Blocks = 0
+		cost := tokens.Estimate(section.ID+" "+section.Title) + 12
+		if len(out.Sections) > 0 && used+cost > sectionBudget {
+			out.SectionsTruncated = true
+			break
+		}
+		out.Sections = append(out.Sections, section)
+		used += cost
 	}
 
 	// Sizes in bytes and nodes describe the extraction, not the page.
@@ -192,6 +208,7 @@ func (m Manifest) ForAgent() Manifest {
 	// The long form of this is in the server instructions, which are sent once
 	// per session rather than once per page.
 	out.Guidance = "Read outcome.status first. Fetch sections by id with get_content; " +
-		"counts.est_total_tokens is what the whole artifact would cost."
+		"counts.est_total_tokens is what the whole artifact would cost. " +
+		"If sections_truncated is true, search_content still searches every omitted section."
 	return out
 }

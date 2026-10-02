@@ -1,0 +1,43 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>Unsemantic click-anywhere gate</title>
+<style>
+  html, body { margin: 0; background: #101010; color: white; font: 16px/1.5 system-ui; }
+  main { padding: 4rem; max-width: 48rem; }
+  #gate { position: fixed; inset: 0; z-index: 20; display: grid;
+          grid-template-rows: auto 1fr; background: #050505; }
+  nav { display: flex; gap: 2rem; padding: 1rem; }
+  #instruction { display: grid; place-items: center; }
+</style>
+</head>
+<body>
+  <!-- The LOGIN label is ordinary navigation, not what the entry gesture
+       activates.  This is the exact ambiguity on organimo.com: a global deny
+       scan must not erase the local, explicit, no-commit instruction. -->
+  <section id="gate">
+    <nav><span>SHOP</span><span>HOME</span><span>LOGIN</span><span>USD 0</span></nav>
+    <div id="instruction">Click anywhere</div>
+  </section>
+  <main>
+    <h1>Gesture-driven studio</h1>
+    <p>THE STUDIO IS OPEN. The entire catalogue is present below an intro whose
+       event listener is attached to the window rather than a semantic control.</p>
+    <p>The archive includes projects, commissions, collaborators, publication
+       dates, material specifications, production records, and installation notes.</p>
+    <p>Long-form descriptions cover the studio's methods, sources, experiments,
+       locations, exhibitions, field work, editorial process, and public programme.</p>
+    <p>Each project also carries credits, related works, technical documentation,
+       conservation guidance, accessibility details, and a complete bibliography.</p>
+    <p>Further collection records make the body substantial enough to prove that
+       the opaque layer is hiding a real page rather than decorating an empty one.</p>
+  </main>
+<script>
+  window.addEventListener("click", function open() {
+    document.getElementById("gate").remove();
+    window.removeEventListener("click", open);
+  });
+</script>
+</body>
+</html>
